@@ -8,6 +8,5 @@ __pycache__/
 
 data/photos/
 data/exports/
-
-.env
 desktop.ini
+.env
