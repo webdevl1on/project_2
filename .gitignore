@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+.vscode/
+
+*.db
+*.sqlite3
+
+data/photos/
+data/exports/
+
+.env
+desktop.ini
