@@ -4,8 +4,8 @@ from app.database.db import Base
 class Person(Base):
     __tablename__ = "persons"
 
-    id = Column(Integer, primary_key=True)
-    pib = Column(String)
+    person_id = Column(Integer, primary_key=True, autoincrement=True)
+    pib = Column(String, nullable=False)
     rank = Column(String)
     position = Column(String)
     phone = Column(String)
