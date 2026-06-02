@@ -9,3 +9,4 @@ class EventType(Base):
     event_name = Column(String, nullable=False)
     event_color = Column(String)
     event_is_active = Column(Boolean, default=True)
+    event_exclusive = Column(Boolean, default=True)
