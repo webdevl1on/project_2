@@ -59,3 +59,5 @@ class PersonEvent(Base):
     location = Column(String)
 
     note = Column(Text)
+
+    event_status = Column(String)
