@@ -1,11 +1,13 @@
+from asyncio import Condition
 from datetime import datetime, date, timedelta
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, and_
 from app.database.db import SessionLocal    
 from app import models
 from app.validators.event_validatotor import EventValidator
 
 
 class PersonEventService:
+    #Check person_id, if no person raise ERROR
     @staticmethod
     def get_person_or_raise(person_id, db):
         person = db.query(models.Person).filter(
@@ -14,7 +16,7 @@ class PersonEventService:
         if not person:
             raise ValueError(f"Person with id {person_id} does not exist.")
         return person
-    
+    #Check event_id(type), if wrong raise ERROR
     @staticmethod
     def get_event_type_or_raise(event_type_id, db):
         event_type = db.query(models.EventType).filter(
@@ -23,6 +25,7 @@ class PersonEventService:
         if not event_type:
             raise ValueError(f"Event type with id {event_type_id} does not exist.")
         return event_type_id
+    #Check sub_event_id(type), if wrong raise ERROR
     @staticmethod
     def get_event_subtype_or_raise(event_subtype_id, db):
         event_subtype = db.query(models.EventSubtype).filter(
@@ -33,55 +36,78 @@ class PersonEventService:
         return event_subtype_id
     @staticmethod
     def get_all_person_event(person_id,db):
-        return db.query(models.PersonEvent).filter(
-            models.PersonEvent.person_id == person_id).all()
+        stmt = db.select(models.PersonEvent).filter(
+            models.PersonEvent.person_id == person_id).order_by(
+                models.PersonEvent.date_start.asc()
+            )
+        return db.scalars(stmt).all()
        
     @staticmethod
     def get_conflicting_events(person_id, date_start, date_end, db):
-        stmt = db.select(models.PersonEvent).where(
-            models.PersonEvent.person_id == person_id,
-            or_(
-                models.PersonEvent.date_end >= date_start, 
-                models.PersonEvent.date_end.is_(None),
-                models.PersonEvent.date_start >= date_start
+        conditions = [models.PersonEvent.person_id == person_id]
+        if date_end is None:
+            conditions.append(
+                or_(
+                    models.PersonEvent.date_end.is_(None),
+                    models.PersonEvent.date_end > date_start
+                )
             )
-        ).order_by(models.PersonEvent.date_start.asc())
+        else:
+            conditions.append(
+                or_(
+                    and_(
+                        models.PersonEvent.date_end.is_not(None),
+                        models.PersonEvent.date_start < date_end,
+                        models.PersonEvent.date_end > date_start
+                    ),
+                    and_(
+                        models.PersonEvent.date_end.is_(None),
+                        models.PersonEvent.date_start < date_end
+                    )
+                )
+            )
+        stmt = (
+                select(models.PersonEvent)
+                .where(and_(*conditions))
+                .order_by(models.PersonEvent.date_start.asc()))
         return db.scalars(stmt).all()
+        
+ 
+    # @staticmethod
+    # def process_event_creation(person_id, date_start, date_end, db):
+    #     all_events = PersonEventService.get_all_person_event(person_id, date_start, date_end, db)
+
+    #     hard_conflicts = []
+    #     future_events = []
+    #     open_active_events = None
+    #     for event in all_events:
+    #         # Old event that start earlier than new event and has no end date
+    #         if event.date_start <= date_start and event.date_end is None:
+    #             open_active_events = event
+    #         # Old event that start earlier than new event and end after new event start date
+    #         elif event.date_start <= date_start and event.date_end >= date_start:
+    #             hard_conflicts.append(event)
+    #         elif event.date_start >= date_start:
+    #             future_events.append(event)
+    #     # main logic for handling conflicts
+    #     if hard_conflicts:
+    #         raise ValueError(
+    #             f"New event conflicts with existing events: {[e.event_id for e in hard_conflicts]}"
+    #         )   
+    #         #if new event has no end date, and it's start date is before start date of future event, then it's a conflict
+    #     if open_active_events:
+    #         open_active_events.date_end = date_start - timedelta(days=1)
+    #     if date_end is None and future_events:
+    #         first_future_event = future_events[0]
+    #         date_end = first_future_event.date_start - timedelta(days=1)
+    #         print(f"New event has no end date, setting end date to {date_end} to avoid conflict with future event {first_future_event.event_id}")
+    #     new_event = models.PersonEvent(
+    #         person_id=person_id,
+    #         date_start=date_start,
+    #         date_end=date_end
+    #     )
+
     @staticmethod
-    def process_event_creation(person_id, date_start, date_end, db):
-        all_events = PersonEventService.get_all_person_event(person_id, date_start, date_end, db)
-
-        hard_conflicts = []
-        future_events = []
-        open_active_events = None
-        for event in all_events:
-            # Old event that start earlier than new event and has no end date
-            if event.date_start <= date_start and event.date_end is None:
-                open_active_events = event
-            # Old event that start earlier than new event and end after new event start date
-            elif event.date_start <= date_start and event.date_end >= date_start:
-                hard_conflicts.append(event)
-            elif event.date_start >= date_start:
-                future_events.append(event)
-        # main logic for handling conflicts
-        if hard_conflicts:
-            raise ValueError(
-                f"New event conflicts with existing events: {[e.event_id for e in hard_conflicts]}"
-            )   
-            #if new event has no end date, and it's start date is before start date of future event, then it's a conflict
-        if open_active_events:
-            open_active_events.date_end = date_start - timedelta(days=1)
-        if date_end is None and future_events:
-            first_future_event = future_events[0]
-            date_end = first_future_event.date_start - timedelta(days=1)
-            print(f"New event has no end date, setting end date to {date_end} to avoid conflict with future event {first_future_event.event_id}")
-        new_event = models.PersonEvent(
-            person_id=person_id,
-            date_start=date_start,
-            date_end=date_end
-        )
-
-
     def create_person_event(
         person_id,
         event_type_id,
@@ -101,6 +127,7 @@ class PersonEventService:
         person_events = PersonEventService.get_all_person_event(person_id,db)
         event_type = PersonEventService.get_event_type_or_raise(event_type_id,db)
         event_subtype = PersonEventService.get_event_subtype_or_raise(event_subtype_id,db) if event_subtype_id else None
+        
         try:
 
             person_event = models.PersonEvent(
@@ -141,9 +168,17 @@ class PersonEventService:
                     note
                 ),
 
-                event_status=event_status.strip() if event_status else None
+                event_status=event_status.strip() if event_status else None,
+                 
             )
-
+            if person_event.duration is not None and person_event.date_end is not None:
+                if (person_event.date_end - person_event.date_start).days+1 != person_event.duration: 
+                    raise ValueError("Incorrect duration and end date")
+            elif person_event.duration is not None and person_event.date_end is None:
+                person_event.date_end = person_event.date_start + timedelta(days=person_event.duration-1)
+            conflicts = PersonEventService.get_conflicting_events(person_id, person_event.date_start, person_event.date_end, db)
+            if conflicts:
+                return conflicts
             db.add(person_event)
             db.commit()
             db.refresh(person_event)
@@ -152,3 +187,21 @@ class PersonEventService:
 
         finally:
             db.close()
+    
+    @staticmethod
+    def change_person_event(
+        event_id,
+        person_id,
+        event_type_id,
+        event_subtype_id=None,
+        date_start=None,
+        duration=None,
+        date_end=None,
+        order_date=None,
+        order_number=None,
+        purpose=None,
+        location=None,
+        note=None,
+        event_status=None
+    ):
+        pass

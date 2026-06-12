@@ -24,7 +24,6 @@ class EventValidator:
             raise ValueError(
                 "Invalid date format. Use DD.MM.YYYY"
             )
-
        
     @staticmethod
     def validate_event_duration(event_duration):
@@ -48,6 +47,7 @@ class EventValidator:
         if location and len(location) > 255:
             raise ValueError("Event location cannot exceed 255 characters.")
         return location
+    
     @staticmethod
     def validate_event_note(description):
         description = description.strip() if description else None
