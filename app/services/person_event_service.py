@@ -1,6 +1,7 @@
 from ast import stmt
 from asyncio import Condition
 from datetime import datetime, date, timedelta
+from typing import final
 from sqlalchemy import select, or_, and_
 from app.database.db import SessionLocal    
 from app import models
@@ -208,51 +209,54 @@ class PersonEventService:
         event_status=None
     ):
         db = SessionLocal()
-        person_event_old = PersonEventService.get_event_or_raise(event_id, db)
-        event_type = PersonEventService.get_event_type_or_raise(event_type_id,db)
-        event_subtype = PersonEventService.get_event_subtype_or_raise(event_subtype_id,db) if event_subtype_id else None
-        PersonEventService.validate_event_subtype_belongs_to_type(
-            event_type,
-            event_subtype
-        )
-        person_event_new = PersonEventService.prepare_new_person_event(
-            event_type,
-            event_subtype,
-            date_start,
-            duration,
-            date_end,
-            order_date,
-            order_number,
-            purpose,
-            location,
-            note,
-            event_status
-        )
-        person_event_new.person_id = person_event_old.person_id
-        PersonEventService.compare_date_end_and_duration(person_event_new)
-        conflicts = PersonEventService.get_conflicting_events(
-            person_event_new.person_id, 
-            person_event_new.date_start,
-            person_event_new.date_end,
-            db,
-            person_event_old.event_id)
-        if conflicts:
-            return conflicts
-        person_event_old.event_type_id = person_event_new.event_type_id
-        person_event_old.event_subtype_id = person_event_new.event_subtype_id
-        person_event_old.date_start = person_event_new.date_start
-        person_event_old.duration = person_event_new.duration
-        person_event_old.date_end = person_event_new.date_end
-        person_event_old.order_date = person_event_new.order_date
-        person_event_old.order_number = person_event_new.order_number
-        person_event_old.purpose = person_event_new.purpose
-        person_event_old.location = person_event_new.location
-        person_event_old.note = person_event_new.note
-        person_event_old.event_status = person_event_new.event_status
-        db.commit()
-        db.refresh(person_event_old)
-        db.close()
-        return person_event_old
+        try:
+            person_event_old = PersonEventService.get_event_or_raise(event_id, db)
+            event_type = PersonEventService.get_event_type_or_raise(event_type_id,db)
+            event_subtype = PersonEventService.get_event_subtype_or_raise(event_subtype_id,db) if event_subtype_id else None
+            PersonEventService.validate_event_subtype_belongs_to_type(
+                event_type,
+                event_subtype
+            )
+            person_event_new = PersonEventService.prepare_new_person_event(
+                event_type,
+                event_subtype,
+                date_start,
+                duration,
+                date_end,
+                order_date,
+                order_number,
+                purpose,
+                location,
+                note,
+                event_status
+            )
+            person_event_new.person_id = person_event_old.person_id
+            PersonEventService.compare_date_end_and_duration(person_event_new)
+            conflicts = PersonEventService.get_conflicting_events(
+                person_event_new.person_id, 
+                person_event_new.date_start,
+                person_event_new.date_end,
+                db,
+                person_event_old.event_id)
+            if conflicts:
+                return conflicts
+            person_event_old.event_type_id = person_event_new.event_type_id
+            person_event_old.event_subtype_id = person_event_new.event_subtype_id
+            person_event_old.date_start = person_event_new.date_start
+            person_event_old.duration = person_event_new.duration
+            person_event_old.date_end = person_event_new.date_end
+            person_event_old.order_date = person_event_new.order_date
+            person_event_old.order_number = person_event_new.order_number
+            person_event_old.purpose = person_event_new.purpose
+            person_event_old.location = person_event_new.location
+            person_event_old.note = person_event_new.note
+            person_event_old.event_status = person_event_new.event_status
+            db.commit()
+            db.refresh(person_event_old)
+            return person_event_old
+        finally:
+            db.close()
+        
 
 
         
@@ -304,12 +308,16 @@ class PersonEventService:
             db.close()
     
     @staticmethod
-    def delete_person_event(event_id, db):
-        stmt = select(models.PersonEvent).where(models.PersonEvent.event_id == event_id)
-        event = db.scalars(stmt).first()
-        if event:
-            db.delete(event)
-            db.commit()
-            return True
-        return False
+    def delete_person_event(event_id):
+        db = SessionLocal()
+        try:
+            stmt = select(models.PersonEvent).where(models.PersonEvent.event_id == event_id)
+            event = db.scalars(stmt).first()
+            if event:
+                db.delete(event)
+                db.commit()
+                return True
+            return False
+        finally:
+            db.close()
         
