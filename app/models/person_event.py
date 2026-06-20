@@ -42,9 +42,7 @@ class PersonEvent(Base):
     )
 
     date_start: Mapped[date] = mapped_column(
-        Date,
-        nullable=False,
-        index=True
+        Date, nullable=False,  index=True
     )
 
     duration: Mapped[Optional[int]]= mapped_column(Integer)

@@ -12,7 +12,7 @@ class EventValidator:
         return name
     
     @staticmethod
-    def validate_event_date(event_date):
+    def validate_event_date(event_date: str | None) -> date | None:
         if not event_date:
             return None 
         try:
@@ -26,15 +26,15 @@ class EventValidator:
             )
        
     @staticmethod
-    def validate_event_duration(event_duration):
+    def validate_event_duration(event_duration: str | None)->int | None:
         if not event_duration:
             return None 
         event_duration = event_duration.strip()
         try:
-            event_duration = int(event_duration)
-            if event_duration < 0:
+            duration = int(event_duration)
+            if duration < 0:
                 raise ValueError("Event duration cannot be negative.")  
-            return event_duration 
+            return duration 
         except ValueError:
 
             raise ValueError(
