@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Пошук людини</title>
+</head>
+
+<body>
+
+    <h1>Пошук людини по ID</h1>
+
+    <form action="/search" method="get">
+
+        <input type="number" name="person_id" placeholder="Введіть ID" required>
+
+        <button type="submit">
+            Знайти
+        </button>
+
+    </form>
+
+    <hr>
+
+    {% if person %}
+
+    <h2>{{ person.pib }}</h2>
+
+    <p>Звання: {{ person.rank }}</p>
+
+    <p>Посада: {{ person.position }}</p>
+
+    <p>Телефон: {{ person.phone }}</p>
+
+    <p>Статус: {{ person.status }}</p>
+
+    {% endif %}
+
+</body>
+
+</html>
