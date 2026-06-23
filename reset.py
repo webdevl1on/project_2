@@ -1,6 +1,6 @@
 from pathlib import Path
 from app.database.init_db import init_db   
-from app.services.seed_all import seed_all
+from app.seeds.seed_all import seed_all
 
 DB_FILE = Path("data/database/project_2.db")
 

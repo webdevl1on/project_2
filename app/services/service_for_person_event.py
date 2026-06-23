@@ -5,7 +5,7 @@ from typing import final
 from sqlalchemy import select, or_, and_
 from app.database.db import SessionLocal    
 from app import models
-from app.services.service_validator_person import PersonService
+from app.services.service_for_person import PersonService
 from app.validators.event_validatotor import EventValidator
 
 

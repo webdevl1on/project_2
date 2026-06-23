@@ -1,4 +1,4 @@
-from app.services.service_validator_person import PersonService
+from app.services.service_for_person import PersonService
 
 person = PersonService.create_person(
     pib = "Іванов Іван Іванович",
