@@ -9,4 +9,4 @@ person = PersonService.create_person(
     status = "active"
 )
 
-print(f"Person created: {person.pib}, Rank: {person.rank}, Birth Date: {person.birth_date}, Position: {person.position}, Phone: {person.phone}, Status: {person.status}")
+print(f"Person created: {person.pib},       Rank: {person.rank}, Birth Date: {person.birth_date},  Position: {person.position}, Phone: {person.phone},  Status: {person.status}")

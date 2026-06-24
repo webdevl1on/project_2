@@ -10,7 +10,7 @@ EVENT_TYPES = [
     ("HOSPITAL", "Лікарняний"),
     ("UNAUTHORIZED_ABSENCE", "СЗЧ")
 ]
-
+ 
 def seed_event_types():
     db = SessionLocal()
     for event_type, event_name in EVENT_TYPES:
