@@ -1,4 +1,5 @@
 from app.database.db import SessionLocal
+from app.database.db_test import SessionLocal_test
 from app.models.person import Person
 from app.services.service_for_person_event import PersonEventService
 from app.validators.person_validator import PersonValidator

@@ -1,13 +1,19 @@
 from pathlib import Path
-import json
-from app.database.db_test import SessionLocal_test
-from app.models.person import Person 
+from app.utils.json_loader import load_json
+from app.services.service_for_person import PersonService
 
 DATA_FILE_DIR = Path("app/seeds")
-DATA_FILE = DATA_FILE_DIR /"data.json"
+DATA_FILE = DATA_FILE_DIR /"test_database_seed.json"
 
-with open(DATA_FILE, "r", encoding="utf-8") as file:
-    data = json.load(file)
+data =load_json(DATA_FILE)
 
-for item in data:
-    print(item)
+
+
+
+for items in data[:2]:
+    print(items["birth_date"])
+        
+
+
+
+
