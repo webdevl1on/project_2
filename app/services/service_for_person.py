@@ -1,43 +1,12 @@
 from app.database.db import SessionLocal
 from app.database.db_test import SessionLocal_test
 from app.models.person import Person
-from app.services.service_for_person_event import PersonEventService
-from app.validators.person_validator import PersonValidator
+from app.services.service_common_person_func import CommonPersonFunc
+
 
 
 class PersonService:
 
-    @staticmethod
-    def prepare_new_person(
-        pib,
-        rank=None,
-        birth_date=None,
-        position=None,
-        phone=None,
-        status=None
-    ):
-        new_person = Person(
-
-                pib=PersonValidator.validate_person_pib(
-                    pib
-                ),
-
-                rank=PersonValidator.validate_person_rank(
-                    rank
-                ),
-
-                birth_date=PersonValidator.validate_person_birth_date(
-                    birth_date
-                ),
-
-                phone=PersonValidator.validate_person_phone(
-                    phone
-                ),
-
-                position=position,
-                status=status
-            )
-        return new_person
     
     @staticmethod
     def create_person(
@@ -50,7 +19,7 @@ class PersonService:
     ):
         db = SessionLocal()
         try:
-            person = PersonService.prepare_new_person(
+            person = CommonPersonFunc.prepare_new_person(
                 pib,
                 rank,
                 birth_date,
@@ -80,8 +49,8 @@ class PersonService:
     ):
         db = SessionLocal()
         try:
-            person_to_change = PersonEventService.get_person_or_raise(person_id, db)
-            prepared_changes = PersonService.prepare_new_person(
+            person_to_change = CommonPersonFunc.get_person_or_raise(person_id, db)
+            prepared_changes = CommonPersonFunc.prepare_new_person(
                 pib,
                 rank,
                 birth_date,

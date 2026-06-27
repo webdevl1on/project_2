@@ -5,20 +5,12 @@ from typing import final
 from sqlalchemy import select, or_, and_
 from app.database.db import SessionLocal    
 from app import models
-from app.services.service_for_person import PersonService
+from app.services.service_common_person_func import CommonPersonFunc
 from app.validators.event_validatotor import EventValidator
 
 
 class PersonEventService:
-    #Check person_id, if no person raise ERROR
-    @staticmethod
-    def get_person_or_raise(person_id, db):
-        person = db.query(models.Person).filter(
-            models.Person.person_id == person_id
-        ).first()
-        if not person:
-            raise ValueError(f"Person with id {person_id} does not exist.")
-        return person
+
     #Check event_id, if no person raise ERROR
     @staticmethod
     def get_event_or_raise(event_id, db):
@@ -159,7 +151,7 @@ class PersonEventService:
     ):
         db = SessionLocal()
         try:
-            person = PersonEventService.get_person_or_raise(person_id,db)
+            person = CommonPersonFunc.get_person_or_raise(person_id,db)
             event_type = PersonEventService.get_event_type_or_raise(event_type_id,db)
             event_subtype = PersonEventService.get_event_subtype_or_raise(event_subtype_id,db) if event_subtype_id else None
             PersonEventService.validate_event_subtype_belongs_to_type(
@@ -264,7 +256,7 @@ class PersonEventService:
     def get_person_event_by_date(person_id: int, date_start: str, date_end: str | None = None, duration: str | None = None,):
         db = SessionLocal()
         try:
-            PersonEventService.get_person_or_raise(person_id, db)
+            CommonPersonFunc.get_person_or_raise(person_id, db)
             start_date=EventValidator.validate_event_date(date_start)
             assert start_date is not None
             end_date=EventValidator.validate_event_date(date_end)
