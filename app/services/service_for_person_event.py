@@ -6,52 +6,12 @@ from sqlalchemy import select, or_, and_
 from app.database.db import SessionLocal    
 from app import models
 from app.services.service_common_person_func import CommonPersonFunc
+from app.services.service_common_event_func import CommonEventFunc
 from app.validators.event_validatotor import EventValidator
 
 
-class PersonEventService:
+class PersonEventService: 
 
-    #Check event_id, if no person raise ERROR
-    @staticmethod
-    def get_event_or_raise(event_id, db):
-        event = db.query(models.PersonEvent).filter(models.PersonEvent.event_id == event_id).first()
-        if not event:
-            raise ValueError(f"Event with id {event_id} does not exist!")
-        return event
-    #Check event_id(type), if wrong raise ERROR
-    @staticmethod
-    def get_event_type_or_raise(event_type_id, db):
-        event_type = db.query(models.EventType).filter(
-            models.EventType.event_type_id == event_type_id
-        ).first()
-        if not event_type:
-            raise ValueError(f"Event type with id {event_type_id} does not exist.")
-        return event_type
-    #Check sub_event_id(type), if wrong raise ERROR
-    @staticmethod
-    def get_event_subtype_or_raise(event_subtype_id, db):
-        event_subtype = db.query(models.EventSubtype).filter(
-            models.EventSubtype.event_subtype_id == event_subtype_id
-        ).first()
-        if not event_subtype:
-            raise ValueError(f"Event subtype with id {event_subtype_id} does not exist.")
-        return event_subtype
-    #Check sub_event belongs to event
-    @staticmethod
-    def validate_event_subtype_belongs_to_type(event_type,event_subtype):
-        if event_subtype is None:
-            return 
-        if event_subtype.event_type_id != event_type.event_type_id:
-            raise ValueError(
-            f"Event subtype {event_subtype.event_subtype_name} "
-            f"does not belong to event type {event_type.event_name}")
-    @staticmethod
-    def get_all_person_event(person_id,db):
-        stmt = db.select(models.PersonEvent).filter(
-            models.PersonEvent.person_id == person_id).order_by(
-                models.PersonEvent.date_start.asc()
-            )
-        return db.scalars(stmt).all()  
     @staticmethod
     def get_conflicting_events(person_id, date_start, date_end, db, exclude_event_id=None):
         conditions = [models.PersonEvent.person_id == person_id]
@@ -152,9 +112,9 @@ class PersonEventService:
         db = SessionLocal()
         try:
             person = CommonPersonFunc.get_person_or_raise(person_id,db)
-            event_type = PersonEventService.get_event_type_or_raise(event_type_id,db)
-            event_subtype = PersonEventService.get_event_subtype_or_raise(event_subtype_id,db) if event_subtype_id else None
-            PersonEventService.validate_event_subtype_belongs_to_type(
+            event_type = CommonEventFunc.get_event_type_or_raise(event_type_id,db)
+            event_subtype = CommonEventFunc.get_event_subtype_or_raise(event_subtype_id,db) if event_subtype_id else None
+            CommonEventFunc.validate_event_subtype_belongs_to_type(
                 event_type,
                 event_subtype)
             person_event = PersonEventService.prepare_new_person_event(
@@ -183,7 +143,6 @@ class PersonEventService:
             return person_event
         finally:
             db.close
-        
     
     @staticmethod
     def change_person_event(
@@ -202,10 +161,10 @@ class PersonEventService:
     ):
         db = SessionLocal()
         try:
-            person_event_old = PersonEventService.get_event_or_raise(event_id, db)
-            event_type = PersonEventService.get_event_type_or_raise(event_type_id,db)
-            event_subtype = PersonEventService.get_event_subtype_or_raise(event_subtype_id,db) if event_subtype_id else None
-            PersonEventService.validate_event_subtype_belongs_to_type(
+            person_event_old = CommonEventFunc.get_event_or_raise(event_id, db)
+            event_type = CommonEventFunc.get_event_type_or_raise(event_type_id,db)
+            event_subtype = CommonEventFunc.get_event_subtype_or_raise(event_subtype_id,db) if event_subtype_id else None
+            CommonEventFunc.validate_event_subtype_belongs_to_type(
                 event_type,
                 event_subtype
             )
