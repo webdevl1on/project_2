@@ -17,8 +17,6 @@ class PersonService:
         phone=None,
         status=None
     ):
-        db = SessionLocal()
-        try:
             person = CommonPersonFunc.prepare_new_person(
                 pib,
                 rank,
@@ -27,15 +25,8 @@ class PersonService:
                 phone,
                 status
             )
-
-            db.add(person)
-            db.commit()
-            db.refresh(person)
-
             return person
 
-        finally:
-            db.close()
 
     @staticmethod
     def change_person(
