@@ -1,5 +1,6 @@
 from app import models
 from app.models.person import Person
+from app.models.person_identity import PersonName
 from app.validators.person_validator import PersonValidator
 
 

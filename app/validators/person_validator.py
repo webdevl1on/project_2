@@ -11,6 +11,26 @@ class PersonValidator:
 
             raise ValueError("PIB cannot exceed 255 characters.")
         return pib
+    
+    @staticmethod
+    def validate_names(name):
+        name = name.strip() if name else None
+        if name:
+            name = name.capitalize()
+            if len(name) > 40:
+                raise ValueError("Cannot exceed 40 characters.")
+            elif len(name) < 2:
+                raise ValueError("Canot be so short")
+        return name
+    @staticmethod
+    def validate_tax_number(number):
+        number = number.strip() if number else None
+        if number:
+            if not number.isdecimal():
+                raise ValueError('Wrong tax number')
+            if len(number) != 10:
+                raise ValueError('Wrong tax number')
+        return number
    
     @staticmethod
     def validate_person_rank(rank):
@@ -41,4 +61,30 @@ class PersonValidator:
             raise ValueError(
                 "Невірний формат дати. Використовуйте ДД.ММ.РРРР"
             )
-        
+    
+    @staticmethod
+    def validate_passport_type(passport_type):
+        passport_type = passport_type.strip() if passport_type else None
+        if passport_type is None:
+            raise ValueError("Wrong type of passport")
+        if passport_type:
+            passport_type = passport_type.lower()
+        if passport_type != "id" or passport_type !="book":
+            raise ValueError("Wrong type of passport")
+        return passport_type
+    
+    @staticmethod
+    def validate_passport_series_id(passport_series):
+        passport_series = passport_series.strip() if passport_series else None
+        if passport_series is not None:
+            raise ValueError ('Wrong ID, must be empty')
+        return passport_series
+    
+    @staticmethod
+    def validate_passport_series_book(passport_series):
+        passport_series = passport_series.strip() if passport_series else None
+        if passport_series is None or len(passport_series) !=2:
+            raise ValueError ('Wrong series')
+        if not passport_series.isalpha():
+            raise ValueError ('Wrong series')
+        return passport_series

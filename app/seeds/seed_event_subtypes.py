@@ -1,4 +1,3 @@
-from app.database.db import SessionLocal
 from app.models.event_type import EventType
 from app.models.event_subtype import EventSubtype
 
@@ -27,8 +26,8 @@ EVENT_SUBTYPES = {
         ("HOSPITAL_OTHER", "Інше"),
     ],
 }
-def seed_event_subtypes():
-    db = SessionLocal()
+def seed_event_subtypes(db):
+
     for event_type_code, subtypes in EVENT_SUBTYPES.items():
         event_type = (
             db.query(EventType)
@@ -47,9 +46,6 @@ def seed_event_subtypes():
             if exists:
                 continue
             db.add(EventSubtype(event_type_id=event_type.event_type_id, event_subtype=subtype_code, event_subtype_name=subtype_name))
-    db.commit()
+            db.flush()
     print("Rows:", db.query(EventSubtype).count()) 
-    db.close()
-if __name__ == "__main__":
-    seed_event_subtypes() 
-    print("Event subtypes seeded successfully.")
+

@@ -1,4 +1,4 @@
-from app.database.db import SessionLocal
+
 from app.models.event_type import EventType
 
 EVENT_TYPES = [
@@ -11,8 +11,7 @@ EVENT_TYPES = [
     ("UNAUTHORIZED_ABSENCE", "СЗЧ")
 ]
  
-def seed_event_types():
-    db = SessionLocal()
+def seed_event_types(db):
     for event_type, event_name in EVENT_TYPES:
         print(f"Checking {event_type}")
         exists = (
@@ -24,9 +23,6 @@ def seed_event_types():
             print("Already exists")
             continue
         db.add(EventType(event_type=event_type, event_name=event_name))
-    db.commit()
+        db.flush()
     print("Rows:", db.query(EventType).count()) 
-    db.close()
-if __name__ == "__main__":
-    seed_event_types() 
-    print("Event types seeded successfully.")
+    

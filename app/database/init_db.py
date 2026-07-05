@@ -1,4 +1,5 @@
-from app.database.db import Base, engine
+from app.database.db import engine
+from app.database.base import Base
 from app.models.person import Person
 from app.models.person_event import PersonEvent
 from app.models.event_type import EventType

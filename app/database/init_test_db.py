@@ -1,4 +1,5 @@
-from app.database.db_test import Base, engine_test
+from app.database.db_test import engine_test
+from app.database.base import Base
 from app.models.person import Person
 from app.models.person_event import PersonEvent
 from app.models.event_type import EventType

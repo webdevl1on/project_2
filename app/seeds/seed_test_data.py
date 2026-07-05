@@ -8,7 +8,7 @@ DATA_FILE_DIR = Path("app/seeds")
 DATA_FILE = DATA_FILE_DIR /"test_database_seed.json"
 
 data =load_json(DATA_FILE)
-db =SessionLocal()
+db =SessionLocal_test()
 
 
 def new_1(data):

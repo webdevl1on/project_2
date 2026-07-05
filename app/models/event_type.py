@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean
-from app.database.db import Base
+from app.database.base import Base
 
 class EventType(Base):
     __tablename__ = "event_types"
