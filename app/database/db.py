@@ -9,3 +9,11 @@ DB_PATH = DATA_DIR / "project2.db"
 
 engine = create_engine(f"sqlite:///{DB_PATH}", echo=False)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

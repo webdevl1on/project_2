@@ -3,7 +3,7 @@ from unittest import result
 import pytest
 from datetime import date
 from app.database.db import SessionLocal
-from app.services.person_event_service import PersonEventService
+from app.services.service_for_person_event import PersonEventService
 
 #test get_person_or_raise
 def test_get_person_or_raise_ok():

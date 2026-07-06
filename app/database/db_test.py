@@ -9,3 +9,10 @@ TEST_DB_PATH = DATA_DIR / "project2_test.db"
 
 engine_test = create_engine(f"sqlite:///{TEST_DB_PATH}", echo =False)
 SessionLocal_test = sessionmaker(autocommit=False, autoflush=False, bind=engine_test)
+
+def get_test_db():
+    db = SessionLocal_test()
+    try:
+        yield db
+    finally:
+        db.close()

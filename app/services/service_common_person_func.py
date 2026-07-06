@@ -18,7 +18,7 @@ class CommonPersonFunc:
         return person
     
     @staticmethod
-    def get_person_tax_number_or_raise(person_tax_number, db):
+    def ensure_tax_number_is_unique(person_tax_number, db):
         tax_number = db.query(models.Person).filter(
             models.Person.tax_number == person_tax_number).first()
         if tax_number is not Null and tax_number is not None:
@@ -60,37 +60,18 @@ class CommonPersonFunc:
     
     @staticmethod
     def create_person(data, db):
-        tax_number = PersonValidator.validate_tax_number(data['tax_number'])
-        tax_number = CommonPersonFunc.get_person_tax_number_or_raise(tax_number, db)
-        birth_date = PersonValidator.validate_person_birth_date(data["birth_date"])
-
-        validated_name_data = {
-            "surname" : PersonValidator.validate_names(data['surname']),
-            "name" : PersonValidator.validate_names(data["name"]),
-            "patronymic" : PersonValidator.validate_names(data['patronymic']),
-            "surname_latin" : PersonValidator.validate_names(data["surname_latin"]),
-            "name_latin" : PersonValidator.validate_names(data['name_latin']),
-            "patronymic_latin" : PersonValidator.validate_names(data["patronymic_latin"])
-        }
-        validated_passport_data = {
-            "passport_type" : passport_series,
-            "passport_series" : passport_series,
-            "passport_number" : passport_number,
-            "passport_issued_by" :  passport_issued_by,
-            "passport_issued_date" : passport_issued_date,
-            "passport_expire_date" : passport_expire_date
-        }
-        
-        if not validated_name_data['surname']  or not tax_number:
-            raise ValueError("Name or tax number required!")
+        person_data = CommonPersonFunc.validate_person_base_data(data)
+        name_data = CommonPersonFunc.validate_name_data(data)
                 
-        person = Person(
-            tax_number = tax_number,
-            birth_date = birth_date
-        )
+        if not person_data["tax_number"] and not name_data["surname"]:
+            raise ValueError("Surname or tax number required!")
+        if person_data["tax_number"]:
+            CommonPersonFunc.ensure_tax_number_is_unique(person_data["tax_number"], db)
+        person = Person(**person_data)
         db.add(person)
         db.flush()
-        name = CommonPersonFunc.add_name(person_id = person.person_id, **validated_name_data)
+        name = CommonPersonFunc.add_name(
+            person_id = person.person_id, **name_data)
         db.add(name)
         
     @staticmethod
@@ -112,6 +93,7 @@ class CommonPersonFunc:
             name_latin=name_latin,
             patronymic_latin=patronymic_latin
         )
+    
     @staticmethod
     def add_pasport(
         person_id,
@@ -129,3 +111,20 @@ class CommonPersonFunc:
             passport_issued_date = passport_issued_date,
             passport_expire_date = passport_expire_date
         )
+    
+    @staticmethod
+    def validate_person_base_data(data):
+        return {
+            "tax_number" : PersonValidator.validate_tax_number(data.get("tax_number")),
+            "birth_date" : PersonValidator.validate_person_birth_date(data.get("birth_date"))
+        }
+    @staticmethod
+    def validate_name_data(data):
+        return {
+            "surname": PersonValidator.validate_names(data.get("surname")),
+            "name": PersonValidator.validate_names(data.get("name")),
+            "patronymic": PersonValidator.validate_names(data.get("patronymic")),
+            "surname_latin": PersonValidator.validate_names(data.get("surname_latin")),
+            "name_latin": PersonValidator.validate_names(data.get("name_latin")),
+            "patronymic_latin": PersonValidator.validate_names(data.get("patronymic_latin")),
+        }

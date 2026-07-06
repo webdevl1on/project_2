@@ -7,7 +7,6 @@ from app.services.service_common_person_func import CommonPersonFunc
 
 class PersonService:
 
-    
     @staticmethod
     def create_person(
         pib,

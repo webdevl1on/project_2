@@ -66,3 +66,56 @@ def test_validate_person_phone_none():
 def test_validate_person_phone_too_long():
     with pytest.raises(ValueError):
         PersonValidator.validate_person_phone("+123456789012345678901")
+
+#test person name
+def test_validate_names_ok():
+    result = PersonValidator.validate_names("Василь")
+    assert result == "Василь"
+def test_validate_names_too_long():
+    with pytest.raises(ValueError):
+        PersonValidator.validate_names('a'*26)
+def test_validate_names_too_short():
+    with pytest.raises(ValueError):
+        PersonValidator.validate_names("a"*2)
+def test_validate_names_capitalize():
+    result = PersonValidator.validate_names("          ваСИЛЬ         ")
+
+#test person passport
+def test_validate_passport_type_ok_id():
+    result = PersonValidator.validate_passport_type("     Id     ")
+    assert result == 'id'
+def test_validate_passport_type_ok_book():
+    result = PersonValidator.validate_passport_type("     bOOk ")
+    assert result == 'book'
+def test_validate_passport_type_raise():
+    with pytest.raises(ValueError):
+        PersonValidator.validate_passport_type("type")
+def test_validate_passport_series_id_ok():
+    result = PersonValidator.validate_passport_series_id(None)
+    assert result is None
+def test_validate_passport_series_id_raise():
+    with pytest.raises(ValueError):
+        PersonValidator.validate_passport_series_id("AS")
+
+def test_validate_passport_number_id_ok():
+    result= PersonValidator.validate_passport_number_id("123456789")
+    assert result == "123456789"
+def test_validate_passport_number_id_ok_strip():
+    result= PersonValidator.validate_passport_number_id("    123456789    ")
+    assert result == "123456789"
+def test_validate_passport_number_id_none():
+    result= PersonValidator.validate_passport_number_id(None)
+    assert result is None
+def test_validate_passport_number_id_none_blank():
+    result= PersonValidator.validate_passport_number_id("    ")
+    assert result is None
+def test_validate_passport_number_letters():
+    with pytest.raises(ValueError):
+        PersonValidator.validate_passport_number_id("1234a6789")
+def test_validate_passport_number_long():
+    with pytest.raises(ValueError):
+        PersonValidator.validate_passport_number_id("1234567890")
+def test_validate_passport_number_short():
+    with pytest.raises(ValueError):
+        PersonValidator.validate_passport_number_id("1234")
+    

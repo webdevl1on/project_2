@@ -2,7 +2,7 @@ from unittest import result
 
 import pytest
 from datetime import date
-from app.services.service_validator_person import PersonService
+from app.services.service_for_person import PersonService
 
 def test_prepare_new_person_ok():
     person =  PersonService.prepare_new_person(

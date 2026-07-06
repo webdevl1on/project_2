@@ -25,7 +25,7 @@ class Person(Base):
         Date,
         nullable=True
     )
-    names: Mapped[list[PersonName]] = relationship(
+    names: Mapped[list["PersonName"]] = relationship(
         back_populates="person"
     )
 
