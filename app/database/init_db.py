@@ -1,9 +1,6 @@
 from app.database.db import engine
 from app.database.base import Base
-from app.models.person import Person
-from app.models.person_event import PersonEvent
-from app.models.event_type import EventType
-from app.models.event_subtype import EventSubtype
+import app.models  # Registers all models in Base.metadata.
 
 def init_db():
     Base.metadata.create_all(bind=engine)

@@ -1,4 +1,7 @@
 from pathlib import Path
+from app.database.db import SessionLocal
+from app.seeds.seed_event_types import EVENT_TYPES
+from app.seeds.seed_event_subtypes import EVENT_SUBTYPES
 from app.database.init_db import init_db  
 from app.database.db import DATA_DIR
 from app.seeds.seed_structure import seed_all_structure
@@ -11,6 +14,9 @@ if DB_FILE.exists():
 
 init_db()
 print("Database initialized successfully.")
-seed_all_structure()
+db = SessionLocal()
+seed_all_structure(db)
+db.commit()
+db.close()
 print("Database seeded successfully.")
 print("Database reset completed.")

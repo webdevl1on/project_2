@@ -2,3 +2,21 @@ from app.models.person import Person
 from app.models.event_type import EventType
 from app.models.event_subtype import EventSubtype
 from app.models.person_event import PersonEvent
+"""Central registry of SQLAlchemy models.
+
+Import this module before calling ``Base.metadata.create_all()`` so every
+model is registered in SQLAlchemy metadata.
+"""
+
+from app.models.person_identity import Passport, PersonName
+from app.models.person_military_service import PersonRank
+
+__all__ = [
+    "EventSubtype",
+    "EventType",
+    "Passport",
+    "Person",
+    "PersonEvent",
+    "PersonName",
+    "PersonRank",
+]

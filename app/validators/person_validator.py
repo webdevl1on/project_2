@@ -26,12 +26,12 @@ class PersonValidator:
         return number
     
     @staticmethod
-    def validate_person_birth_date(birth_date):
-        if not birth_date:
+    def validate_date(date):
+        if not date:
             return None 
         try:
             return datetime.strptime(
-                birth_date,
+                date,
                 "%d.%m.%Y"
             ).date()
 
@@ -44,8 +44,8 @@ class PersonValidator:
     @staticmethod
     def validate_person_rank(rank):
         rank = rank.strip() if rank else None
-        if rank and len(rank) > 100:
-            raise ValueError("Rank cannot exceed 100 characters.")
+        if rank and len(rank) > 50:
+            raise ValueError("Rank cannot exceed 50 characters.")
         return rank.strip() if rank else None
     
     @staticmethod
@@ -66,6 +66,8 @@ class PersonValidator:
     @staticmethod
     def validate_passport_series_id(passport_series):
         passport_series = passport_series.strip() if passport_series else None
+        if passport_series == "":
+            passport_series = None
         if passport_series is not None:
             raise ValueError ('Wrong ID, must be empty')
         return passport_series
@@ -82,6 +84,8 @@ class PersonValidator:
     @staticmethod
     def validate_issued_by_id(passport_issued_by):
         passport_issued_by = passport_issued_by.strip() if passport_issued_by else None
+        if passport_issued_by == "":
+            passport_issued_by = None
         if passport_issued_by is None:
             return passport_issued_by 
         if not passport_issued_by.isdecimal() or len(passport_issued_by)!=4:
@@ -92,11 +96,22 @@ class PersonValidator:
     @staticmethod
     def validate_passport_series_book(passport_series):
         passport_series = passport_series.strip().upper() if passport_series else None
+        if passport_series == "":
+            passport_series = None
         if passport_series is None:
             return None
         if not passport_series.isalpha() or len(passport_series) !=2:
             raise ValueError ('Wrong series')
         return passport_series
+    
+    @staticmethod
+    def validate_passport_number_book(passport_number):
+        passport_number = passport_number.strip() if passport_number else None
+        if not passport_number or passport_number is None:
+            return None
+        if not passport_number.isdecimal() or len(passport_number)!=6:
+            raise ValueError("Wrong number")
+        return passport_number
     
     @staticmethod
     def validate_issued_by_book(passport_issued_by):

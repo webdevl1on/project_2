@@ -2,6 +2,7 @@ from unittest import result
 
 import pytest
 from datetime import date
+from app.models.person import Person
 from app.validators.person_validator import PersonValidator
 
 #test person pib
@@ -41,17 +42,17 @@ def test_validate_person_rank_none():
 
 #test person birth date
 def test_validate_person_birth_date_ok():
-    result = PersonValidator.validate_person_birth_date("15.06.2026")
+    result = PersonValidator.validate_date("15.06.2026")
     assert result == date(2026, 6, 15)
 def test_validate_person_birth_date_empty():
-    result = PersonValidator.validate_person_birth_date("")
+    result = PersonValidator.validate_date("")
     assert result is None
 def test_validate_person_birth_date_none():
-    result = PersonValidator.validate_person_birth_date(None)
+    result = PersonValidator.validate_date(None)
     assert result is None
 def test_validate_person_birth_date_invalid():
     with pytest.raises(ValueError):
-        PersonValidator.validate_person_birth_date("2025-01-15")
+        PersonValidator.validate_date("2025-01-15")
 
 #test person phone
 def test_validate_person_phone_ok():
@@ -90,8 +91,12 @@ def test_validate_passport_type_ok_book():
 def test_validate_passport_type_raise():
     with pytest.raises(ValueError):
         PersonValidator.validate_passport_type("type")
+
 def test_validate_passport_series_id_ok():
     result = PersonValidator.validate_passport_series_id(None)
+    assert result is None
+def test_validate_passport_series_id_ok_blank():
+    result = PersonValidator.validate_passport_series_id("       ")
     assert result is None
 def test_validate_passport_series_id_raise():
     with pytest.raises(ValueError):
@@ -109,13 +114,48 @@ def test_validate_passport_number_id_none():
 def test_validate_passport_number_id_none_blank():
     result= PersonValidator.validate_passport_number_id("    ")
     assert result is None
-def test_validate_passport_number_letters():
+def test_validate_passport_number_id_letters():
     with pytest.raises(ValueError):
         PersonValidator.validate_passport_number_id("1234a6789")
-def test_validate_passport_number_long():
+def test_validate_passport_number_id_long():
     with pytest.raises(ValueError):
         PersonValidator.validate_passport_number_id("1234567890")
-def test_validate_passport_number_short():
+def test_validate_passport_number_id_short():
     with pytest.raises(ValueError):
         PersonValidator.validate_passport_number_id("1234")
-    
+
+def test_validate_passport_issued_by_id_ok():
+    result = PersonValidator.validate_issued_by_id("0124")
+    assert result == "0124"
+def test_validate_passport_issued_by_id_strip():
+    result = PersonValidator.validate_issued_by_id("      0124    ")
+    assert result == "0124"
+def test_validate_passport_issued_by_id_none():
+    result = PersonValidator.validate_issued_by_id(None)
+    assert result is None
+def test_validate_passport_issued_by_id_none_blank():
+    result = PersonValidator.validate_issued_by_id("            ")
+    assert result is None
+def test_validate_passport_issued_by_id_letter():
+    with pytest.raises(ValueError):
+        PersonValidator.validate_issued_by_id("12a4")
+def test_validate_passport_issued_by_id_long():
+    with pytest.raises(ValueError):
+        PersonValidator.validate_issued_by_id("12345")
+def test_validate_passport_issued_by_id_short():
+    with pytest.raises(ValueError):
+        PersonValidator.validate_issued_by_id("123")
+
+
+def test_validate_passport_series_book_ok():
+    result = PersonValidator.validate_passport_series_book("ав")
+    assert result == "АВ"
+def test_validate_passport_series_book_ok_none():
+    result = PersonValidator.validate_passport_series_book(None)
+    assert result is None
+def test_validate_passport_series_book_ok_none_blank():
+    result = PersonValidator.validate_passport_series_book("    ")
+    assert result is None
+def test_validate_passport_series_book_raise():
+    with pytest.raises(ValueError):
+        PersonValidator.validate_passport_series_book("ASD")
