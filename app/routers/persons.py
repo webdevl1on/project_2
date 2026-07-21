@@ -17,6 +17,12 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
+def format_form_date(value):
+    if not value:
+        return ""
+    return value.strftime("%d.%m.%Y")
+
+
 @router.get("/persons")
 def get_persons_page(request: Request, 
                      sort_by: str = "surname",
@@ -79,7 +85,13 @@ def get_create_person_page(request: Request):
     return templates.TemplateResponse(
         request=request,
         name="person_form.html",
-        context={"form_data": {}},
+        context={
+            "form_data": {},
+            "form_action": "/persons/new",
+            "page_title": "Додати людину",
+            "submit_label": "Зберегти",
+            "cancel_url": "/persons",
+        },
     )
 
 
@@ -116,7 +128,105 @@ def create_person_from_form(
         return templates.TemplateResponse(
             request=request,
             name="person_form.html",
-            context={"error": str(error), "form_data": form_data},
+            context={
+                "error": str(error),
+                "form_data": form_data,
+                "form_action": "/persons/new",
+                "page_title": "Додати людину",
+                "submit_label": "Зберегти",
+                "cancel_url": "/persons",
+            },
+            status_code=400,
+        )
+
+    return RedirectResponse(url=f"/persons/{person.person_id}", status_code=303)
+
+
+@router.get("/persons/{person_id}/edit")
+def get_edit_person_page(person_id: int, request: Request, db: Session = Depends(get_db)):
+    person = CommonPersonFunc.get_person_or_raise(person_id, db)
+    current_name = (
+        db.query(PersonName)
+        .filter(
+            PersonName.person_id == person_id,
+            PersonName.date_to.is_(None),
+        )
+        .first()
+    )
+    current_rank = (
+        db.query(PersonRank)
+        .filter(
+            PersonRank.person_id == person_id,
+            PersonRank.date_to.is_(None),
+        )
+        .first()
+    )
+    form_data = {
+        "surname": current_name.surname if current_name else "",
+        "name": current_name.name if current_name else "",
+        "patronymic": current_name.patronymic if current_name else "",
+        "tax_number": person.tax_number or "",
+        "birth_date": format_form_date(person.birth_date),
+        "rank": current_rank.rank if current_rank else "",
+        "rank_order_number": current_rank.rank_order_number if current_rank else "",
+        "rank_order_date": format_form_date(current_rank.rank_order_date) if current_rank else "",
+    }
+
+    return templates.TemplateResponse(
+        request=request,
+        name="person_form.html",
+        context={
+            "form_data": form_data,
+            "form_action": f"/persons/{person_id}/edit",
+            "page_title": f"Редагувати людину #{person_id}",
+            "submit_label": "Зберегти зміни",
+            "cancel_url": f"/persons/{person_id}",
+        },
+    )
+
+
+@router.post("/persons/{person_id}/edit")
+def update_person_from_form(
+    person_id: int,
+    request: Request,
+    surname: Annotated[str, Form()],
+    name: Annotated[str, Form()],
+    patronymic: Annotated[str | None, Form()] = None,
+    tax_number: Annotated[str | None, Form()] = None,
+    birth_date: Annotated[str | None, Form()] = None,
+    rank: Annotated[str | None, Form()] = None,
+    rank_order_number: Annotated[str | None, Form()] = None,
+    rank_order_date: Annotated[str | None, Form()] = None,
+    db: Session = Depends(get_db),
+):
+    form_data = {
+        "surname": surname,
+        "name": name,
+        "patronymic": patronymic,
+        "surname_latin": None,
+        "name_latin": None,
+        "patronymic_latin": None,
+        "tax_number": tax_number,
+        "birth_date": birth_date,
+        "rank": rank,
+        "rank_order_number": rank_order_number,
+        "rank_order_date": rank_order_date,
+    }
+
+    try:
+        person = CommonPersonFunc.update_person(person_id, form_data, db)
+    except ValueError as error:
+        return templates.TemplateResponse(
+            request=request,
+            name="person_form.html",
+            context={
+                "error": str(error),
+                "form_data": form_data,
+                "form_action": f"/persons/{person_id}/edit",
+                "page_title": f"Редагувати людину #{person_id}",
+                "submit_label": "Зберегти зміни",
+                "cancel_url": f"/persons/{person_id}",
+            },
             status_code=400,
         )
 
