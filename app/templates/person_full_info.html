@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Людина</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+
+</head>
+
+<body>
+
+    <h1>Картка людини</h1>
+
+    <p>ID людини: {{ person_id }}</p>
+    <p>Персона: {{ person.names[0].surname }} {{ person.names[0].name }} {{ person.names[0].patronymic }}
+    </p>
+    <div><span>ІПН людини: {{ person.tax_number}}</span><button type="button" class="btn btn-primary"
+            data-bs-toggle="modal" data-bs-target="#change_tax_number">
+            Змінити
+        </button>
+    </div>
+    <p>Дата народження людини: {{ person.birth_date}}</p>
+
+    <h2 class="h4 mt-4">Історія ПІБ</h2>
+    <a href="">Новий запис</a>
+    <table class="table table-sm">
+        <thead>
+            <tr>
+                <th>№</th>
+                <th>Прізвище</th>
+                <th>Ім'я</th>
+                <th>По-батькові</th>
+                <th>Прізвище латинь</th>
+                <th>Ім'я латинь</th>
+                <th>По-батькові латинь</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for names in person.names %}
+            <tr>
+                <td>{{loop.index}}</td>
+                <td>{{names.surname}}</td>
+                <td>{{names.name}}</td>
+                <td>{{names.patronymic}}</td>
+                <td>{{names.surname_latin}}</td>
+                <td>{{names.name_latin}}</td>
+                <td>{{names.patronymic_latin}}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <!-- Button trigger modal -->
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#exampleModal">
+        Launch demo modal
+    </button>
+
+    <!-- Modal for name-->
+    <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h1 class="modal-title fs-5" id="exampleModalLabel">Modal title</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form method="post" class="row g-3" action="/person_full_info_name_add/{{ person.person_id }}">
+                        <div class="col-md-6">
+                            <label for="surname">Прізвище *</label>
+                            <input id="surname" name="surname" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="name">Ім'я *</label>
+                            <input id="name" name="name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="patronymic">По батькові</label>
+                            <input id="patronymic" name="patronymic">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="surname_latin">Прізвище латинь</label>
+                            <input id="surname_latin" name="surname_latin">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="name_latin">Ім'я латинь</label>
+                            <input id="name_latin" name="name_latin">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="patronymic_latin">По-батькові латинь</label>
+                            <input id="patronymic_latin" name="patronymic_latin">
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-primary">Save фівфівchanges</button>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    <!-- Modal for tax_number-->
+    <div class="modal fade" id="change_tax_number" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <form method="post" class="row g-3" action="/person_full_info_name_add/{{ person.person_id }}">
+                        <div class="col-md-6">
+                            <label for="tax_number">ІПН </label>
+                            <input id="tax_number" name="tax_number" value="{{ form_data.get('tax_number', '') }}">
+                        </div>
+
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <button type="submit" class="btn btn-primary">Save </button>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+        crossorigin="anonymous"></script>
+</body>
+
+</html>

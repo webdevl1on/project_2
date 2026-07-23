@@ -272,3 +272,45 @@ def get_person_page(person_id: int, request: Request, db: Session = Depends(get_
             "current_rank": current_rank,
         },
     )
+
+# my try
+@router.get("/person_full_info/{person_id}")
+def get_person_full_info(request: Request, person_id: int, db: Session = Depends(get_db)):
+    person = CommonPersonFunc.get_person_or_raise(person_id, db)
+    
+    return templates.TemplateResponse(
+        request=request,
+        name = "person_full_info.html",
+        context = {
+            "person": person,
+            "person_id" : person_id,
+        }
+    )
+@router.post("/person_full_info_name_add/{person_id}")
+def add_new_name_to_person(
+    person_id: int,
+    request: Request,
+    surname: Annotated[str, Form()],
+    name: Annotated[str, Form()],
+    patronymic: Annotated[str | None, Form()] = None,
+    surname_latin: Annotated[str | None, Form()] = None,
+    name_latin: Annotated[str | None, Form()] = None,
+    patronymic_latin: Annotated[str | None, Form()] = None,
+    db: Session = Depends(get_db),
+):
+    form_data = {
+        "surname": surname,
+        "name": name,
+        "patronymic": patronymic,
+        "surname_latin": surname_latin,
+        "name_latin": name_latin,
+        "patronymic_latin": patronymic_latin,
+    }
+    person = CommonPersonFunc.add_new_name(person_id, form_data, db)
+    
+    return RedirectResponse(
+        url=f"/person_full_info/{person_id}",
+        status_code=303,
+        )
+#@router.get("")
+

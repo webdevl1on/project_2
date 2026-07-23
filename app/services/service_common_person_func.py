@@ -146,25 +146,43 @@ class CommonPersonFunc:
 
 
     @staticmethod
-    def add_name(
-        person_id, 
-        surname,
-        name,
-        patronymic,
-        surname_latin,
-        name_latin,
-        patronymic_latin
-        ):
+    def add_name(person_id, data, db):
+        person = CommonPersonFunc.get_person_or_raise(person_id, db)
+        name_data = CommonPersonFunc.validate_name_data(data)
+        if not name_data["surname"] or not name_data["name"]:
+            raise ValueError("Surname and name required!")
+        
         return PersonName(
             person_id=person_id,
-            surname=surname,
-            name=name,
-            patronymic=patronymic,
-            surname_latin=surname_latin,
-            name_latin=name_latin,
-            patronymic_latin=patronymic_latin,
+            surname=name_data.get("surname"),
+            name=name_data.get("name"),
+            patronymic=name_data.get("patronymic"),
+            surname_latin=name_data.get("surname_latin"),
+            name_latin=name_data.get("name_latin"),
+            patronymic_latin=name_data.get("patronymic_latin"),
             date_from = date.today(),
         )
+    @staticmethod
+    def add_new_name(person_id, data, db):
+        person = CommonPersonFunc.get_person_or_raise(person_id, db)
+        name_data = CommonPersonFunc.validate_name_data(data)
+        if not name_data["surname"] or not name_data["name"]:
+            raise ValueError("Surname and name required!")
+        person_name = PersonName(
+            person_id=person_id,
+            surname=name_data.get("surname"),
+            name=name_data.get("name"),
+            patronymic=name_data.get("patronymic"),
+            surname_latin=name_data.get("surname_latin"),
+            name_latin=name_data.get("name_latin"),
+            patronymic_latin=name_data.get("patronymic_latin"),
+            date_from = date.today(),
+        )
+        db.add(person_name)
+        db.commit()
+        db.refresh(person_name)
+        return person_name
+         
     
     @staticmethod
     def change_person_name(person_id, data, db):
