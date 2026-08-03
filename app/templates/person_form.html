@@ -17,18 +17,15 @@
     <form method="post" action="{{ form_action or '/persons/new' }}" class="row g-3">
         <div class="col-md-6">
             <label class="form-label" for="surname">Прізвище *</label>
-            <input class="form-control" id="surname" name="surname" required
-                value="{{ form_data.get('surname', '') }}">
+            <input class="form-control" id="surname" name="surname" required value="{{ form_data.get('surname', '') }}">
         </div>
         <div class="col-md-6">
-            <label class="form-label" for="name">Ім'я *</label>
-            <input class="form-control" id="name" name="name" required
-                value="{{ form_data.get('name', '') }}">
+            <label class="form-label" for="name">Ім'я123 *</label>
+            <input class="form-control" id="name" name="name" required value="{{ form_data.get('name', '') }}">
         </div>
         <div class="col-md-6">
             <label class="form-label" for="patronymic">По батькові</label>
-            <input class="form-control" id="patronymic" name="patronymic"
-                value="{{ form_data.get('patronymic', '') }}">
+            <input class="form-control" id="patronymic" name="patronymic" value="{{ form_data.get('patronymic', '') }}">
         </div>
         <div class="col-md-6">
             <label class="form-label" for="tax_number">ІПН</label>

@@ -72,7 +72,10 @@ class CommonPersonFunc:
         db.add(person)
         db.flush()
         name = CommonPersonFunc.add_name(
-            person_id = person.person_id, **name_data)
+            person.person_id,
+            name_data,
+            db,
+        )
         db.add(name)
         if rank_data["rank"]:
             rank = CommonPersonFunc.add_rank(
@@ -147,7 +150,7 @@ class CommonPersonFunc:
 
     @staticmethod
     def add_name(person_id, data, db):
-        person = CommonPersonFunc.get_person_or_raise(person_id, db)
+        CommonPersonFunc.get_person_or_raise(person_id, db)
         name_data = CommonPersonFunc.validate_name_data(data)
         if not name_data["surname"] or not name_data["name"]:
             raise ValueError("Surname and name required!")
@@ -159,8 +162,7 @@ class CommonPersonFunc:
             patronymic=name_data.get("patronymic"),
             surname_latin=name_data.get("surname_latin"),
             name_latin=name_data.get("name_latin"),
-            patronymic_latin=name_data.get("patronymic_latin"),
-            date_from = date.today(),
+            patronymic_latin=name_data.get("patronymic_latin"),  
         )
     @staticmethod
     def add_new_name(person_id, data, db):
@@ -316,15 +318,13 @@ class CommonPersonFunc:
             validated_data['rank'] = PersonValidator.validate_person_rank(data.get("rank_order_number"))
         if data.get("rank_order_date"):
             validated_data['rank_order_date'] = PersonValidator.validate_date(data.get("rank_order_date"))
-        change_date = date.today()
-        current_rank.date_to = change_date
+        
         new_person_rank = PersonRank(
             person_id = person_id,
             rank = validated_data.get('rank'),
             rank_order_number = validated_data.get('rank_order_number'),
             rank_order_date = validated_data.get('rank_order_date'),
-            date_from=change_date,
-            date_to=None,
+            
         )
         db.add(new_person_rank)
         db.commit()

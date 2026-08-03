@@ -2,6 +2,7 @@ from app.database.base import Base
 from datetime import date, datetime, UTC
 from typing import Optional
 from sqlalchemy import (
+    Boolean,
     Integer,
     String,
     Date,
@@ -21,6 +22,7 @@ class HistoryModel(Base):
         default=lambda: datetime.now(UTC),
         onupdate=lambda: datetime.now(UTC)
     )
-    date_from: Mapped[date] = mapped_column(Date)
-    date_to: Mapped[Optional[date]] = mapped_column(Date,
-        nullable=True)
+    is_active: Mapped[bool] = mapped_column(
+        default=True,
+        nullable=False,
+    )

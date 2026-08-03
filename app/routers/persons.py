@@ -50,14 +50,14 @@ def get_persons_page(request: Request,
             PersonName,
             and_(
                 PersonName.person_id == Person.person_id,
-                PersonName.date_to.is_(None),
+                PersonName.is_active.is_(True),
             ),
         )
         .outerjoin(
             PersonRank,
             and_(
                 PersonRank.person_id == Person.person_id,
-                PersonRank.date_to.is_(None),
+                PersonRank.is_active.is_(True),
             ),
         )
         .order_by(order, Person.person_id)
