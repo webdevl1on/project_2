@@ -12,7 +12,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.person_history_model import HistoryModel
 
-
 if TYPE_CHECKING:
     from app.models.person import Person
 

@@ -7,10 +7,14 @@ from app.database.base import Base
 
 if TYPE_CHECKING:
     from app.models.person_identity import PersonName
+    from app.models.person_military_service import PersonRank
 
 class Person(Base):
     __tablename__ = "persons"
 
+    def __repr__(self):
+        return f"<Person id={self.person_id}, tax={self.tax_number}"
+    
     person_id: Mapped[int] = mapped_column(
         Integer,
         primary_key=True,
@@ -28,6 +32,8 @@ class Person(Base):
     names: Mapped[list["PersonName"]] = relationship(
         back_populates="person"
     )
-
+    ranks: Mapped[list["PersonRank"]] = relationship(
+        back_populates="person"
+    )
     
     

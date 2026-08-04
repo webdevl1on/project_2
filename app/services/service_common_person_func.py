@@ -164,9 +164,20 @@ class CommonPersonFunc:
             name_latin=name_data.get("name_latin"),
             patronymic_latin=name_data.get("patronymic_latin"),  
         )
+
+    
     @staticmethod
     def add_new_name(person_id, data, db):
-        person = CommonPersonFunc.get_person_or_raise(person_id, db)
+        CommonPersonFunc.get_person_or_raise(person_id, db)
+        current_name = (
+                    db.query(PersonName)
+                    .filter(PersonName.person_id == person_id,
+                            PersonName.is_active.is_(True))
+                    .first()
+                )
+        if not current_name:
+            raise ValueError("Current person name was not found")
+        
         name_data = CommonPersonFunc.validate_name_data(data)
         if not name_data["surname"] or not name_data["name"]:
             raise ValueError("Surname and name required!")
@@ -178,8 +189,9 @@ class CommonPersonFunc:
             surname_latin=name_data.get("surname_latin"),
             name_latin=name_data.get("name_latin"),
             patronymic_latin=name_data.get("patronymic_latin"),
-            date_from = date.today(),
+            is_active = True,
         )
+        current_name.is_active = False
         db.add(person_name)
         db.commit()
         db.refresh(person_name)
@@ -193,7 +205,7 @@ class CommonPersonFunc:
         current_name = (
             db.query(PersonName)
             .filter(PersonName.person_id == person_id,
-                    PersonName.date_to.is_(None))
+                    PersonName.is_active.is_(True))
             .first()
         )
         if not current_name:
@@ -220,8 +232,7 @@ class CommonPersonFunc:
         if not new_surname or not new_name:
             raise ValueError("Surname and name required!")
         # Close the old record and create a new historical record
-        change_date = date.today()
-        current_name.date_to = change_date
+        current_name.is_active = False
 
         new_person_name = PersonName(
             person_id=person_id,
@@ -231,15 +242,15 @@ class CommonPersonFunc:
             surname_latin=new_surname_latin,
             name_latin=new_name_latin,
             patronymic_latin=new_patronymic_latin,
-            date_from=change_date,
-            date_to=None,
+            
         )
 
         db.add(new_person_name)
         db.commit()
         db.refresh(new_person_name)
         return new_person_name
-    
+
+
     @staticmethod
     def update_person_name(person_id, person_name_id, data, db):
         # Find the exact name record that belongs to this person
@@ -284,7 +295,9 @@ class CommonPersonFunc:
         db.refresh(person_name)
 
         return person_name
-    
+
+
+#add and another RANK functions
     @staticmethod
     def add_rank(
         person_id,
@@ -297,7 +310,7 @@ class CommonPersonFunc:
             rank = rank,
             rank_order_number = rank_order_number,
             rank_order_date = rank_order_date,
-            date_from = date.today(),
+            
         )
     
     @staticmethod
@@ -357,7 +370,7 @@ class CommonPersonFunc:
 
         return person_rank
 
-
+#add and another passport functions
     @staticmethod
     def add_pasport(
         person_id,
@@ -376,7 +389,7 @@ class CommonPersonFunc:
             passport_expire_date = passport_expire_date
         )
     
-#Validate different data   
+#Validate different types of data   
     @staticmethod
     def validate_person_base_data(data):
         return {

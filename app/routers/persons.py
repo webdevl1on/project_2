@@ -27,7 +27,7 @@ def format_form_date(value):
 def get_persons_page(request: Request, 
                      sort_by: str = "surname",
                      direction: str = "asc",
-                      db: Session = Depends(get_db)):
+                     db: Session = Depends(get_db)):
     sort_columns = {
             "id": Person.person_id,
             "surname": PersonName.surname,
@@ -149,7 +149,7 @@ def get_edit_person_page(person_id: int, request: Request, db: Session = Depends
         db.query(PersonName)
         .filter(
             PersonName.person_id == person_id,
-            PersonName.date_to.is_(None),
+            
         )
         .first()
     )
@@ -157,7 +157,7 @@ def get_edit_person_page(person_id: int, request: Request, db: Session = Depends
         db.query(PersonRank)
         .filter(
             PersonRank.person_id == person_id,
-            PersonRank.date_to.is_(None),
+            
         )
         .first()
     )
@@ -180,7 +180,7 @@ def get_edit_person_page(person_id: int, request: Request, db: Session = Depends
             "form_action": f"/persons/{person_id}/edit",
             "page_title": f"Редагувати людину #{person_id}",
             "submit_label": "Зберегти зміни",
-            "cancel_url": f"/persons/{person_id}",
+            "cancel_url": f"/person_detail/{person_id}",
         },
     )
 
@@ -233,7 +233,7 @@ def update_person_from_form(
     return RedirectResponse(url=f"/persons/{person.person_id}", status_code=303)
 
 
-@router.get("/persons/{person_id}")
+@router.get("/person_detail/{person_id}")
 def get_person_page(person_id: int, request: Request, db: Session = Depends(get_db)):
     person = db.query(Person).filter(Person.person_id == person_id).first()
     if not person:
@@ -243,21 +243,21 @@ def get_person_page(person_id: int, request: Request, db: Session = Depends(get_
         db.query(PersonName)
         .filter(
             PersonName.person_id == person_id,
-            PersonName.date_to.is_(None),
+            PersonName.is_active.is_(True),
         )
         .first()
     )
     name_history = (
         db.query(PersonName)
         .filter(PersonName.person_id == person_id)
-        .order_by(PersonName.date_from.desc())
+        .order_by(PersonName.created_at.desc())
         .all()
     )
     current_rank = (
         db.query(PersonRank)
         .filter(
             PersonRank.person_id == person_id,
-            PersonRank.date_to.is_(None),
+            PersonRank.is_active.is_(True),
         )
         .first()
     )
@@ -277,17 +277,53 @@ def get_person_page(person_id: int, request: Request, db: Session = Depends(get_
 @router.get("/person_full_info/{person_id}")
 def get_person_full_info(request: Request, person_id: int, db: Session = Depends(get_db)):
     person = CommonPersonFunc.get_person_or_raise(person_id, db)
-    
+    current_name = (
+            db.query(PersonName)
+            .filter(
+                PersonName.person_id == person_id,
+                PersonName.is_active.is_(True),
+            )
+            .first()
+        )
     return templates.TemplateResponse(
         request=request,
         name = "person_full_info.html",
         context = {
             "person": person,
+            "current_name": current_name,
             "person_id" : person_id,
         }
     )
+
 @router.post("/person_full_info_name_add/{person_id}")
 def add_new_name_to_person(
+    person_id: int,
+    request: Request,
+    surname: Annotated[str, Form()],
+    name: Annotated[str, Form()],
+    patronymic: Annotated[str | None, Form()] = None,
+    surname_latin: Annotated[str | None, Form()] = None,
+    name_latin: Annotated[str | None, Form()] = None,
+    patronymic_latin: Annotated[str | None, Form()] = None,
+    db: Session = Depends(get_db),
+):
+    form_data = {
+        "surname": surname,
+        "name": name,
+        "patronymic": patronymic,
+        "surname_latin": surname_latin,
+        "name_latin": name_latin,
+        "patronymic_latin": patronymic_latin,
+    }
+    CommonPersonFunc.add_new_name(person_id, form_data, db)
+    
+    return RedirectResponse(
+        url=f"/person_full_info/{person_id}",
+        status_code=303,
+        )
+
+@router.post("/person_full_info_name_update/{person_id}")
+def update_name_to_person(
     person_id: int,
     request: Request,
     surname: Annotated[str, Form()],
@@ -312,5 +348,3 @@ def add_new_name_to_person(
         url=f"/person_full_info/{person_id}",
         status_code=303,
         )
-#@router.get("")
-

@@ -103,7 +103,8 @@
         <tbody>
             {% for item in persons %}
             <tr>
-                <td class="col-id"><a href="/persons/{{ item.person.person_id }}">{{ item.person.person_id }}</a></td>
+                <td class="col-id"><a href="/person_detail/{{ item.person.person_id }}">{{ item.person.person_id }}</a>
+                </td>
                 <td class="col-surname">{{ item.name.surname if item.name else "—" }}</td>
                 <td>{{ item.name.name if item.name else "—" }}</td>
                 <td>{{ item.person.tax_number or "—" }}</td>
