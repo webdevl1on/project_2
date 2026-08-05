@@ -295,7 +295,7 @@ def get_person_full_info(request: Request, person_id: int, db: Session = Depends
         }
     )
 
-@router.post("/person_full_info_name_add/{person_id}")
+@router.post("/person_name/add_new/{person_id}")
 def add_new_name_to_person(
     person_id: int,
     request: Request,
@@ -322,9 +322,9 @@ def add_new_name_to_person(
         status_code=303,
         )
 
-@router.post("/person_full_info_name_update/{person_id}")
+@router.post("/person_name/{person_name_id}/update")
 def update_name_to_person(
-    person_id: int,
+    person_name_id: int,
     request: Request,
     surname: Annotated[str, Form()],
     name: Annotated[str, Form()],
@@ -342,9 +342,10 @@ def update_name_to_person(
         "name_latin": name_latin,
         "patronymic_latin": patronymic_latin,
     }
-    person = CommonPersonFunc.add_new_name(person_id, form_data, db)
+
+    person_name = CommonPersonFunc.update_person_name(person_name_id, form_data, db)
     
     return RedirectResponse(
-        url=f"/person_full_info/{person_id}",
+        url=f"/person_full_info/{person_name.person_id}",
         status_code=303,
-        )
+    )

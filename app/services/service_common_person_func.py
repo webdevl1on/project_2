@@ -252,44 +252,26 @@ class CommonPersonFunc:
 
 
     @staticmethod
-    def update_person_name(person_id, person_name_id, data, db):
+    def update_person_name(person_name_id, data, db):
         # Find the exact name record that belongs to this person
         person_name = (
             db.query(PersonName)
             .filter(
-                PersonName.person_id == person_id,
                 PersonName.person_name_id == person_name_id,
             )
             .first()
         )
-
         if not person_name:
             raise ValueError("Person name record was not found.")
 
-        # Validate only fields passed for update
-        validated_data = {}
+        name_data = CommonPersonFunc.validate_name_data(data)
 
-        for field in (
-            "surname",
-            "name",
-            "patronymic",
-            "surname_latin",
-            "name_latin",
-            "patronymic_latin",
-        ):
-            if field in data:
-                validated_data[field] = PersonValidator.validate_names(data[field])
-
-        # Check required values after applying updates
-        final_surname = validated_data.get("surname", person_name.surname)
-        final_name = validated_data.get("name", person_name.name)
-
-        if not final_surname or not final_name:
-            raise ValueError("Surname and name required!")
-
-        # Update only fields that were passed
-        for field, value in validated_data.items():
-            setattr(person_name, field, value)
+        person_name.surname = name_data["surname"]
+        person_name.name = name_data["name"]
+        person_name.patronymic = name_data["patronymic"]
+        person_name.surname_latin = name_data["surname_latin"]
+        person_name.name_latin = name_data["name_latin"]
+        person_name.patronymic_latin = name_data["patronymic_latin"]
 
         db.commit()
         db.refresh(person_name)
