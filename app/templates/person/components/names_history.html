@@ -14,6 +14,7 @@
             <th>Ім'я латинь</th>
             <th>По-батькові латинь</th>
             <th>Редагувати</th>
+            <th>Зробити активним</th>
             <th>Видалити</th>
         </tr>
     </thead>
@@ -78,6 +79,17 @@
                     </div>
                 </div>
 
+            </td>
+            <td>
+                {% if names.is_active %}
+                <span class="badge bg-success">Активний</span>
+                {% else %}
+                <form method="post" action="/person_name/{{ names.person_name_id }}/make_active">
+                    <button class="btn btn-sm btn-success">
+                        Зробити активним
+                    </button>
+                </form>
+                {% endif %}
             </td>
             <td>
                 <form method="post" action="/person_name/{{names.person_name_id}}/delete">

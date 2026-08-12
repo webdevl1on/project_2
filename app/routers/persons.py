@@ -349,3 +349,11 @@ def update_name_to_person(
         url=f"/person_full_info/{person_name.person_id}",
         status_code=303,
     )
+
+@router.post("/person_name/{person_name_id}/make_active")
+def change_name_to_active(
+    person_name_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    CommonPersonFunc.change_person_name_to_active(person_name_id, db)

@@ -278,6 +278,29 @@ class CommonPersonFunc:
 
         return person_name
 
+    @staticmethod
+    def change_person_name_to_active(person_name_id, db):
+        new_active_name = (db.query(PersonName)
+                               .filter(PersonName.person_name_id == person_name_id,
+                                       )
+                                .first()
+        )
+        if not new_active_name:
+                    raise ValueError("Person name not found")
+        person_id = new_active_name.person_id
+        previos_active_name = (db.query(PersonName)
+                               .filter(PersonName.person_id == person_id,
+                                       PersonName.is_active == True,
+                                       PersonName.person_name_id != person_name_id,)
+                               .first()
+        )
+        if not previos_active_name:
+            raise ValueError("Person active name not found")
+        previos_active_name.is_active = False
+        new_active_name.is_active = True
+
+        db.commit()
+
 
 #add and another RANK functions
     @staticmethod
