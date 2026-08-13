@@ -1,0 +1,134 @@
+<h2 class="h4 mt-4">Історія звань</h2>
+<!-- Button trigger modal -->
+<button type=" button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addNewName">
+    Додати новий запис про звання
+</button>
+<table class="table table-sm">
+    <thead>
+        <tr>
+            <th>№</th>
+            <th>Звання</th>
+            <th>№ наказу</th>
+            <th>Дата наказу</th>
+            <th>Редагувати</th>
+            <th>Зробити активним</th>
+            <th>Видалити</th>
+        </tr>
+    </thead>
+    <tbody>
+
+
+        {% for ranks in person.ranks %}
+        <tr {% if ranks.is_active %} style="border: rgb(10, 50, 184) solid;" {% endif %}>
+            <td>{{loop.index}}</td>
+            <td>{{ranks.rank}}</td>
+            <td>{{ranks.rank_order_number}}</td>
+            <td>{{ranks.rank_order_date}}</td>
+            <td><button class="btn btn-sm btn-warning" data-bs-toggle="modal"
+                    data-bs-target="#editRankModal{{ranks.person_rank_id}}">Ред</button>
+                <!-- Modal for change name-->
+                <div class="modal fade" id="editRankModal{{ranks.person_rank_id}}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h1 class="modal-title fs-5">Редагувати Звання</h1>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                    aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form method="post" class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="rank">Звання *</label>
+                                        <input id="rank" name="rank" required value="{{ranks.rank}}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="rank_order_number">Ім'я *</label>
+                                        <input id="rank_order_number" name="rank_order_number" value="{{names.name}}">
+                                    </div>
+
+
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary"
+                                            data-bs-dismiss="modal">Close</button>
+                                        <button type="submit" class="btn btn-primary">Зберегти</button>
+                                    </div>
+                                </form>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+            </td>
+            <td>
+
+            </td>
+
+            <td>
+
+
+
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- Modal for change name-->
+<div class="modal fade" id="editRankModal{{ranks.person_rank_id}}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h1 class="modal-title fs-5">Редагувати ПІБ</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form method="post" action="/person_name/{{names.person_name_id}}/update" class="row g-3">
+                    <div class="col-md-6">
+                        <label for="surname">Прізвище *</label>
+                        <input id="surname" name="surname" required value="{{names.surname}}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="name">Ім'я *</label>
+                        <input id="name" name="name" required value="{{names.name}}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="patronymic">По батькові</label>
+                        <input id="patronymic" name="patronymic" value="{{names.patronymic}}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="surname_latin">Прізвище латинь</label>
+                        <input id="surname_latin" name="surname_latin" value="{{names.surname_latin}}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="name_latin">Ім'я латинь</label>
+                        <input id="name_latin" name="name_latin" value="{{names.name_latin}}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="patronymic_latin">По-батькові латинь</label>
+                        <input id="patronymic_latin" name="patronymic_latin" value="{{names.patronymic_latin}}">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn btn-primary">Зберегти</button>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+    </div>
+</div>
+<!--alerts-->>
+
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const alert = document.getElementById("errorAlert");
+
+        if (alert) {
+            setTimeout(() => {
+                alert.classList.remove("show");
+            }, 3000);
+        }
+    });
+</script>

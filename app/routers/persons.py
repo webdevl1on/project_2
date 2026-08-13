@@ -1,5 +1,7 @@
 from typing import Annotated
 
+from urllib.parse import quote
+from colorama import reinit
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -275,7 +277,11 @@ def get_person_page(person_id: int, request: Request, db: Session = Depends(get_
 
 # my try
 @router.get("/person_full_info/{person_id}")
-def get_person_full_info(request: Request, person_id: int, db: Session = Depends(get_db)):
+def get_person_full_info(
+    request: Request, 
+    person_id: int, 
+    db: Session = Depends(get_db),
+    error: str | None = None,):
     person = CommonPersonFunc.get_person_or_raise(person_id, db)
     current_name = (
             db.query(PersonName)
@@ -292,6 +298,7 @@ def get_person_full_info(request: Request, person_id: int, db: Session = Depends
             "person": person,
             "current_name": current_name,
             "person_id" : person_id,
+            "error" : error,
         }
     )
 
@@ -356,4 +363,37 @@ def change_name_to_active(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    CommonPersonFunc.change_person_name_to_active(person_name_id, db)
+    person_id = CommonPersonFunc.change_person_name_to_active(person_name_id, db)
+    return RedirectResponse(
+        url=f"/person_full_info/{person_id}",
+        status_code=303,
+    )
+
+@router.post("/person_name/{person_name_id}/delete")
+def delete_person_name(
+    person_name_id: int,
+    confirmation: Annotated[str, Form()],
+    db: Session = Depends(get_db),
+):
+    try:
+        person_id = CommonPersonFunc.delete_person_name(
+            person_name_id,
+            confirmation,
+            db,
+        )
+    except ValueError as error:
+        person_name = (
+            db.query(PersonName)
+            .filter(PersonName.person_name_id == person_name_id)
+            .first()
+        )
+        error_message = quote(str(error))
+        
+        return RedirectResponse(
+            url=f"/person_full_info/{person_name.person_id}?error={error_message}",
+            status_code=303,
+        )
+    return  RedirectResponse(
+        url = f"/person_full_info/{person_id}",
+        status_code=303,
+    )

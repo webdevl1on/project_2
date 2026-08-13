@@ -300,6 +300,27 @@ class CommonPersonFunc:
         new_active_name.is_active = True
 
         db.commit()
+        return person_id
+
+    @staticmethod
+    def delete_person_name(person_name_id, confirmation, db):
+        if confirmation != "DELETE":
+            raise ValueError("Для видалення введіть DELETE")
+
+        person_name = (db.query(PersonName)
+                       .filter(PersonName.person_name_id == person_name_id)
+                       .first()
+        )
+        if not person_name:
+            raise ValueError("Person name not found")
+        if person_name.is_active == True:
+            raise ValueError("Cannot DELETE active record")    
+        person_id = person_name.person_id
+
+        db.delete(person_name)
+        db.commit()
+
+        return person_id
 
 
 #add and another RANK functions

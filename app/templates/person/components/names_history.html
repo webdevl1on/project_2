@@ -19,8 +19,10 @@
         </tr>
     </thead>
     <tbody>
+
+
         {% for names in person.names %}
-        <tr>
+        <tr {% if names.is_active %} style="border: rgb(10, 50, 184) solid;" {% endif %}>
             <td>{{loop.index}}</td>
             <td>{{names.surname}}</td>
             <td>{{names.name}}</td>
@@ -91,10 +93,38 @@
                 </form>
                 {% endif %}
             </td>
+
             <td>
-                <form method="post" action="/person_name/{{names.person_name_id}}/delete">
-                    <button class="btn btn-sm btn-danger">X</button>
-                </form>
+                <button class="btn btn-sm btn-danger" data-bs-toggle="modal"
+                    data-bs-target="#deleteNameRecord{{names.person_name_id}}">DEL</button>
+                <!----modal for delete----->
+                <div class="modal fade" id="deleteNameRecord{{names.person_name_id}}" tabindex="-1"
+                    aria-labelledby="deleteNameRecordLabel" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h1 class="modal-title fs-5" id="deleteNameRecordLabel">Видалити запис</h1>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                    aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <form method="post" class="row g-3"
+                                    action="/person_name/{{ names.person_name_id }}/delete">
+                                    <input type="text" name="confirmation" placeholder="Введіть DELETE" required>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary"
+                                            data-bs-dismiss="modal">Close</button>
+                                        <button type="submit" class="btn btn-danger">
+                                            Видалити назавжди
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
             </td>
         </tr>
         {% endfor %}
@@ -145,3 +175,18 @@
         </div>
     </div>
 </div>
+
+<!--alerts-->>
+
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const alert = document.getElementById("errorAlert");
+
+        if (alert) {
+            setTimeout(() => {
+                alert.classList.remove("show");
+            }, 3000);
+        }
+    });
+</script>
