@@ -1,5 +1,5 @@
 from typing import Annotated
-
+from datetime import datetime
 from urllib.parse import quote
 from colorama import reinit
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
@@ -275,13 +275,13 @@ def get_person_page(person_id: int, request: Request, db: Session = Depends(get_
         },
     )
 
-# my try
+# my try names
 @router.get("/person_full_info/{person_id}")
 def get_person_full_info(
     request: Request, 
     person_id: int, 
     db: Session = Depends(get_db),
-    error: str | None = None,):
+    ):
     person = CommonPersonFunc.get_person_or_raise(person_id, db)
     current_name = (
             db.query(PersonName)
@@ -298,7 +298,7 @@ def get_person_full_info(
             "person": person,
             "current_name": current_name,
             "person_id" : person_id,
-            "error" : error,
+            
         }
     )
 
@@ -381,19 +381,119 @@ def delete_person_name(
             confirmation,
             db,
         )
-    except ValueError as error:
+    except ValueError:
         person_name = (
             db.query(PersonName)
             .filter(PersonName.person_name_id == person_name_id)
             .first()
         )
-        error_message = quote(str(error))
-        
+
+
         return RedirectResponse(
-            url=f"/person_full_info/{person_name.person_id}?error={error_message}",
+            url=f"/person_full_info/{person_name.person_id}",
             status_code=303,
         )
     return  RedirectResponse(
         url = f"/person_full_info/{person_id}",
         status_code=303,
     )
+
+#funtions for ranks
+@router.post("/person_ranks/add_rank/{person_id}")
+def add_new_rank_to_person(
+    person_id: int,
+    request: Request,
+    rank: Annotated[str, Form()],
+    rank_order_number: Annotated[str | None, Form()] = None,
+    rank_order_date: Annotated[str | None, Form()] = None,
+    db: Session = Depends(get_db),
+):
+    rank_order_date_date = (
+        datetime.strptime(rank_order_date, "%d.%m.%Y").date()
+        if rank_order_date
+        else None
+    )
+    form_data = {
+        "rank": rank,
+        "rank_order_number": rank_order_number,
+        "rank_order_date": rank_order_date_date,
+    }
+    try:
+        CommonPersonFunc.add_rank(person_id, form_data, db)
+    except ValueError:
+        return RedirectResponse(
+                url=f"/person_full_info/{person_id}",
+                status_code=303,
+                )
+    
+    return RedirectResponse(
+        url=f"/person_full_info/{person_id}",
+        status_code=303,
+        )
+
+@router.post("/person_ranks/{person_rank_id}/make_active")
+def change_rank_to_active(
+    person_rank_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    person_id = CommonPersonFunc.change_person_rank_to_active(person_rank_id, db)
+    return RedirectResponse(
+        url=f"/person_full_info/{person_id}",
+        status_code=303,
+    )
+
+@router.post("/person_ranks/{person_rank_id}/update")
+def update_rank_to_person(
+    person_rank_id: int,
+    request: Request,
+    rank: Annotated[str, Form()],
+    rank_order_number: Annotated[str | None, Form()] = None,
+    rank_order_date: Annotated[str | None, Form()] = None,
+    db: Session = Depends(get_db),
+):
+    rank_order_date_date = (
+            datetime.strptime(rank_order_date, "%d.%m.%Y").date()
+            if rank_order_date
+            else None
+        )
+    form_data = {
+            "rank": rank,
+            "rank_order_number": rank_order_number,
+            "rank_order_date": rank_order_date_date,
+        }
+
+    person_rank = CommonPersonFunc.update_person_rank(person_rank_id, form_data, db)
+    
+    return RedirectResponse(
+        url=f"/person_full_info/{person_rank.person_id}",
+        status_code=303,
+    )
+
+@router.post("/person_ranks/{person_rank_id}/delete")
+def delete_person_rank(
+    person_rank_id: int,
+    confirmation: Annotated[str, Form()],
+    db: Session = Depends(get_db),
+):
+    try:
+        person_id = CommonPersonFunc.delete_person_rank(
+            person_rank_id,
+            confirmation,
+            db,
+        )
+    except ValueError:
+        person_rank = (
+            db.query(PersonRank)
+            .filter(PersonRank.person_rank_id == person_rank_id)
+            .first()
+        )
+        return RedirectResponse(
+            url=f"/person_full_info/{person_rank.person_id}",
+            status_code=303,
+        )
+    return  RedirectResponse(
+        url = f"/person_full_info/{person_id}",
+        status_code=303,
+    )
+

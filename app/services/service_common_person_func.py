@@ -327,18 +327,106 @@ class CommonPersonFunc:
     @staticmethod
     def add_rank(
         person_id,
-        rank,
-        rank_order_number,
-        rank_order_date,
+        data,
+        db,
     ):
-        return PersonRank(
-            person_id=person_id,
-            rank = rank,
-            rank_order_number = rank_order_number,
-            rank_order_date = rank_order_date,
-            
+        CommonPersonFunc.get_person_or_raise(person_id, db)
+        rank_data = CommonPersonFunc.validate_rank_data(data)
+        if not rank_data["rank"]:
+            raise ValueError("Rank is required!")
+        same_rank = (
+            db.query(PersonRank)
+            .filter(PersonRank.person_id == person_id,
+                    PersonRank.rank == rank_data.get("rank"))
+            .first()
         )
-    
+        if same_rank:
+            raise ValueError("This rank is already exist")
+        current_rank = (
+            db.query(PersonRank)
+            .filter(PersonRank.person_id == person_id,
+                    PersonRank.is_active.is_(True))
+            .first()
+        )
+        
+        person_rank = PersonRank(
+            person_id = person_id,
+            rank = rank_data.get("rank"),
+            rank_order_number = rank_data.get("rank_order_number"),
+            rank_order_date = rank_data.get("rank_order_date"),
+            is_active = False,
+        )
+        if not current_rank:
+            person_rank.is_active = True
+        db.add(person_rank)
+        db.commit()
+        db.refresh(person_rank)
+        return person_rank
+
+    @staticmethod
+    def update_person_rank(person_rank_id, data, db):
+        
+        person_rank = (
+            db.query(PersonRank)
+            .filter(
+                PersonRank.person_rank_id == person_rank_id,
+            )
+            .first()
+        )
+        if not person_rank:
+            raise ValueError("Person rank record was not found.")
+
+        rank_data = CommonPersonFunc.validate_rank_data(data)
+
+        person_rank.rank = rank_data["rank"]
+        person_rank.rank_order_number = rank_data["rank_order_number"]
+        person_rank.rank_order_date_date = rank_data["rank_order_date"]
+
+        db.commit()
+        db.refresh(person_rank)
+
+        return person_rank
+
+    @staticmethod
+    def change_person_rank_to_active(person_rank_id, db):
+        new_active_rank = (db.query(PersonRank)
+                               .filter(PersonRank.person_rank_id == person_rank_id,
+                                       )
+                                .first()
+        )
+        if not new_active_rank:
+                    raise ValueError("Person rank not found")
+        person_id = new_active_rank.person_id
+        previos_active_rank = (db.query(PersonRank)
+                               .filter(PersonRank.person_id == person_id,
+                                       PersonRank.is_active == True,
+                                       PersonRank.person_rank_id != person_rank_id,)
+                               .first()
+        )
+        if not previos_active_rank:
+            raise ValueError("Person active name not found")
+        previos_active_rank.is_active = False
+        new_active_rank.is_active = True
+
+        db.commit()
+        return person_id
+
+    @staticmethod
+    def delete_person_rank(person_rank_id, confirmation, db):
+        if confirmation != "DELETE":
+            raise ValueError("Для видалення введіть DELETE")
+
+        person_rank = (db.query(PersonRank)
+                       .filter(PersonRank.person_rank_id == person_rank_id)
+                       .first()
+        )
+        if not person_rank:
+            raise ValueError("Person name not found")  
+        person_id = person_rank.person_id
+        db.delete(person_rank)
+        db.commit()
+        return person_id
+
     @staticmethod
     def change_person_rank(person_id, data, db):
         CommonPersonFunc.get_person_or_raise(person_id, db)
@@ -370,31 +458,7 @@ class CommonPersonFunc:
         db.refresh(new_person_rank)
         return new_person_rank
 
-    @staticmethod
-    def update_person_rank(person_id, person_rank_id, data, db):
-        person_rank = (
-            db.query(PersonRank)
-            .filter(
-                PersonRank.person_id == person_id,
-                PersonRank.person_rank_id == person_rank_id,
-            )
-            .first()
-        )
-        if not person_rank:
-            raise ValueError("Person rank record was not found.")
-        validated_data = {}
-        if data.get("rank"):
-            validated_data['rank'] = PersonValidator.validate_person_rank(data.get("rank"))
-        if data.get("rank_order_number"):
-            validated_data['rank'] = PersonValidator.validate_person_rank(data.get("rank_order_number"))
-        if data.get("rank_order_date"):
-            validated_data['rank_order_date'] = PersonValidator.validate_date(data.get("rank_order_date"))
-        for key, value in validated_data.items():
-            setattr(person_rank, key, value)
-        db.commit()
-        db.refresh(person_rank)
 
-        return person_rank
 
 #add and another passport functions
     @staticmethod

@@ -131,50 +131,7 @@
     </tbody>
 </table>
 
-<!-- Modal for new name-->
-<div class="modal fade" id="addNewName" tabindex="-1" aria-labelledby="addNewNameLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h1 class="modal-title fs-5" id="addNewNameLabel">Нове ім'я</h1>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form method="post" class="row g-3" action="/person_name/add_new/{{person_id}}">
-                    <div class="col-md-6">
-                        <label for="surname">Прізвище *</label>
-                        <input id="surname" name="surname" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label for="name">Ім'я *</label>
-                        <input id="name" name="name" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label for="patronymic">По батькові</label>
-                        <input id="patronymic" name="patronymic">
-                    </div>
-                    <div class="col-md-6">
-                        <label for="surname_latin">Прізвище латинь</label>
-                        <input id="surname_latin" name="surname_latin">
-                    </div>
-                    <div class="col-md-6">
-                        <label for="name_latin">Ім'я латинь</label>
-                        <input id="name_latin" name="name_latin">
-                    </div>
-                    <div class="col-md-6">
-                        <label for="patronymic_latin">По-батькові латинь</label>
-                        <input id="patronymic_latin" name="patronymic_latin">
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Зберегти</button>
-                    </div>
-                </form>
-            </div>
 
-        </div>
-    </div>
-</div>
 
 <!--alerts-->>
 
