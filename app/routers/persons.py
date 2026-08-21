@@ -12,7 +12,8 @@ from app.database.db import get_db
 from app.models.person import Person
 from app.models.person_identity import PersonName
 from app.models.person_military_service import PersonRank
-from app.services.service_common_person_func import CommonPersonFunc
+from app.services.service_person_create import ServicePersonCreate
+from app.services.service_person_checking import ServicePersonCheck
 
 
 router = APIRouter()
@@ -24,7 +25,7 @@ def format_form_date(value):
         return ""
     return value.strftime("%d.%m.%Y")
 
-
+#головна таблиця
 @router.get("/persons")
 def get_persons_page(request: Request, 
                      sort_by: str = "surname",
@@ -82,6 +83,8 @@ def get_persons_page(request: Request,
     )
 
 
+
+#Додати нову людину
 @router.get("/persons/new")
 def get_create_person_page(request: Request):
     return templates.TemplateResponse(
@@ -125,7 +128,7 @@ def create_person_from_form(
     }
 
     try:
-        person = CommonPersonFunc.create_person(form_data, db)
+        person = ServicePersonCreate.create_person(form_data, db)
     except ValueError as error:
         return templates.TemplateResponse(
             request=request,
@@ -143,10 +146,93 @@ def create_person_from_form(
 
     return RedirectResponse(url=f"/persons/{person.person_id}", status_code=303)
 
+#Коротка інформація про людину
+@router.get("/person_detail/{person_id}")
+def get_person_page(person_id: int, request: Request, db: Session = Depends(get_db)):
+    person = db.query(Person).filter(Person.person_id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="Person not found")
 
+    current_name = (
+        db.query(PersonName)
+        .filter(
+            PersonName.person_id == person_id,
+            PersonName.is_active.is_(True),
+        )
+        .first()
+    )
+    name_history = (
+        db.query(PersonName)
+        .filter(PersonName.person_id == person_id)
+        .order_by(PersonName.created_at.desc())
+        .all()
+    )
+    current_rank = (
+        db.query(PersonRank)
+        .filter(
+            PersonRank.person_id == person_id,
+            PersonRank.is_active.is_(True),
+        )
+        .first()
+    )
+
+    return templates.TemplateResponse(
+        request=request,
+        name="person_detail.html",
+        context={
+            "person": person,
+            "current_name": current_name,
+            "name_history": name_history,
+            "current_rank": current_rank,
+        },
+    )
+
+#Повна інформація та редагування
+@router.get("/person_full_info/{person_id}")
+def get_person_full_info(
+    request: Request, 
+    person_id: int, 
+    db: Session = Depends(get_db),
+    ):
+    person = ServicePersonCheck.get_person_or_raise(person_id, db)
+    current_name = (
+            db.query(PersonName)
+            .filter(
+                PersonName.person_id == person_id,
+                PersonName.is_active.is_(True),
+            )
+            .first()
+        )
+    current_rank = (
+            db.query(PersonRank)
+            .filter(
+                PersonRank.person_id == person_id,
+                PersonRank.is_active.is_(True),
+            )
+            .first()
+        )  
+    return templates.TemplateResponse(
+        request=request,
+        name = "person_full_info.html",
+        context = {
+            "person": person,
+            "current_name": current_name,
+            "current_rank" : current_rank,
+            "person_id" : person_id,
+            
+        }
+    )
+
+
+
+
+
+
+
+#Редагувати людину  НЕ ВИКОРИСТОВУЄТЬСЯ
 @router.get("/persons/{person_id}/edit")
 def get_edit_person_page(person_id: int, request: Request, db: Session = Depends(get_db)):
-    person = CommonPersonFunc.get_person_or_raise(person_id, db)
+    person = ServicePersonCheck.get_person_or_raise(person_id, db)
     current_name = (
         db.query(PersonName)
         .filter(
@@ -186,7 +272,7 @@ def get_edit_person_page(person_id: int, request: Request, db: Session = Depends
         },
     )
 
-
+# НЕ ВИКОРИСТОВУЄТЬСЯ
 @router.post("/persons/{person_id}/edit")
 def update_person_from_form(
     person_id: int,
@@ -233,267 +319,4 @@ def update_person_from_form(
         )
 
     return RedirectResponse(url=f"/persons/{person.person_id}", status_code=303)
-
-
-@router.get("/person_detail/{person_id}")
-def get_person_page(person_id: int, request: Request, db: Session = Depends(get_db)):
-    person = db.query(Person).filter(Person.person_id == person_id).first()
-    if not person:
-        raise HTTPException(status_code=404, detail="Person not found")
-
-    current_name = (
-        db.query(PersonName)
-        .filter(
-            PersonName.person_id == person_id,
-            PersonName.is_active.is_(True),
-        )
-        .first()
-    )
-    name_history = (
-        db.query(PersonName)
-        .filter(PersonName.person_id == person_id)
-        .order_by(PersonName.created_at.desc())
-        .all()
-    )
-    current_rank = (
-        db.query(PersonRank)
-        .filter(
-            PersonRank.person_id == person_id,
-            PersonRank.is_active.is_(True),
-        )
-        .first()
-    )
-
-    return templates.TemplateResponse(
-        request=request,
-        name="person_detail.html",
-        context={
-            "person": person,
-            "current_name": current_name,
-            "name_history": name_history,
-            "current_rank": current_rank,
-        },
-    )
-
-# my try names
-@router.get("/person_full_info/{person_id}")
-def get_person_full_info(
-    request: Request, 
-    person_id: int, 
-    db: Session = Depends(get_db),
-    ):
-    person = CommonPersonFunc.get_person_or_raise(person_id, db)
-    current_name = (
-            db.query(PersonName)
-            .filter(
-                PersonName.person_id == person_id,
-                PersonName.is_active.is_(True),
-            )
-            .first()
-        )
-    return templates.TemplateResponse(
-        request=request,
-        name = "person_full_info.html",
-        context = {
-            "person": person,
-            "current_name": current_name,
-            "person_id" : person_id,
-            
-        }
-    )
-
-@router.post("/person_name/add_new/{person_id}")
-def add_new_name_to_person(
-    person_id: int,
-    request: Request,
-    surname: Annotated[str, Form()],
-    name: Annotated[str, Form()],
-    patronymic: Annotated[str | None, Form()] = None,
-    surname_latin: Annotated[str | None, Form()] = None,
-    name_latin: Annotated[str | None, Form()] = None,
-    patronymic_latin: Annotated[str | None, Form()] = None,
-    db: Session = Depends(get_db),
-):
-    form_data = {
-        "surname": surname,
-        "name": name,
-        "patronymic": patronymic,
-        "surname_latin": surname_latin,
-        "name_latin": name_latin,
-        "patronymic_latin": patronymic_latin,
-    }
-    CommonPersonFunc.add_new_name(person_id, form_data, db)
-    
-    return RedirectResponse(
-        url=f"/person_full_info/{person_id}",
-        status_code=303,
-        )
-
-@router.post("/person_name/{person_name_id}/update")
-def update_name_to_person(
-    person_name_id: int,
-    request: Request,
-    surname: Annotated[str, Form()],
-    name: Annotated[str, Form()],
-    patronymic: Annotated[str | None, Form()] = None,
-    surname_latin: Annotated[str | None, Form()] = None,
-    name_latin: Annotated[str | None, Form()] = None,
-    patronymic_latin: Annotated[str | None, Form()] = None,
-    db: Session = Depends(get_db),
-):
-    form_data = {
-        "surname": surname,
-        "name": name,
-        "patronymic": patronymic,
-        "surname_latin": surname_latin,
-        "name_latin": name_latin,
-        "patronymic_latin": patronymic_latin,
-    }
-
-    person_name = CommonPersonFunc.update_person_name(person_name_id, form_data, db)
-    
-    return RedirectResponse(
-        url=f"/person_full_info/{person_name.person_id}",
-        status_code=303,
-    )
-
-@router.post("/person_name/{person_name_id}/make_active")
-def change_name_to_active(
-    person_name_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    person_id = CommonPersonFunc.change_person_name_to_active(person_name_id, db)
-    return RedirectResponse(
-        url=f"/person_full_info/{person_id}",
-        status_code=303,
-    )
-
-@router.post("/person_name/{person_name_id}/delete")
-def delete_person_name(
-    person_name_id: int,
-    confirmation: Annotated[str, Form()],
-    db: Session = Depends(get_db),
-):
-    try:
-        person_id = CommonPersonFunc.delete_person_name(
-            person_name_id,
-            confirmation,
-            db,
-        )
-    except ValueError:
-        person_name = (
-            db.query(PersonName)
-            .filter(PersonName.person_name_id == person_name_id)
-            .first()
-        )
-
-
-        return RedirectResponse(
-            url=f"/person_full_info/{person_name.person_id}",
-            status_code=303,
-        )
-    return  RedirectResponse(
-        url = f"/person_full_info/{person_id}",
-        status_code=303,
-    )
-
-#funtions for ranks
-@router.post("/person_ranks/add_rank/{person_id}")
-def add_new_rank_to_person(
-    person_id: int,
-    request: Request,
-    rank: Annotated[str, Form()],
-    rank_order_number: Annotated[str | None, Form()] = None,
-    rank_order_date: Annotated[str | None, Form()] = None,
-    db: Session = Depends(get_db),
-):
-    rank_order_date_date = (
-        datetime.strptime(rank_order_date, "%d.%m.%Y").date()
-        if rank_order_date
-        else None
-    )
-    form_data = {
-        "rank": rank,
-        "rank_order_number": rank_order_number,
-        "rank_order_date": rank_order_date_date,
-    }
-    try:
-        CommonPersonFunc.add_rank(person_id, form_data, db)
-    except ValueError:
-        return RedirectResponse(
-                url=f"/person_full_info/{person_id}",
-                status_code=303,
-                )
-    
-    return RedirectResponse(
-        url=f"/person_full_info/{person_id}",
-        status_code=303,
-        )
-
-@router.post("/person_ranks/{person_rank_id}/make_active")
-def change_rank_to_active(
-    person_rank_id: int,
-    request: Request,
-    db: Session = Depends(get_db),
-):
-    person_id = CommonPersonFunc.change_person_rank_to_active(person_rank_id, db)
-    return RedirectResponse(
-        url=f"/person_full_info/{person_id}",
-        status_code=303,
-    )
-
-@router.post("/person_ranks/{person_rank_id}/update")
-def update_rank_to_person(
-    person_rank_id: int,
-    request: Request,
-    rank: Annotated[str, Form()],
-    rank_order_number: Annotated[str | None, Form()] = None,
-    rank_order_date: Annotated[str | None, Form()] = None,
-    db: Session = Depends(get_db),
-):
-    rank_order_date_date = (
-            datetime.strptime(rank_order_date, "%d.%m.%Y").date()
-            if rank_order_date
-            else None
-        )
-    form_data = {
-            "rank": rank,
-            "rank_order_number": rank_order_number,
-            "rank_order_date": rank_order_date_date,
-        }
-
-    person_rank = CommonPersonFunc.update_person_rank(person_rank_id, form_data, db)
-    
-    return RedirectResponse(
-        url=f"/person_full_info/{person_rank.person_id}",
-        status_code=303,
-    )
-
-@router.post("/person_ranks/{person_rank_id}/delete")
-def delete_person_rank(
-    person_rank_id: int,
-    confirmation: Annotated[str, Form()],
-    db: Session = Depends(get_db),
-):
-    try:
-        person_id = CommonPersonFunc.delete_person_rank(
-            person_rank_id,
-            confirmation,
-            db,
-        )
-    except ValueError:
-        person_rank = (
-            db.query(PersonRank)
-            .filter(PersonRank.person_rank_id == person_rank_id)
-            .first()
-        )
-        return RedirectResponse(
-            url=f"/person_full_info/{person_rank.person_id}",
-            status_code=303,
-        )
-    return  RedirectResponse(
-        url = f"/person_full_info/{person_id}",
-        status_code=303,
-    )
 

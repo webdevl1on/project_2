@@ -1,12 +1,14 @@
 from fastapi import FastAPI
-from app.routers.persons import router as persons_router
 
-app = FastAPI(
-    title="Project 2.0"
-)
+from app.routers import persons
+from app.routers import person_name
+from app.routers import person_rank
+from app.routers import person_service
 
-app.include_router(persons_router)
 
-@app.get("/")
-def root():
-    return {"message": "Project 2.0"}
+app = FastAPI()
+
+app.include_router(persons.router)
+app.include_router(person_name.router)
+app.include_router(person_rank.router)
+#app.include_router(person_service.router)

@@ -35,7 +35,6 @@ def seed_event_subtypes(db):
             .first()
         )
         if not event_type:
-            print(f"Event type {event_type_code} not found, skipping subtypes.")
             continue
         for subtype_code, subtype_name in subtypes:
             exists = (
@@ -47,5 +46,5 @@ def seed_event_subtypes(db):
                 continue
             db.add(EventSubtype(event_type_id=event_type.event_type_id, event_subtype=subtype_code, event_subtype_name=subtype_name))
             db.flush()
-    print("Rows:", db.query(EventSubtype).count()) 
+    print("=== SEED EVENT_SUBTYPES END ===") 
 

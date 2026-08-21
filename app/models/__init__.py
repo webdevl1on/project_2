@@ -9,7 +9,7 @@ model is registered in SQLAlchemy metadata.
 """
 
 from app.models.person_identity import Passport, PersonName
-from app.models.person_military_service import PersonRank
+from app.models.person_military_service import PersonRank, PersonServiceHistory 
 
 __all__ = [
     "EventSubtype",
@@ -19,4 +19,5 @@ __all__ = [
     "PersonEvent",
     "PersonName",
     "PersonRank",
+    "PersonServiceHistory",
 ]

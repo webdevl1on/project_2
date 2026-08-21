@@ -23,10 +23,10 @@
             <td>{{loop.index}}</td>
             <td>{{ranks.rank}}</td>
             <td>{{ranks.rank_order_number}}</td>
-            <td>{{ranks.rank_order_date}}</td>
+            <td>{{ranks.rank_order_date.strftime("%d.%m.%Y") if ranks.rank_order_date else ""}}</td>
             <td><button class="btn btn-sm btn-warning" data-bs-toggle="modal"
                     data-bs-target="#editRankModal{{ranks.person_rank_id}}">Ред</button>
-                <!-- Modal for change name-->
+                <!-- Modal for change ranks-->
                 <div class="modal fade" id="editRankModal{{ranks.person_rank_id}}" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog">
                         <div class="modal-content">
@@ -52,8 +52,8 @@
                                     </div>
                                     <div class="col-md-6">
                                         <label for="rank_order_date">Дата наказу</label>
-                                        <input id="rank_order_date" name="rank_order_date"
-                                            value="{{ranks.rank_order_date or ''}}">
+                                        <input id="rank_order_date" class="date-mask" name="rank_order_date"
+                                            value="{{ranks.rank_order_date.strftime('%d.%m.%Y') if ranks.rank_order_date else ''}}">
                                     </div>
 
 

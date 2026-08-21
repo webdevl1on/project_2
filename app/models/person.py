@@ -8,6 +8,7 @@ from app.database.base import Base
 if TYPE_CHECKING:
     from app.models.person_identity import PersonName
     from app.models.person_military_service import PersonRank
+    from app.models.person_military_service import PersonServiceHistory
 
 class Person(Base):
     __tablename__ = "persons"
@@ -34,6 +35,9 @@ class Person(Base):
     )
     ranks: Mapped[list["PersonRank"]] = relationship(
         back_populates="person"
+    )
+    service_history: Mapped[list["PersonServiceHistory"]] = relationship(
+    back_populates="person"
     )
     
     
