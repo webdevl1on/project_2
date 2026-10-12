@@ -2,9 +2,13 @@ from turtle import position
 from typing import Optional
 
 from sqlalchemy import Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.person_positions import PersonPosition
 
 
 class Rank(Base):
@@ -112,4 +116,7 @@ class Position(Base):
     name_vocative: Mapped[str] = mapped_column(
         String,
         nullable=False,
+    )
+    persons: Mapped[list["PersonPosition"]] = relationship(
+    back_populates="position"
     )

@@ -2,6 +2,8 @@ from app.models.person import Person
 from app.models.event_type import EventType
 from app.models.event_subtype import EventSubtype
 from app.models.person_event import PersonEvent
+from app.models.reference_book import Rank, Position
+from app.models.person_positions import PersonPosition
 """Central registry of SQLAlchemy models.
 
 Import this module before calling ``Base.metadata.create_all()`` so every
@@ -20,4 +22,8 @@ __all__ = [
     "PersonName",
     "PersonRank",
     "PersonServiceHistory",
+    "Rank",
+    "Position",
+    "PersonPosition",
+    
 ]

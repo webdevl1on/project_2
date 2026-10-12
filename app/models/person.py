@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from app.models.person_identity import PersonName
     from app.models.person_military_service import PersonRank
     from app.models.person_military_service import PersonServiceHistory
+    from app.models.person_positions import PersonPosition
 
 class Person(Base):
     __tablename__ = "persons"
@@ -39,5 +40,7 @@ class Person(Base):
     service_history: Mapped[list["PersonServiceHistory"]] = relationship(
     back_populates="person"
     )
-    
+    positions: Mapped[list["PersonPosition"]] = relationship(
+    back_populates="person"
+    )
     
