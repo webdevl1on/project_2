@@ -1,5 +1,5 @@
-
 from app.validators.person_validator import PersonValidator
+from app.utils.date_utils import validate_date_components
 
 
 class DataGroupValidate:
@@ -7,9 +7,15 @@ class DataGroupValidate:
 
     @staticmethod
     def validate_person_base_data(data):
+        birth_components = validate_date_components(
+            data.get("birth_day"),
+            data.get("birth_month"),
+            data.get("birth_year"),
+            full=False,
+        )
         return {
             "tax_number" : PersonValidator.validate_tax_number(data.get("tax_number")),
-            "birth_date" : PersonValidator.validate_date(data.get("birth_date"))
+            **birth_components.as_dict(),
         }
 
 
@@ -23,12 +29,3 @@ class DataGroupValidate:
             "name_latin": PersonValidator.validate_names(data.get("name_latin")),
             "patronymic_latin": PersonValidator.validate_names(data.get("patronymic_latin")),
         }
-
-    
-    @staticmethod
-    def validate_rank_data(data):
-        return {
-            "rank" : PersonValidator.validate_person_rank(data.get("rank")),
-            "rank_order_number" : PersonValidator.validate_person_rank(data.get("rank_order_number")),
-            "rank_order_date" : PersonValidator.validate_date(data.get("rank_order_date")),
-        }   

@@ -11,6 +11,27 @@ from app.services.service_person_group_data_validation import DataGroupValidate
 #add and another RANK functions
 class ServicePersonRankFunc:
     @staticmethod
+    def _get_rank_or_raise(rank_id, db):
+        if not rank_id:
+            raise ValueError("Оберіть звання.")
+
+        rank = db.get(Rank, rank_id)
+        if not rank:
+            raise ValueError("Обране звання не знайдено.")
+        return rank
+
+    @staticmethod
+    def _get_rank_data(data):
+        return {
+            "rank_order_number": PersonValidator.validate_person_rank(
+                data.get("rank_order_number")
+            ),
+            "rank_order_date": PersonValidator.validate_date(
+                data.get("rank_order_date")
+            ),
+        }
+
+    @staticmethod
     def add_rank(
         person_id,
         data,
@@ -19,18 +40,8 @@ class ServicePersonRankFunc:
         ServicePersonCheck.get_person_or_raise(person_id, db)
 
         rank_id = data.get("rank_id")
-
-        if not rank_id:
-            raise ValueError("Rank is required!")
-
-        rank = (
-            db.query(Rank)
-            .filter(Rank.rank_id == rank_id)
-            .first()
-        )
-
-        if not rank:
-            raise ValueError("Selected rank was not found.")
+        ServicePersonRankFunc._get_rank_or_raise(rank_id, db)
+        rank_data = ServicePersonRankFunc._get_rank_data(data)
 
         same_rank = (
             db.query(PersonRank)
@@ -42,7 +53,7 @@ class ServicePersonRankFunc:
         )
 
         if same_rank:
-            raise ValueError("This rank is already exist")
+            raise ValueError("Таке звання вже є в історії людини.")
 
         current_rank = (
             db.query(PersonRank)
@@ -56,8 +67,8 @@ class ServicePersonRankFunc:
         person_rank = PersonRank(
             person_id=person_id,
             rank_id=rank_id,
-            rank_order_number=data.get("rank_order_number"),
-            rank_order_date=data.get("rank_order_date"),
+            rank_order_number=rank_data["rank_order_number"],
+            rank_order_date=rank_data["rank_order_date"],
             is_active=False,
         )
 
@@ -87,22 +98,12 @@ class ServicePersonRankFunc:
             raise ValueError("Person rank record was not found.")
 
         rank_id = data.get("rank_id")
-
-        if not rank_id:
-            raise ValueError("Rank is required!")
-
-        rank = (
-            db.query(Rank)
-            .filter(Rank.rank_id == rank_id)
-            .first()
-        )
-
-        if not rank:
-            raise ValueError("Selected rank was not found.")
+        ServicePersonRankFunc._get_rank_or_raise(rank_id, db)
+        rank_data = ServicePersonRankFunc._get_rank_data(data)
 
         person_rank.rank_id = rank_id
-        person_rank.rank_order_number = data.get("rank_order_number")
-        person_rank.rank_order_date = data.get("rank_order_date")
+        person_rank.rank_order_number = rank_data["rank_order_number"]
+        person_rank.rank_order_date = rank_data["rank_order_date"]
 
         db.commit()
         db.refresh(person_rank)
@@ -122,39 +123,32 @@ class ServicePersonRankFunc:
         )
         if not person_rank:
             raise ValueError("Person name not found")  
+        if person_rank.is_active:
+            raise ValueError("Не можна видалити активне звання.")
         person_id = person_rank.person_id
         db.delete(person_rank)
         db.commit()
         return person_id
 
     @staticmethod
-    def change_person_rank(person_id, data, db):
-        ServicePersonCheck.get_person_or_raise(person_id, db)
+    def change_person_rank_to_active(person_rank_id, db):
+        new_active_rank = db.get(PersonRank, person_rank_id)
+        if not new_active_rank:
+            raise ValueError("Запис про звання не знайдено.")
+
         current_rank = (
             db.query(PersonRank)
-            .filter(PersonRank.person_id == person_id,
-                    PersonRank.date_to.is_(None))
+            .filter(
+                PersonRank.person_id == new_active_rank.person_id,
+                PersonRank.is_active.is_(True),
+                PersonRank.person_rank_id != person_rank_id,
+            )
             .first()
         )
-        if not current_rank:
-            raise ValueError("Current person rank was not found")
-        validated_data = {}
-        if data.get("rank"):
-            validated_data['rank'] = PersonValidator.validate_person_rank(data.get("rank"))
-        if data.get("rank_order_number"):
-            validated_data['rank'] = PersonValidator.validate_person_rank(data.get("rank_order_number"))
-        if data.get("rank_order_date"):
-            validated_data['rank_order_date'] = PersonValidator.validate_date(data.get("rank_order_date"))
-        
-        new_person_rank = PersonRank(
-            person_id = person_id,
-            rank = validated_data.get('rank'),
-            rank_order_number = validated_data.get('rank_order_number'),
-            rank_order_date = validated_data.get('rank_order_date'),
-            
-        )
-        db.add(new_person_rank)
+        if current_rank:
+            current_rank.is_active = False
+
+        new_active_rank.is_active = True
         db.commit()
-        db.refresh(new_person_rank)
-        return new_person_rank
+        return new_active_rank.person_id
 

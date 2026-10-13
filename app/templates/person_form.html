@@ -13,14 +13,13 @@
     {% if error %}
     <div class="alert alert-danger">{{ error }}</div>
     {% endif %}
-    123123123123
     <form method="post" action="{{ form_action or '/persons/new' }}" class="row g-3">
         <div class="col-md-6">
             <label class="form-label" for="surname">Прізвище *</label>
             <input class="form-control" id="surname" name="surname" required value="{{ form_data.get('surname', '') }}">
         </div>
         <div class="col-md-6">
-            <label class="form-label" for="name">Ім'я123 *</label>
+            <label class="form-label" for="name">Ім'я *</label>
             <input class="form-control" id="name" name="name" required value="{{ form_data.get('name', '') }}">
         </div>
         <div class="col-md-6">
@@ -32,24 +31,25 @@
             <input class="form-control" id="tax_number" name="tax_number" inputmode="numeric"
                 value="{{ form_data.get('tax_number', '') }}">
         </div>
-        <div class="col-md-6">
-            <label class="form-label" for="birth_date">Дата народження (ДД.ММ.РРРР)</label>
-            <input class="form-control" id="birth_date" name="birth_date" placeholder="01.12.1990"
-                value="{{ form_data.get('birth_date', '') }}">
-        </div>
-        <div class="col-md-6">
-            <label class="form-label" for="rank">Звання</label>
-            <input class="form-control" id="rank" name="rank" value="{{ form_data.get('rank', '') }}">
-        </div>
-        <div class="col-md-6">
-            <label class="form-label" for="rank_order_number">Номер наказу на присвоєння звання</label>
-            <input class="form-control" id="rank_order_number" name="rank_order_number"
-                value="{{ form_data.get('rank_order_number', '') }}">
-        </div>
-        <div class="col-md-6">
-            <label class="form-label" for="rank_order_date">Дата наказу на присвоєння звання</label>
-            <input class="form-control" id="rank_order_date" name="rank_order_date"
-                value="{{ form_data.get('rank_order_date', '') }}">
+        <div class="col-md-12">
+            <label class="form-label">Дата народження</label>
+            <div class="row g-2" id="birth-date-fields">
+                <div class="col-md-3">
+                    <input class="form-control birth-date-part" id="birth_day" name="birth_day"
+                        inputmode="numeric" maxlength="2" list="birth-days" placeholder="День"
+                        value="{{ form_data.get('birth_day', '') }}">
+                </div>
+                <div class="col-md-3">
+                    <input class="form-control birth-date-part" id="birth_month" name="birth_month"
+                        inputmode="numeric" maxlength="2" list="birth-months" placeholder="Місяць"
+                        value="{{ form_data.get('birth_month', '') }}">
+                </div>
+                <div class="col-md-3">
+                    <input class="form-control birth-date-part" id="birth_year" name="birth_year"
+                        inputmode="numeric" maxlength="4" list="birth-years" placeholder="Рік"
+                        value="{{ form_data.get('birth_year', '') }}">
+                </div>
+            </div>
         </div>
         <div class="col-12">
             <button class="btn btn-primary" type="submit">{{ submit_label or "Зберегти" }}</button>
@@ -57,5 +57,52 @@
         </div>
     </form>
 </body>
+
+<datalist id="birth-days">
+    {% for value in range(1, 32) %}
+    <option value="{{ '%02d'|format(value) }}"></option>
+    {% endfor %}
+</datalist>
+<datalist id="birth-months">
+    {% for value in range(1, 13) %}
+    <option value="{{ '%02d'|format(value) }}"></option>
+    {% endfor %}
+</datalist>
+<datalist id="birth-years"></datalist>
+
+<script>
+    const birthDateParts = Array.from(document.querySelectorAll(".birth-date-part"));
+    const birthYears = document.getElementById("birth-years");
+    for (let year = new Date().getFullYear(); year >= 1; year -= 1) {
+        const option = document.createElement("option");
+        option.value = year;
+        birthYears.appendChild(option);
+    }
+
+    birthDateParts.forEach((input, index) => {
+        input.addEventListener("input", () => {
+            input.value = input.value.replace(/\D/g, "");
+            if (index < birthDateParts.length - 1 && input.value.length === input.maxLength) {
+                birthDateParts[index + 1].focus();
+            }
+        });
+    });
+
+    document.querySelector("form").addEventListener("submit", (event) => {
+        const [day, month, year] = birthDateParts.map((input) => input.value.trim());
+        const values = [day, month, year].filter(Boolean);
+
+        if (!values.length) {
+            return;
+        }
+
+        if ((day && (Number(day) < 1 || Number(day) > 31)) ||
+            (month && (Number(month) < 1 || Number(month) > 12)) ||
+            (year && (Number(year) < 1 || Number(year) > new Date().getFullYear()))) {
+            event.preventDefault();
+            alert("Перевірте компоненти дати народження.");
+        }
+    });
+</script>
 
 </html>

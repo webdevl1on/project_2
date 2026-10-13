@@ -10,6 +10,7 @@
 <body class="container py-4">
     <a href="/persons" class="btn btn-outline-secondary mb-3">До списку</a>
     <a href="/persons" class="btn btn-outline-secondary mb-3">Видалити</a>
+    <a href="/persons/{{ person.person_id }}/edit" class="btn btn-outline-primary mb-3">Редагувати дані</a>
     <a href="/person_full_info/{{ person.person_id }}" class="btn btn-outline-secondary mb-3">Повна інформація та
         редагування</a>
 
@@ -24,11 +25,11 @@
         <dd class="col-sm-9">{{ person.tax_number or "-" }}</dd>
 
         <dt class="col-sm-3">Дата народження</dt>
-        <dd class="col-sm-9">{{ person.birth_date or "-" }}</dd>
+        <dd class="col-sm-9">{{ format_partial_date(person.birth_day, person.birth_month, person.birth_year) or "-" }}</dd>
 
         {% if current_rank %}
         <dt class="col-sm-3">Звання</dt>
-        <dd class="col-sm-9">{{ current_rank.rank or "-" }}</dd>
+        <dd class="col-sm-9">{{ current_rank.rank.nominative }}</dd>
 
         <dt class="col-sm-3">Наказ про звання</dt>
         <dd class="col-sm-9">

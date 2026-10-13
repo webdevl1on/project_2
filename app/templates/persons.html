@@ -18,7 +18,7 @@
             <select class="form-select" name="sort_by">
                 <option value="surname" {% if sort_by=="surname" %}selected{% endif %}>Прізвище</option>
                 <option value="name" {% if sort_by=="name" %}selected{% endif %}>Ім'я</option>
-                <option value="birth_date" {% if sort_by=="birth_date" %}selected{% endif %}>Дата народження</option>
+                <option value="birth_year" {% if sort_by=="birth_year" %}selected{% endif %}>Рік народження</option>
                 <option value="rank" {% if sort_by=="rank" %}selected{% endif %}>Звання</option>
 
             </select>
@@ -108,8 +108,8 @@
                 <td class="col-surname">{{ item.name.surname if item.name else "—" }}</td>
                 <td>{{ item.name.name if item.name else "—" }}</td>
                 <td>{{ item.person.tax_number or "—" }}</td>
-                <td>{{ item.person.birth_date or "—" }}</td>
-                <td class="col-rank">{{ item.rank.rank if item.rank else "—" }}</td>
+                <td>{{ format_partial_date(item.person.birth_day, item.person.birth_month, item.person.birth_year) or "—" }}</td>
+                <td class="col-rank">{{  item.rank.rank.nominative if item.rank and item.rank.rank else "—" }}</td>
                 <td class="col-rank_order_number">{{ item.rank.rank_order_number if item.rank else "—" }}</td>
             </tr>
             {% endfor %}

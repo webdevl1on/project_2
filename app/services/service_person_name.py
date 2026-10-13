@@ -52,7 +52,19 @@ class ServicePersonNameFunc:
         if not person_name:
             raise ValueError("Person name record was not found.")
 
-        name_data = DataGroupValidate.validate_name_data(data)
+        # A partial update changes only supplied fields. A full browser form
+        # still passes every field, including optional fields to be cleared.
+        source_data = {
+            "surname": data["surname"] if "surname" in data else person_name.surname,
+            "name": data["name"] if "name" in data else person_name.name,
+            "patronymic": data["patronymic"] if "patronymic" in data else person_name.patronymic,
+            "surname_latin": data["surname_latin"] if "surname_latin" in data else person_name.surname_latin,
+            "name_latin": data["name_latin"] if "name_latin" in data else person_name.name_latin,
+            "patronymic_latin": data["patronymic_latin"] if "patronymic_latin" in data else person_name.patronymic_latin,
+        }
+        name_data = DataGroupValidate.validate_name_data(source_data)
+        if not name_data["surname"] or not name_data["name"]:
+            raise ValueError("Surname and name required!")
 
         person_name.surname = name_data["surname"]
         person_name.name = name_data["name"]
@@ -109,6 +121,3 @@ class ServicePersonNameFunc:
         db.commit()
 
         return person_id
-
-
-    

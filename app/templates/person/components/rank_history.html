@@ -18,16 +18,16 @@
     <tbody>
 
 
-        {% for ranks in person.ranks %}
-        <tr {% if ranks.is_active %} style="border: rgb(10, 50, 184) solid;" {% endif %}>
+        {% for person_rank in person.ranks %}
+        <tr {% if person_rank.is_active %} style="border: rgb(10, 50, 184) solid;" {% endif %}>
             <td>{{loop.index}}</td>
-            <td>{{ranks.rank}}</td>
-            <td>{{ranks.rank_order_number}}</td>
-            <td>{{ranks.rank_order_date.strftime("%d.%m.%Y") if ranks.rank_order_date else ""}}</td>
+            <td>{{ person_rank.rank.nominative }}</td>
+            <td>{{ person_rank.rank_order_number }}</td>
+            <td>{{ person_rank.rank_order_date.strftime("%d.%m.%Y") if person_rank.rank_order_date else "" }}</td>
             <td><button class="btn btn-sm btn-warning" data-bs-toggle="modal"
-                    data-bs-target="#editRankModal{{ranks.person_rank_id}}">Ред</button>
+                    data-bs-target="#editRankModal{{ person_rank.person_rank_id }}">Ред</button>
                 <!-- Modal for change ranks-->
-                <div class="modal fade" id="editRankModal{{ranks.person_rank_id}}" tabindex="-1" aria-hidden="true">
+                <div class="modal fade" id="editRankModal{{ person_rank.person_rank_id }}" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog">
                         <div class="modal-content">
                             <div class="modal-header">
@@ -37,23 +37,24 @@
                             </div>
                             <div class="modal-body">
                                 <form method="post" class="row g-3"
-                                    action="/person_ranks/{{ranks.person_rank_id}}/update">
-                                    {% for key in person.ranks.keys%}
-                                    {{key}}
-                                    {% endfor %}
+                                    action="/person_ranks/{{ person_rank.person_rank_id }}/update">
                                     <div class="col-md-6">
-                                        <label for="rank">Звання *</label>
-                                        <input id="rank" name="rank" required value="{{ranks.rank}}">
+                                        <label for="rank_id">Звання *</label>
+                                        <select id="rank_id" name="rank_id" required class="form-select">
+                                            {% for rank in ranks %}
+                                            <option value="{{ rank.rank_id }}" {% if rank.rank_id == person_rank.rank_id %}selected{% endif %}>{{ rank.nominative }}</option>
+                                            {% endfor %}
+                                        </select>
                                     </div>
                                     <div class="col-md-6">
                                         <label for="rank_order_number">№ наказу</label>
                                         <input id="rank_order_number" name="rank_order_number"
-                                            value="{{ ranks.rank_order_number or '' }}">
+                                            value="{{ person_rank.rank_order_number or '' }}">
                                     </div>
                                     <div class="col-md-6">
                                         <label for="rank_order_date">Дата наказу</label>
                                         <input id="rank_order_date" class="date-mask" name="rank_order_date"
-                                            value="{{ranks.rank_order_date.strftime('%d.%m.%Y') if ranks.rank_order_date else ''}}">
+                                            value="{{ person_rank.rank_order_date.strftime('%d.%m.%Y') if person_rank.rank_order_date else '' }}">
                                     </div>
 
 
@@ -71,10 +72,10 @@
 
             </td>
             <td>
-                {% if ranks.is_active %}
+                {% if person_rank.is_active %}
                 <span class="badge bg-success">Активний</span>
                 {% else %}
-                <form method="post" action="/person_ranks/{{ ranks.person_rank_id }}/make_active">
+                <form method="post" action="/person_ranks/{{ person_rank.person_rank_id }}/make_active">
                     <button class="btn btn-sm btn-success">
                         Зробити активним
                     </button>
@@ -84,9 +85,9 @@
 
             <td>
                 <button class="btn btn-sm btn-danger" data-bs-toggle="modal"
-                    data-bs-target="#deleteRankRecord{{ranks.person_rank_id}}">DEL</button>
+                    data-bs-target="#deleteRankRecord{{ person_rank.person_rank_id }}">DEL</button>
                 <!----modal for delete----->
-                <div class="modal fade" id="deleteRankRecord{{ranks.person_rank_id}}" tabindex="-1"
+                <div class="modal fade" id="deleteRankRecord{{ person_rank.person_rank_id }}" tabindex="-1"
                     aria-labelledby="deleteRankRecordLabel" aria-hidden="true">
                     <div class="modal-dialog">
                         <div class="modal-content">
@@ -97,7 +98,7 @@
                             </div>
                             <div class="modal-body">
                                 <form method="post" class="row g-3"
-                                    action="/person_ranks/{{ ranks.person_rank_id }}/delete">
+                                    action="/person_ranks/{{ person_rank.person_rank_id }}/delete">
                                     <input type="text" name="confirmation" placeholder="Введіть DELETE" required>
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-secondary"

@@ -29,7 +29,9 @@ class CommonPersonFunc:
             )
 
         person.tax_number = person_data["tax_number"]
-        person.birth_date = person_data["birth_date"]
+        person.birth_day = person_data["birth_day"]
+        person.birth_month = person_data["birth_month"]
+        person.birth_year = person_data["birth_year"]
 
         current_name = (
             db.query(PersonName)

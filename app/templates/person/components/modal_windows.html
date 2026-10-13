@@ -54,8 +54,13 @@
             <div class="modal-body">
                 <form method="post" class="row g-3" action="/person_ranks/add_rank/{{person_id}}">
                     <div class="col-md-6">
-                        <label for="rank">Звання *</label>
-                        <input id="rank" name="rank" required>
+                        <label for="rank_id">Звання *</label>
+                        <select id="rank_id" name="rank_id" required class="form-select">
+                            <option value="">Оберіть звання</option>
+                            {% for rank in ranks %}
+                            <option value="{{ rank.rank_id }}">{{ rank.nominative }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <div class="col-md-6">
                         <label for="rank_order_number">Номер наказу</label>

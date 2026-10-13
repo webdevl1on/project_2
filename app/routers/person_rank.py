@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -21,14 +20,14 @@ router = APIRouter(
 def add_new_rank_to_person(
     person_id: int,
     request: Request,
-    rank: Annotated[str, Form()],
+    rank_id: Annotated[int, Form()],
     rank_order_number: Annotated[str | None, Form()] = None,
     rank_order_date: Annotated[str | None, Form()] = None,
     db: Session = Depends(get_db),
 ):
 
     form_data = {
-        "rank": rank,
+        "rank_id": rank_id,
         "rank_order_number": rank_order_number,
         "rank_order_date": rank_order_date,
     }
@@ -61,20 +60,15 @@ def change_rank_to_active(
 def update_rank_to_person(
     person_rank_id: int,
     request: Request,
-    rank: Annotated[str, Form()],
+    rank_id: Annotated[int, Form()],
     rank_order_number: Annotated[str | None, Form()] = None,
     rank_order_date: Annotated[str | None, Form()] = None,
     db: Session = Depends(get_db),
-):
-    rank_order_date_date = (
-            datetime.strptime(rank_order_date, "%d.%m.%Y").date()
-            if rank_order_date
-            else None
-        )
+    ):
     form_data = {
-            "rank": rank,
+            "rank_id": rank_id,
             "rank_order_number": rank_order_number,
-            "rank_order_date": rank_order_date_date,
+            "rank_order_date": rank_order_date,
         }
 
     person_rank = ServicePersonRankFunc.update_person_rank(person_rank_id, form_data, db)

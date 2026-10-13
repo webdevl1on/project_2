@@ -12,7 +12,7 @@
     {% include "person/components/full_info_top_navigation.html" %}
 
     <h1>Картка військовослужбовця</h1>
-    <p>{{ current_rank.rank }} {{ current_name.surname }} {{ current_name.name }} {{ current_name.patronymic }}</p>
+    <p>{{ current_rank.rank.nominative if current_rank else "" }} {{ current_name.surname if current_name else "" }} {{ current_name.name if current_name else "" }} {{ current_name.patronymic if current_name and current_name.patronymic else "" }}</p>
 
 
 
