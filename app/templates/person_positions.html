@@ -17,17 +17,73 @@
         white-space: normal;
     }
     .filter-menu [hidden] { display: none !important; }
+    /* Загальні розмір і вирівнювання кнопки зі значком фільтра. */
     .filter-toggle {
-        position: relative;
-        width: 26px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
         height: 26px;
+        padding: 0 !important;
         flex-shrink: 0;
+        line-height: 1;
     }
+    /* Неактивна кнопка без рамки та фону. */
+    .filter-toggle:not(.filter-toggle-active) {
+        border-color: transparent !important;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+    /* Легке підсвічування неактивної кнопки під час наведення або фокуса. */
+    .filter-toggle:not(.filter-toggle-active):hover,
+    .filter-toggle:not(.filter-toggle-active):focus-visible {
+        border-color: #dee2e6 !important;
+        background: #f8f9fa !important;
+    }
+    /* Базові розмір, колір і позиція трикутника. */
+    .filter-toggle-triangle {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 17px;
+        height: 16px;
+        padding: 0;
+        color: #6c757d;
+        font-size: 15px;
+        line-height: 1;
+    }
+    /* Розмір трикутника в кнопці з активним фільтром. */
+    .filter-toggle-active .filter-toggle-triangle {
+        width: 19px;
+        height: 18px;
+        padding-top: 3px;
+        font-size: 19px;
+        color: #ddd7d7;
+       
+    }
+    /* Номер активного фільтра поверх трикутника; змінюй top для вертикального зсуву. */
     .filter-toggle .filter-number {
         position: absolute;
-        top: -11px;
-        right: -6px;
-        font-size: 10px;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #0602f8;
+        font-size: 16px;
+        font-weight: 700;
+        line-height: 1;
+        pointer-events: none;
+    }
+    /* Відстань між назвою колонки та кнопкою фільтра. */
+    .position-column-heading {
+        min-width: 0;
+        gap: 5px !important;
+    }
+    /* Дозволяє довгій назві колонки вміститися, не зсуваючи кнопку. */
+    .position-column-heading > a {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     thead th { padding-top: 16px !important; }
 </style>
@@ -84,21 +140,23 @@
                         ("patronymic", "По батькові")
                     ] %}
                     <th>
-                        <div class="d-flex align-items-center gap-1 text-nowrap">
+                        <div class="position-column-heading d-flex align-items-center text-nowrap">
                             <a href="{{ sort_urls[key] }}" class="text-decoration-none">
                                 {{ label }}
                                 {% if sort_by == key %}
-                                <small>{{ "▲" if direction == "asc" else "▼" }}</small>
+                                <small>{{ "" if direction == "asc" else "" }}</small>
                                 {% endif %}
                             </a>
+                            
                             <div class="dropdown">
-                                <button class="btn btn-sm {{ 'btn-primary' if key in filter_numbers else 'btn-outline-secondary' }} py-0 px-1 filter-toggle" type="button"
+                                <button class="btn btn-sm filter-toggle {{ 'filter-toggle-active border-primary text-primary' if key in filter_numbers else 'text-secondary' }}" type="button"
                                     data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
                                     aria-label="Фільтр: {{ label }}" title="Фільтр: {{ label }}">
-                                    ▾
+                                    <span class="filter-toggle-triangle" aria-hidden="true">▼
                                     {% if key in filter_numbers %}
-                                    <span class="badge rounded-pill bg-primary filter-number">{{ filter_numbers[key] }}</span>
+                                    <span class="filter-number">{{ filter_numbers[key] }}</span>
                                     {% endif %}
+                                    </span>
                                 </button>
                                 <div class="dropdown-menu p-2 filter-menu" data-filter-key="{{ key }}">
                                     <a class="dropdown-item sort-command px-1" href="{{ sort_commands[key]['asc'] }}">Сортувати за зростанням</a>
