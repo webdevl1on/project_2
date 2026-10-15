@@ -98,29 +98,37 @@
                         {{ item.name.patronymic if item.name else "—" }}
                     </td>
                     <td>
-                        <form method="post" action="/person-positions/assign" class="d-flex gap-2">
+                        <form method="post" action="/person-positions/assign"
+                            class="d-flex gap-2 person-assignment-form">
 
                             <input type="hidden" name="position_id" value="{{ item.position.position_id }}">
 
-                            <select name="person_id" class="form-select form-select-sm">
-                                <option value="">— Вільна посада —</option>
+                            <div class="person-selector flex-grow-1">
+                                <input type="search" class="form-control form-control-sm person-search mb-1"
+                                    placeholder="Пошук за ПІБ..." autocomplete="off">
 
-                                {% for person_item in people %}
-                                <option value="{{ person_item.person.person_id }}" {% if item.assignment and
-                                    item.assignment.person_id==person_item.person.person_id %} selected {% endif %}>
+                                <select name="person_id" class="form-select form-select-sm person-select">
 
-                                    {{ person_item.name.surname if person_item.name else "Без ПІБ" }}
-                                    {{ person_item.name.name if person_item.name else "" }}
-                                    {{ person_item.name.patronymic if person_item.name else "" }}
-                                    (ID: {{ person_item.person.person_id }})
-                                </option>
-                                {% endfor %}
-                            </select>
+                                    <option value="">— Вільна посада —</option>
 
-                            <button type="submit" class="btn btn-sm btn-primary">
+                                    {% for person_item in people %}
+                                    <option value="{{ person_item.person.person_id }}" {% if item.assignment and
+                                        item.assignment.person_id==person_item.person.person_id %} selected {% endif %}>
+                                        {{ person_item.name.surname if person_item.name else "Без ПІБ" }}
+                                        {{ person_item.name.name if person_item.name else "" }}
+                                        {{ person_item.name.patronymic if person_item.name else "" }}
+                                        (ID: {{ person_item.person.person_id }})
+                                    </option>
+                                    {% endfor %}
+
+                                </select>
+                            </div>
+
+                            <button type="submit" class="btn btn-sm btn-primary align-self-start">
                                 Зберегти
                             </button>
                         </form>
+
                     </td>
                 </tr>
                 {% else %}
@@ -135,5 +143,36 @@
     </div>
 
 </body>
+<script>
+    document.querySelectorAll(".person-assignment-form").forEach(form => {
+        const search = form.querySelector(".person-search");
+        const select = form.querySelector(".person-select");
+
+        const options = Array.from(select.options);
+
+        search.addEventListener("input", () => {
+            const query = search.value
+                .trim()
+                .toLocaleLowerCase("uk");
+
+            options.forEach(option => {
+                if (option.value === "") {
+                    option.hidden = false;
+                    return;
+                }
+
+                option.hidden = !option.text
+                    .toLocaleLowerCase("uk")
+                    .includes(query);
+            });
+
+            const selectedOption = select.selectedOptions[0];
+
+            if (selectedOption && selectedOption.hidden) {
+                select.value = "";
+            }
+        });
+    });
+</script>
 
 </html>
