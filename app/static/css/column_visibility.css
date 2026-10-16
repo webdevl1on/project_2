@@ -1,0 +1,15 @@
+.column-visibility-menu {
+    width: 360px;
+    max-width: calc(100vw - 24px);
+    white-space: normal;
+}
+
+.column-visibility-tree {
+    max-height: 55vh;
+    overflow-y: auto;
+}
+
+.column-visibility [hidden],
+[data-column-table] [data-column-key][hidden] {
+    display: none !important;
+}

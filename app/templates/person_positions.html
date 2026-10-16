@@ -1,3 +1,5 @@
+{% from "components/column_visibility.html" import column_visibility %}
+{% set columns = table_columns.groups | map(attribute="columns") | sum(start=[]) %}
 <!DOCTYPE html>
 <html lang="uk">
 
@@ -6,6 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Штатні посади</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/column_visibility.css" rel="stylesheet">
 </head>
 <style>
     .table-container {
@@ -123,26 +126,20 @@
         <span>Вільно: <strong>{{ vacant }}</strong></span>
     </div>
 
+    {{ column_visibility(table_columns) }}
+
     <div class="table-responsive">
         <div class="table-container">
-        <table class="table table-striped table-hover align-middle">
+        <table id="{{ table_columns.id }}" data-column-table class="table table-striped table-hover align-middle">
             <thead>
                 <tr>
-                    <th>№</th>
-                    {% for key, label in [
-                        ("position_number", "№ посади за штатом"),
-                        ("unit_short", "Взвод / підрозділ"),
-                        ("name_short", "Коротка посада"),
-                        ("name_nominative", "Повна посада"),
-                        ("rank", "Звання"),
-                        ("surname", "Прізвище"),
-                        ("name", "Ім'я"),
-                        ("patronymic", "По батькові")
-                    ] %}
-                    <th>
+                    {% for column in columns %}
+                    {% set key = column.key %}
+                    <th scope="col" data-column-key="{{ key }}"{% if not column.default_visible %} hidden{% endif %}>
+                        {% if key in sort_urls %}
                         <div class="position-column-heading d-flex align-items-center text-nowrap">
                             <a href="{{ sort_urls[key] }}" class="text-decoration-none">
-                                {{ label }}
+                                {{ column.label }}
                                 {% if sort_by == key %}
                                 <small>{{ "" if direction == "asc" else "" }}</small>
                                 {% endif %}
@@ -151,7 +148,7 @@
                             <div class="dropdown">
                                 <button class="btn btn-sm filter-toggle {{ 'filter-toggle-active border-primary text-primary' if key in filter_numbers else 'text-secondary' }}" type="button"
                                     data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
-                                    aria-label="Фільтр: {{ label }}" title="Фільтр: {{ label }}">
+                                    aria-label="Фільтр: {{ column.label }}" title="Фільтр: {{ column.label }}">
                                     <span class="filter-toggle-triangle" aria-hidden="true">▼
                                     {% if key in filter_numbers %}
                                     <span class="filter-number">{{ filter_numbers[key] }}</span>
@@ -196,25 +193,31 @@
                                 </div>
                             </div>
                         </div>
+                        {% else %}
+                        {{ column.label }}
+                        {% endif %}
                     </th>
                     {% endfor %}
-                    <th>Призначений військовослужбовець</th>
                 </tr>
             </thead>
 
             <tbody>
                 {% for item in rows %}
                 <tr>
-                    <td>{{ loop.index }}</td>
-                    <td>{{ item.position.position_number }}</td>
-                    <td>{{ item.position.unit_short }}</td>
-                    <td>{{ item.position.name_short }}</td>
-                    <td>{{ item.position.name_nominative }}</td>
-                    <td>{{ item.rank.nominative if item.rank else "—" }}</td>
-                    <td>{{ item.name.surname if item.name else "—" }}</td>
-                    <td>{{ item.name.name if item.name else "—" }}</td>
-                    <td>{{ item.name.patronymic if item.name and item.name.patronymic else "—" }}</td>
-                    <td>
+                    {% set values = {
+                        "row_number": loop.index,
+                        "position_number": item.position.position_number,
+                        "unit_short": item.position.unit_short,
+                        "name_short": item.position.name_short,
+                        "name_nominative": item.position.name_nominative,
+                        "rank": item.rank.nominative if item.rank else "—",
+                        "surname": item.name.surname if item.name else "—",
+                        "name": item.name.name if item.name else "—",
+                        "patronymic": item.name.patronymic if item.name and item.name.patronymic else "—"
+                    } %}
+                    {% for column in columns %}
+                    <td data-column-key="{{ column.key }}"{% if not column.default_visible %} hidden{% endif %}>
+                        {% if column.key == "assignment" %}
                         <form method="post" action="/person-positions/assign"
                             class="d-flex gap-2 person-assignment-form">
                             <input type="hidden" name="position_id" value="{{ item.position.position_id }}">
@@ -237,11 +240,15 @@
                             </div>
                             <button type="submit" class="btn btn-sm btn-primary align-self-start">Зберегти</button>
                         </form>
+                        {% else %}
+                        {{ values[column.key] }}
+                        {% endif %}
                     </td>
+                    {% endfor %}
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="10" class="text-center">Штатних посад не знайдено.</td>
+                    <td data-column-empty colspan="{{ columns | length }}" class="text-center">Штатних посад не знайдено.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -250,6 +257,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/column_visibility.js"></script>
     <script>
         document.querySelectorAll(".person-assignment-form").forEach(form => {
             const search = form.querySelector(".person-search");

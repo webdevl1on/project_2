@@ -9,6 +9,7 @@ from app.database.db import get_db
 from app.models.person import Person
 from app.models.person_identity import PersonName
 from app.services.service_person_positions import FILTER_COLUMNS, ServicePersonPositionFunc
+from app.table_columns import PERSON_POSITIONS_COLUMNS
 
 
 router = APIRouter()
@@ -124,6 +125,7 @@ def get_person_positions_page(
             "filter_numbers": {key: index + 1 for index, key in enumerate(order)},
             "sort_commands": sort_commands,
             "people": people,
+            "table_columns": PERSON_POSITIONS_COLUMNS,
         },
     )
 

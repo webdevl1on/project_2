@@ -1,0 +1,83 @@
+"""Browser-test server: real routes with generated data in an in-memory database."""
+
+from copy import deepcopy
+import sys
+
+from fastapi.responses import HTMLResponse
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+import uvicorn
+
+from app.database.base import Base
+from app.database.db import get_db
+from app.main import app
+from app.models import Person, PersonName, PersonPosition, PersonRank
+from app.routers.person_positions import templates
+from tests.test_person_positions import make_position, make_rank
+
+
+engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+Base.metadata.create_all(engine)
+Session = sessionmaker(bind=engine)
+with Session() as db:
+    positions = [
+        make_position(10, "Перший", "Водій", "Водій"),
+        make_position(20, "Перший", "Стрілець", "Стрілець"),
+        make_position(30, "Другий", "Медик", "Медик"),
+    ]
+    rank = make_rank()
+    people = [Person(), Person()]
+    db.add_all([*positions, rank, *people])
+    db.flush()
+    for person, position, surname in zip(people, positions, ("Альфа", "Бета")):
+        db.add_all([
+            PersonName(person_id=person.person_id, surname=surname, name="Тест"),
+            PersonRank(person_id=person.person_id, rank_id=rank.rank_id),
+            PersonPosition(person_id=person.person_id, position_id=position.position_id),
+        ])
+    db.commit()
+
+
+def memory_db():
+    with Session() as db:
+        yield db
+
+
+app.dependency_overrides[get_db] = memory_db
+
+
+@app.get("/_column-test/two-tables", response_class=HTMLResponse)
+def two_tables():
+    first = {
+        "id": "example-first",
+        "groups": [{"key": "details", "label": "Дані", "columns": [
+            {"key": "title", "label": "Назва", "default_visible": True, "informational": True},
+            {"key": "code", "label": "Код", "default_visible": False, "informational": True},
+        ]}],
+    }
+    second = deepcopy(first)
+    second["id"] = "example-second"
+    return templates.env.from_string('''
+        {% from "components/column_visibility.html" import column_visibility %}
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+        <link rel="stylesheet" href="/static/css/column_visibility.css">
+        {% for config in configs %}
+            {{ column_visibility(config) }}
+            <table id="{{ config.id }}" data-column-table><thead><tr>
+            {% for column in config.groups[0].columns %}
+                <th data-column-key="{{ column.key }}">{{ column.label }}</th>
+            {% endfor %}
+            </tr></thead><tbody><tr>
+            {% for column in config.groups[0].columns %}
+                <td data-column-key="{{ column.key }}">Значення</td>
+            {% endfor %}
+            </tr></tbody></table>
+        {% endfor %}
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="/static/js/column_visibility.js"></script>
+    ''').render(configs=[first, second])
+
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port=int(sys.argv[1]), log_level="warning")

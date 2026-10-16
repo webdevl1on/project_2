@@ -1,6 +1,6 @@
 # Архітектура project_2
 
-Карта коду гілки `testing`, перевірена на коміті `1d1e56c5a64199d53f23e6b793a9715531a5215f`. Актуальний код має пріоритет; стан реалізації та проблеми наведені в [CURRENT_STATE.md](CURRENT_STATE.md).
+Карта коду гілки `testing`. Актуальний код має пріоритет; стан реалізації та результати перевірок наведені в [CURRENT_STATE.md](CURRENT_STATE.md).
 
 ## Навігація за завданням
 
@@ -13,13 +13,14 @@
 | Історія ПІБ | `app/routers/person_name.py`, `app/services/service_person_name.py`, `app/models/person_identity.py`, `app/templates/person/components/names_history.html` |
 | Історія звань | `app/routers/person_rank.py`, `app/services/service_person_rank.py`, `app/models/person_military_service.py`, `app/templates/person/components/rank_history.html` |
 | Посади, призначення, фільтри | `app/routers/person_positions.py`, `app/services/service_person_positions.py`, `app/models/person_positions.py`, `app/templates/person_positions.html`, `tests/test_person_positions.py` |
+| Видимість колонок, Checkbox Tree | `app/table_columns.py`, `app/templates/components/column_visibility.html`, `app/static/js/column_visibility.js`, `app/static/css/column_visibility.css`, `tests/test_table_columns.py`, `tests/browser/` |
 | Події | `app/services/service_for_person_event.py`, `app/services/service_common_event_func.py`, `app/models/person_event.py`, `app/validators/event_validatotor.py` |
 | Довідники та початкові дані | `app/models/reference_book.py`, `app/seeds/seed_structure.py`, `app/seeds/seed_reference.py`, `app/config.py`, `reference_data.xlsx` |
 | Підключення застосунку, БД, тестів | `app/main.py`, `app/database/`, `requirements.txt`, `tests/conftest.py` |
 
 ## Компоненти та потік запиту
 
-Вебзастосунок — FastAPI з серверним рендерингом Jinja2. [app/main.py](../app/main.py) створює `app` і підключає чотири роутери: `persons`, `person_name`, `person_rank`, `person_positions`. JavaScript і CSS розміщені в HTML-шаблонах; Bootstrap завантажується з `cdn.jsdelivr.net`. Окремого frontend-збирання у репозиторії немає. PySide6 є в залежностях, але не є точкою входу поточного вебінтерфейсу.
+Вебзастосунок — FastAPI з серверним рендерингом Jinja2. [app/main.py](../app/main.py) створює `app` і підключає чотири роутери: `persons`, `person_name`, `person_rank`, `person_positions`. JavaScript і CSS сторінок переважно розміщені в HTML; спільний компонент видимості колонок має файли в `app/static/`. `StaticFiles` у `app/main.py` обслуговує `/static` з абсолютного шляху `BASE_DIR / "static"`. Bootstrap завантажується з `cdn.jsdelivr.net`. Окремого frontend-збирання у репозиторії немає. PySide6 є в залежностях, але не є точкою входу поточного вебінтерфейсу.
 
 ```mermaid
 flowchart LR
@@ -93,6 +94,22 @@ GET-маршрути зазвичай самі виконують ORM-запит
 
 `filter_order` зберігає порядок увімкнення фільтрів для URL та номерів у заголовках; це не пріоритет багаторівневого сортування. Є один вибраний ключ сортування та додаткові ключі стабілізації порядку. Призначення видаляє попередню прив'язку людини, а зайняту цільову посаду перепризначає; порожній `person_id` звільняє цільову посаду.
 
+### Видимість колонок
+
+[app/table_columns.py](../app/table_columns.py) містить метадані `PERSON_POSITIONS_COLUMNS`: унікальний ID `person-positions`, групи та колонки з українськими назвами, стабільними ключами, `default_visible` й ознакою `informational`. Порядок списків визначає порядок груп і колонок. Усі 10 колонок таблиці посад типово видимі; номер рядка й форма призначення не зараховуються до восьми інформаційних полів. Окремий файл використано через наявний `app/config.py`, без перетворення його на пакет.
+
+Роутер передає конфігурацію в контекст як `table_columns`. Шаблон використовує її для заголовків, порядку комірок і Checkbox Tree; дані комірок зіставляються з ключами явно. Метадані не імпортують ORM і не формують SQL: allowlist `FILTER_COLUMNS`, фільтрація, сортування й бізнес-логіка залишаються окремими.
+
+Макрос `column_visibility(config)` у [components/column_visibility.html](../app/templates/components/column_visibility.html) формує Bootstrap dropdown із групами, окремими checkbox, розгортанням та кнопками «Показати всі», «Скинути», «Застосувати». Звичайний JavaScript у `app/static/js/column_visibility.js` ініціалізує кожен `[data-column-picker]`, знаходить таблицю за `config.id` і змінює `hidden` заголовків та комірок через `data-column-key`. Частковий вибір встановлює нативну властивість `checkbox.indeterminate`; згортання груп не змінює вибору. Порожній рядок із `[data-column-empty]` отримує актуальний `colspan`.
+
+Вибір у меню — чернетка: «Скинути» повертає стандартні значення, «Показати всі» вибирає всі поля; вони набувають чинності лише після «Застосувати». Закриття меню без застосування скасовує чернетку. Якщо не обрано жодної інформаційної колонки, застосування заблоковане й показано пояснення. Приховування не змінює форми, їхні значення, URL-параметри, порядок рядків чи дані БД: фільтр прихованої колонки продовжує діяти.
+
+Сховище — `localStorage`, окремий ключ `project2:table-columns:<table-id>`. Формат: об'єкт із `version: 1` і `visibility` — словником стабільних ключів та булевих значень. Невідомі ключі ігноруються, нові/некоректні значення беруться з конфігурації; пошкоджений JSON, невідома версія або вибір без інформаційних полів повертає стандартний вигляд. Якщо браузер блокує сховище, перемикання працює в поточній сторінці, а невдале збереження пояснюється повідомленням.
+
+Для іншої таблиці потрібні власна конфігурація з унікальним ID, виклик макросу, таблиця з таким самим `id` та `data-column-table`, комірки з відповідними `data-column-key` і підключення спільних CSS/JS. ID та ключі мають бути унікальними й стабільними; конфігурація повинна містити хоча б одну типово видиму інформаційну колонку. Нових залежностей для frontend немає. Початкове підключення зроблено лише для `/person-positions`.
+
+Майбутній іменований пресет може зберігати назву та той самий словник `visibility`, який проходить нормалізацію перед відображенням. Повний CRUD пресетів, синхронізація між пристроями й серверне зберігання зараз не реалізовані; таблиць налаштувань у БД немає.
+
 ## Активні HTTP-маршрути
 
 Підключення визначає `app/main.py`, а не сам факт наявності файла роутера.
@@ -124,7 +141,8 @@ GET-маршрути зазвичай самі виконують ORM-запит
 | `person/components/full_info_top_navigation.html` | Посилання на коротку картку та список. |
 | `person/components/modal_windows.html` | Форми додавання ПІБ і звання. |
 | `person/components/names_history.html`, `rank_history.html` | Цикли по ORM-колекціях `person.names` / `person.ranks`, форми редагування, активації та видалення. |
-| `person_positions.html` | Штатна таблиця, меню фільтрів, пошук значень, вибір людини, призначення. JavaScript змінює GET-параметри та фільтрує варіанти у браузері. |
+| `person_positions.html` | Штатна таблиця, меню фільтрів, пошук значень, вибір людини, призначення; підключає спільний Checkbox Tree. Заголовки й порядок комірок визначає `table_columns`; чинні фільтри працюють незалежно від видимості. |
+| `components/column_visibility.html` | Універсальний макрос керування видимістю; назви та групування отримує лише з конфігурації. |
 | `search_person.html` | Застарілий непідключений пошук зі старими полями `Person`. |
 | `person/person_view.html` | Порожній файл, маршрутами не використовується. |
 
@@ -139,3 +157,5 @@ GET-маршрути зазвичай самі виконують ORM-запит
 `reset.py` видаляє робочу БД та створює/заповнює її заново; `reset_test_db.py` аналогічно працює з тестовою. Кореневий `test_seed_positions.py` оновлює **робочу** БД при виконанні/імпорті. `test1.py` і `test2.py` — окремі утиліти звіряння Excel з папками/документами з жорстко заданими Windows-шляхами.
 
 Автоматизовані тести розташовано в `tests/`: створення людини й історії ПІБ, неповні дати, валідатори, вибірка/фільтри/сортування та перенесення/звільнення посад. Фікстура `db` у `tests/conftest.py` викликає `drop_all` / `create_all` для тестової БД перед кожним тестом, що її використовує. Команди та межі перевірки — у [CURRENT_STATE.md](CURRENT_STATE.md).
+
+`tests/test_table_columns.py` перевіряє конфігурацію й відповідність заголовків/комірок зміненому порядку та назвам. `tests/browser/column_visibility.cjs` запускає Chromium через Playwright і тестовий сервер `tests/browser/serve_column_visibility.py`: реальні маршрути з dependency override на SQLite в пам'яті й згенерованими даними. Окремий тестовий маршрут із двома іншими таблицями перевіряє повторне використання макросу; у production він не реєструється.
