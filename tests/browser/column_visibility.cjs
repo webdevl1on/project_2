@@ -44,10 +44,18 @@ async function main() {
             args: ["--no-sandbox"],
         });
         const context = await browser.newContext();
+        context.setDefaultTimeout(10000);
+        context.setDefaultNavigationTimeout(20000);
         await context.route("https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/**", route => {
             const file = route.request().url().split("/dist/")[1];
             return route.fulfill({ body: assets[file], contentType: file.endsWith(".js") ? "application/javascript" : "text/css" });
         });
+        const suites = ["presets", "layout", "filters", "history", "integration"];
+        if (process.env.COLUMN_STAGE) {
+            assert.ok(suites.includes(process.env.COLUMN_STAGE));
+            await require(`./${process.env.COLUMN_STAGE}.cjs`)({ context, base });
+            return;
+        }
         const page = await context.newPage();
         const errors = [];
         context.on("page", tab => tab.on("pageerror", error => errors.push(error.message)));
@@ -55,8 +63,8 @@ async function main() {
         const picker = page.locator("[data-column-picker]");
         const table = page.locator("#person-positions");
         const toggle = picker.locator("[data-column-toggle]");
-        const choice = key => picker.locator(`[data-column-choice="${key}"]`);
-        const group = key => picker.locator(`[data-column-group]:has([aria-controls$="-group-${key}"])`);
+        const choice = key => picker.locator(`[data-visibility-tree] [data-column-choice="${key}"]`);
+        const group = key => picker.locator(`[data-visibility-tree] [data-column-group]:has([aria-controls$="-group-${key}"])`);
         const visibleHeaders = () => table.locator("thead th:visible").count();
         const visit = (query = "") => page.goto(`${base}/person-positions${query}`);
         const apply = () => picker.locator("[data-column-apply]").click();
@@ -66,7 +74,7 @@ async function main() {
             await visit();
             assert.equal(await visibleHeaders(), 10);
             assert.equal(await table.locator("tbody tr").count(), 3);
-            assert.equal(await page.evaluate(() => localStorage.length), 0);
+            assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("project2:table-history:person-positions")).entries.length), 1);
         });
 
         await scenario("whole group, partial indeterminate, collapse and apply", async () => {
@@ -101,7 +109,7 @@ async function main() {
             await toggle.click();
             assert.equal(await choice("surname").isChecked(), true);
             await picker.locator("[data-column-reset]").click();
-            assert.equal(await picker.locator("[data-column-choice]:checked").count(), 10);
+            assert.equal(await picker.locator("[data-visibility-tree] [data-column-choice]:checked").count(), 10);
             assert.equal(await visibleHeaders(), 7);
             await apply();
             assert.equal(await visibleHeaders(), 10);
@@ -132,7 +140,7 @@ async function main() {
             }
         });
 
-        await scenario("hidden columns retain cascade filters, sorting and assignment forms", async () => {
+        await scenario("unrelated hidden columns preserve visible cascade filters, sorting and assignment forms", async () => {
             await toggle.click();
             await choice("surname").uncheck();
             await choice("name_short").uncheck();
@@ -149,7 +157,7 @@ async function main() {
             const url = page.url();
             assert.equal(new URL(url).searchParams.get("filter_order"), "unit_short");
             await toggle.click();
-            await choice("unit_short").uncheck();
+            await choice("rank").uncheck();
             await apply();
             assert.equal(page.url(), url);
             const form = table.locator("tbody tr").first().locator("form");
@@ -166,7 +174,7 @@ async function main() {
         });
 
         await scenario("empty-table colspan follows visibility", async () => {
-            await visit("?surname=Немає");
+            await visit("?position_number=999999");
             assert.equal(await table.locator("[data-column-empty]").getAttribute("colspan"), String(await visibleHeaders()));
         });
 
@@ -176,8 +184,8 @@ async function main() {
             const second = picker.nth(1);
             assert.equal(await page.locator('#example-first th[data-column-key="code"]').isVisible(), false);
             await first.locator("[data-column-toggle]").click();
-            await first.locator('[data-column-choice="code"]').check();
-            await first.locator('[data-column-choice="title"]').uncheck();
+            await first.locator('[data-visibility-tree] [data-column-choice="code"]').check();
+            await first.locator('[data-visibility-tree] [data-column-choice="title"]').uncheck();
             await first.locator("[data-column-apply]").click();
             assert.equal(await page.locator('#example-first th[data-column-key="code"]').isVisible(), true);
             assert.equal(await page.locator('#example-second th[data-column-key="code"]').isVisible(), false);
@@ -185,12 +193,12 @@ async function main() {
             assert.equal(await page.locator('#example-first th[data-column-key="title"]').isVisible(), false);
             await first.locator("[data-column-toggle]").click();
             await first.locator("[data-column-reset]").click();
-            assert.equal(await first.locator('[data-column-choice="title"]').isChecked(), true);
-            assert.equal(await first.locator('[data-column-choice="code"]').isChecked(), false);
+            assert.equal(await first.locator('[data-visibility-tree] [data-column-choice="title"]').isChecked(), true);
+            assert.equal(await first.locator('[data-visibility-tree] [data-column-choice="code"]').isChecked(), false);
             await first.locator("[data-column-apply]").click();
             assert.equal(await page.locator('#example-first th[data-column-key="code"]').isVisible(), false);
             await second.locator("[data-column-toggle]").click();
-            await second.locator('[data-column-choice="title"]').uncheck();
+            await second.locator('[data-visibility-tree] [data-column-choice="title"]').uncheck();
             assert.equal(await second.locator("[data-column-apply]").isDisabled(), true);
         });
 
@@ -201,7 +209,7 @@ async function main() {
             });
             await blocked.goto(`${base}/person-positions`);
             await blocked.locator("[data-column-toggle]").click();
-            await blocked.locator('[data-column-choice="surname"]').uncheck();
+            await blocked.locator('[data-visibility-tree] [data-column-choice="surname"]').uncheck();
             await blocked.locator("[data-column-apply]").click();
             assert.equal(await blocked.locator('th[data-column-key="surname"]').isVisible(), false);
             assert.equal(await blocked.locator("[data-column-storage-error]").isVisible(), true);
@@ -216,6 +224,7 @@ async function main() {
             assert.ok(box.x >= 0 && box.x + box.width <= 390);
             assert.deepEqual(errors, []);
         });
+        for (const suite of suites) await require(`./${suite}.cjs`)({ context, base });
     } finally {
         if (browser) await browser.close();
         server.kill();

@@ -22,7 +22,7 @@ Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 with Session() as db:
     positions = [
-        make_position(10, "Перший", "Водій", "Водій"),
+        make_position(10, "Перший", "Водій", "Командир відділення безпілотних комплексів"),
         make_position(20, "Перший", "Стрілець", "Стрілець"),
         make_position(30, "Другий", "Медик", "Медик"),
     ]
@@ -75,6 +75,12 @@ def two_tables():
             </tr></tbody></table>
         {% endfor %}
         <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+        <script src="/static/js/table_state.js"></script>
+        <script src="/static/js/column_tree.js"></script>
+        <script src="/static/js/column_presets.js"></script>
+        <script src="/static/js/column_interactions.js"></script>
+        <script src="/static/js/table_filters.js"></script>
+        <script src="/static/js/table_history.js"></script>
         <script src="/static/js/column_visibility.js"></script>
     ''').render(configs=[first, second])
 

@@ -1,57 +1,136 @@
-{% macro column_visibility(config) %}
-<div class="dropdown column-visibility mb-3" data-column-picker>
-    <button type="button" id="{{ config.id }}-columns-toggle"
-        class="btn btn-outline-secondary dropdown-toggle" data-column-toggle
-        data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
-        Колонки
-    </button>
-    <div class="dropdown-menu column-visibility-menu p-3"
-        aria-labelledby="{{ config.id }}-columns-toggle">
-        <p class="small text-body-secondary mb-2">Виберіть колонки та застосуйте зміни.</p>
-        <div class="column-visibility-tree">
-            {% for group in config.groups %}
-            <fieldset class="mb-2" data-column-group>
-                <legend class="d-flex align-items-center gap-2 fs-6 mb-1">
-                    <button type="button" class="btn btn-sm btn-outline-secondary"
-                        data-column-expand aria-expanded="true"
-                        aria-controls="{{ config.id }}-group-{{ group.key }}"
-                        aria-label="Розгорнути або згорнути групу: {{ group.label }}">
-                        <span aria-hidden="true" data-column-chevron>▾</span>
-                    </button>
-                    <input type="checkbox" class="form-check-input mt-0" data-column-group-choice
-                        id="{{ config.id }}-group-choice-{{ group.key }}">
-                    <label class="form-check-label fw-semibold"
-                        for="{{ config.id }}-group-choice-{{ group.key }}">{{ group.label }}</label>
-                </legend>
-                <div class="ms-4 ps-3" id="{{ config.id }}-group-{{ group.key }}" data-column-children>
-                    {% for column in group.columns %}
-                    <div class="form-check">
-                        <input type="checkbox" class="form-check-input" data-column-choice="{{ column.key }}"
-                            id="{{ config.id }}-column-choice-{{ column.key }}"
-                            {% if column.default_visible %}checked{% endif %}>
-                        <label class="form-check-label" for="{{ config.id }}-column-choice-{{ column.key }}">
-                            {{ column.label }}
-                        </label>
-                    </div>
-                    {% endfor %}
-                </div>
-            </fieldset>
+{% macro column_tree(config, prefix) %}
+<div class="column-visibility-tree">
+    {% for group in config.groups %}
+    <fieldset class="mb-2" data-column-group>
+        <legend class="d-flex align-items-center gap-2 fs-6 mb-1">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-column-expand
+                aria-expanded="true" aria-controls="{{ prefix }}-group-{{ group.key }}"
+                aria-label="Розгорнути або згорнути групу: {{ group.label }}">
+                <span aria-hidden="true" data-column-chevron>▾</span>
+            </button>
+            <input type="checkbox" class="form-check-input mt-0" data-column-group-choice
+                id="{{ prefix }}-group-choice-{{ group.key }}">
+            <label class="form-check-label fw-semibold" for="{{ prefix }}-group-choice-{{ group.key }}">{{ group.label }}</label>
+        </legend>
+        <div class="ms-4 ps-3" id="{{ prefix }}-group-{{ group.key }}" data-column-children>
+            {% for column in group.columns %}
+            <div class="form-check" data-column-choice-row>
+                <input type="checkbox" class="form-check-input" data-column-choice="{{ column.key }}"
+                    id="{{ prefix }}-column-choice-{{ column.key }}"
+                    {% if column.default_visible or column.system %}checked{% endif %}
+                    {% if column.system %}disabled{% endif %}>
+                <label class="form-check-label" for="{{ prefix }}-column-choice-{{ column.key }}">{{ column.label }}</label>
+            </div>
             {% endfor %}
         </div>
-        <p class="small text-danger mt-2 mb-0" role="status" aria-live="polite"
-            id="{{ config.id }}-columns-error" data-column-error hidden>
-            Залиште видимою хоча б одну інформаційну колонку.
-        </p>
-        <div class="d-flex gap-2 flex-wrap border-top pt-2 mt-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-column-all>Показати всі</button>
-            <button type="button" class="btn btn-sm btn-outline-secondary" data-column-reset>Скинути</button>
-            <button type="button" class="btn btn-sm btn-primary" data-column-apply
-                aria-describedby="{{ config.id }}-columns-error">Застосувати</button>
+    </fieldset>
+    {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro column_visibility(config, filters=none) %}
+<div class="column-visibility mb-3" data-column-picker>
+    <div class="column-toolbar d-flex align-items-start gap-2 flex-wrap">
+        <div class="dropdown" data-visibility-dropdown>
+            <button type="button" id="{{ config.id }}-columns-toggle"
+                class="btn btn-outline-secondary dropdown-toggle" data-column-toggle
+                data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">Колонки</button>
+            <div class="dropdown-menu column-visibility-menu p-3" aria-labelledby="{{ config.id }}-columns-toggle">
+                <p class="small text-body-secondary mb-2">Виберіть колонки та застосуйте зміни.</p>
+                <div data-visibility-tree>{{ column_tree(config, config.id) }}</div>
+                <p class="small text-danger mt-2 mb-0" role="status" aria-live="polite"
+                    id="{{ config.id }}-columns-error" data-column-error hidden>
+                    Залиште видимою хоча б одну інформаційну колонку.
+                </p>
+                <div class="d-flex gap-2 flex-wrap border-top pt-2 mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-column-all>Показати всі</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-column-reset>Скинути</button>
+                    <button type="button" class="btn btn-sm btn-primary" data-column-apply
+                        aria-describedby="{{ config.id }}-columns-error">Застосувати</button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-preset-create>Зберегти пресет</button>
+                </div>
+            </div>
         </div>
+        <button type="button" class="btn btn-outline-primary" data-preset-create>Зберегти пресет</button>
+        <div class="btn-group" role="group" aria-label="Історія станів таблиці">
+            <button type="button" class="btn btn-outline-secondary" data-table-back disabled>Назад</button>
+            <button type="button" class="btn btn-outline-secondary" data-table-forward disabled>Вперед</button>
+        </div>
+        <div class="d-flex gap-2 flex-wrap" data-preset-list></div>
     </div>
     <p class="small text-warning mt-2 mb-0" role="status" aria-live="polite" data-column-storage-error hidden>
-        Колонки змінено, але браузер не дозволив зберегти налаштування після перезавантаження.
+        Браузер не дозволив зберегти налаштування після перезавантаження.
     </p>
+    <p class="small mt-2 mb-0" role="status" aria-live="polite" data-preset-notice hidden></p>
+
+    <div class="modal fade" tabindex="-1" id="{{ config.id }}-preset-save" data-preset-save-modal
+        aria-labelledby="{{ config.id }}-preset-save-title" aria-hidden="true">
+        <div class="modal-dialog"><form class="modal-content" data-preset-save-form novalidate>
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="{{ config.id }}-preset-save-title">Зберегти пресет</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-body-secondary">Зберігається застосований вигляд таблиці: видимі колонки та їхній порядок.</p>
+                <label class="form-label" for="{{ config.id }}-preset-name">Назва пресету</label>
+                <input class="form-control" id="{{ config.id }}-preset-name" data-preset-name maxlength="30" required autocomplete="off">
+                <p class="text-danger small mt-2" data-preset-save-error role="alert" hidden></p>
+                <div class="alert alert-warning mt-3" data-preset-conflict hidden>
+                    <p>Пресет із такою назвою вже існує. Оновити його поточним виглядом таблиці?</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-warning" data-preset-overwrite>Оновити існуючий</button>
+                        <button type="button" class="btn btn-outline-secondary" data-preset-back>Редагувати назву</button>
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Скасувати</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" data-preset-save-actions>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                <button type="submit" class="btn btn-primary">Зберегти</button>
+            </div>
+        </form></div>
+    </div>
+
+    <div class="modal fade" tabindex="-1" id="{{ config.id }}-preset-editor" data-preset-editor-modal
+        aria-labelledby="{{ config.id }}-preset-editor-title" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable"><form class="modal-content" data-preset-editor-form novalidate>
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="{{ config.id }}-preset-editor-title">Налаштування пресету</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label" for="{{ config.id }}-preset-edit-name">Назва пресету</label>
+                <input class="form-control mb-3" id="{{ config.id }}-preset-edit-name" data-preset-editor-name maxlength="30" required autocomplete="off">
+                <p class="small text-warning" data-preset-editor-warning hidden></p>
+                <h3 class="fs-6">Вибрані колонки</h3>
+                <div data-preset-selected class="mb-3"></div>
+                <h3 class="fs-6">Невибрані колонки</h3>
+                <div data-preset-editor-tree>{{ column_tree(config, config.id ~ '-preset') }}</div>
+                <p class="text-danger small mt-2" data-preset-editor-error role="alert" hidden></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-danger me-auto" data-preset-delete>Видалити пресет</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                <button type="submit" class="btn btn-primary" data-preset-editor-save disabled>Зберегти зміни</button>
+            </div>
+        </form></div>
+    </div>
+
+    <div class="modal fade" tabindex="-1" id="{{ config.id }}-preset-delete" data-preset-delete-modal
+        aria-labelledby="{{ config.id }}-preset-delete-title" aria-hidden="true">
+        <div class="modal-dialog"><div class="modal-content">
+            <div class="modal-header"><h2 class="modal-title fs-5" id="{{ config.id }}-preset-delete-title">Видалити пресет?</h2></div>
+            <div class="modal-body">
+                <p data-preset-delete-message></p>
+                <p class="text-danger small" role="alert" data-preset-delete-error hidden></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-preset-delete-cancel>Скасувати</button>
+                <button type="button" class="btn btn-danger" data-preset-delete-confirm>Видалити</button>
+            </div>
+        </div></div>
+    </div>
     <script type="application/json" data-column-config>{{ config | tojson }}</script>
+    {% if filters %}<script type="application/json" data-column-filters>{{ filters | tojson }}</script>{% endif %}
 </div>
 {% endmacro %}

@@ -4,12 +4,17 @@ SQL filter/sort allowlists remain independent of this configuration.
 """
 
 
-def _column(key, label, *, informational=True, default_visible=True):
+def _column(key, label, *, informational=True, default_visible=True, system=False):
     return {
         "key": key,
         "label": label,
         "informational": informational,
         "default_visible": default_visible,
+        "system": system,
+        "draggable": not system,
+        "resizable": informational,
+        "min_width": 100 if informational else 56,
+        "width": 56 if system else (180 if informational else 360),
     }
 
 
@@ -19,7 +24,7 @@ PERSON_POSITIONS_COLUMNS = {
         {
             "key": "numbering",
             "label": "Нумерація",
-            "columns": [_column("row_number", "№", informational=False)],
+            "columns": [_column("row_number", "№", informational=False, system=True)],
         },
         {
             "key": "position",

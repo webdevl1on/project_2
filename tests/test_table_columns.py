@@ -14,6 +14,7 @@ def test_column_metadata_covers_real_columns_with_unique_keys():
     assert len(columns) == len({column["key"] for column in columns}) == 10
     assert sum(column["informational"] for column in columns) == 8
     assert all(column["default_visible"] for column in columns)
+    assert [column["key"] for column in columns if column["system"]] == ["row_number"]
 
 
 def test_table_headers_and_cells_follow_config_order_and_labels():
@@ -47,3 +48,18 @@ def test_table_headers_and_cells_follow_config_order_and_labels():
     number_cell = next(cell for cell in cells if cell.get("data-column-key") == "position_number")
     assert number_cell.text_content().strip() == "10"
     assert len(document.xpath('//form[@action="/person-positions/assign"]')) == 1
+
+
+def test_router_exposes_only_existing_filter_keys_to_url_adapter(db):
+    from starlette.requests import Request
+    from app.routers.person_positions import FILTER_KEYS, get_person_positions_page
+
+    request = Request({"type": "http", "method": "GET", "path": "/person-positions", "query_string": b"", "headers": []})
+    response = get_person_positions_page(
+        request, occupancy="all", sort_by="position_number", direction="asc",
+        filter_order="", db=db, **{key: [] for key in FILTER_KEYS},
+    )
+    adapter = response.context["table_column_filters"]
+    assert adapter["keys"] == list(FILTER_KEYS)
+    assert adapter["extra"] == {"occupancy": "all"}
+    assert "data-column-filters" in response.body.decode()

@@ -1,132 +1,95 @@
 (() => {
     "use strict";
+    const api = globalThis.TableColumns;
 
-    document.querySelectorAll("[data-column-picker]").forEach(picker => {
-        const config = JSON.parse(picker.querySelector("[data-column-config]").textContent);
-        const table = document.getElementById(config.id);
-        if (!table) return;
-
-        const columns = config.groups.flatMap(group => group.columns);
-        const defaults = Object.fromEntries(columns.map(column => [column.key, column.default_visible]));
-        const storageKey = `project2:table-columns:${config.id}`;
-        const choices = Array.from(picker.querySelectorAll("[data-column-choice]"));
-        const groups = Array.from(picker.querySelectorAll("[data-column-group]"));
-        const applyButton = picker.querySelector("[data-column-apply]");
-        const toggle = picker.querySelector("[data-column-toggle]");
-        const error = picker.querySelector("[data-column-error]");
-        const storageError = picker.querySelector("[data-column-storage-error]");
-
-        const hasInformation = visibility => columns.some(column =>
-            column.informational && visibility[column.key]);
-
-        // This key-to-boolean map can also represent a future named preset.
-        // New columns inherit defaults; removed keys and malformed values are ignored.
-        function normaliseVisibility(value) {
-            const visibility = Object.fromEntries(columns.map(column => [
-                column.key,
-                typeof value?.[column.key] === "boolean" ? value[column.key] : defaults[column.key],
-            ]));
-            return hasInformation(visibility) ? visibility : { ...defaults };
-        }
-
-        function loadVisibility() {
-            try {
-                const saved = JSON.parse(localStorage.getItem(storageKey));
-                if (saved?.version === 1 && saved.visibility && !Array.isArray(saved.visibility)
-                    && typeof saved.visibility === "object") {
-                    return normaliseVisibility(saved.visibility);
-                }
-            } catch {
-                // Unavailable storage or invalid JSON must not break the table.
-            }
-            return { ...defaults };
-        }
-
-        let applied = loadVisibility();
-        let draft = { ...applied };
-
-        function renderVisibility() {
-            table.querySelectorAll("[data-column-key]").forEach(cell => {
-                if (Object.hasOwn(applied, cell.dataset.columnKey)) {
-                    cell.hidden = !applied[cell.dataset.columnKey];
-                }
+    class ColumnController {
+        constructor(picker) {
+            this.picker = picker;
+            this.config = JSON.parse(picker.querySelector("[data-column-config]").textContent);
+            this.table = document.getElementById(this.config.id);
+            this.model = new api.ColumnModel(this.config);
+            this.storageError = picker.querySelector("[data-column-storage-error]");
+            this.storage = new api.LocalTableStorage(this.config.id, () => { this.storageError.hidden = false; });
+            this.state = this.storage.load(this.model);
+            this.state.widths = this.model.widths(this.state.widths);
+            const filterConfig = picker.querySelector("[data-column-filters]");
+            this.filterAdapter = new api.QueryFilterAdapter(filterConfig ? JSON.parse(filterConfig.textContent) : {});
+            this.filters = this.filterAdapter.read();
+            this.applyButton = picker.querySelector("[data-column-apply]");
+            this.toggle = picker.querySelector("[data-column-toggle]");
+            this.error = picker.querySelector("[data-column-error]");
+            this.draft = this.model.visibility(this.state.layout);
+            this.tree = new api.CheckboxTree(picker.querySelector("[data-visibility-tree]"), this.config, value => {
+                this.draft = value;
+                this.renderDraft();
             });
-            table.querySelectorAll("[data-column-empty]").forEach(cell => {
-                cell.colSpan = columns.filter(column => applied[column.key]).length;
-            });
-        }
 
-        function renderDraft() {
-            choices.forEach(choice => {
-                choice.checked = draft[choice.dataset.columnChoice];
+            picker.querySelector("[data-column-all]").addEventListener("click", () => {
+                this.draft = Object.fromEntries(this.model.keys.map(key => [key, true]));
+                this.renderDraft();
             });
-            groups.forEach(group => {
-                const children = Array.from(group.querySelectorAll("[data-column-choice]"));
-                const selected = children.filter(choice => choice.checked).length;
-                const checkbox = group.querySelector("[data-column-group-choice]");
-                checkbox.checked = selected === children.length;
-                checkbox.indeterminate = selected > 0 && selected < children.length;
+            picker.querySelector("[data-column-reset]").addEventListener("click", () => {
+                this.draft = this.model.visibility(this.model.defaults);
+                this.renderDraft();
             });
-            const valid = hasInformation(draft);
-            error.hidden = valid;
-            applyButton.disabled = !valid;
-        }
-
-        choices.forEach(choice => {
-            choice.addEventListener("change", () => {
-                draft[choice.dataset.columnChoice] = choice.checked;
-                renderDraft();
+            this.applyButton.addEventListener("click", () => {
+                const layout = this.model.fromVisibility(this.draft, this.state.layout.order);
+                if (!this.model.hasInformation(layout.visible)) return;
+                bootstrap.Dropdown.getOrCreateInstance(this.toggle).hide();
+                this.commitLayout(layout, "checkbox");
+                this.toggle.focus();
             });
-        });
-
-        groups.forEach(group => {
-            const checkbox = group.querySelector("[data-column-group-choice]");
-            checkbox.addEventListener("change", () => {
-                group.querySelectorAll("[data-column-choice]").forEach(choice => {
-                    draft[choice.dataset.columnChoice] = checkbox.checked;
+            const dropdown = picker.querySelector("[data-visibility-dropdown]");
+            for (const event of ["show.bs.dropdown", "hidden.bs.dropdown"]) {
+                dropdown.addEventListener(event, () => {
+                    this.draft = this.model.visibility(this.state.layout);
+                    this.renderDraft();
                 });
-                renderDraft();
-            });
-            const expand = group.querySelector("[data-column-expand]");
-            expand.addEventListener("click", () => {
-                const expanded = expand.getAttribute("aria-expanded") !== "true";
-                expand.setAttribute("aria-expanded", String(expanded));
-                group.querySelector("[data-column-children]").hidden = !expanded;
-                group.querySelector("[data-column-chevron]").textContent = expanded ? "▾" : "▸";
-            });
-        });
-
-        picker.querySelector("[data-column-all]").addEventListener("click", () => {
-            draft = Object.fromEntries(columns.map(column => [column.key, true]));
-            renderDraft();
-        });
-        picker.querySelector("[data-column-reset]").addEventListener("click", () => {
-            draft = { ...defaults };
-            renderDraft();
-        });
-        applyButton.addEventListener("click", () => {
-            if (!hasInformation(draft)) return;
-            applied = { ...draft };
-            renderVisibility();
-            storageError.hidden = true;
-            try {
-                localStorage.setItem(storageKey, JSON.stringify({ version: 1, visibility: applied }));
-            } catch {
-                storageError.hidden = false;
             }
-            bootstrap.Dropdown.getOrCreateInstance(toggle).hide();
-            toggle.focus();
-        });
-        picker.addEventListener("show.bs.dropdown", () => {
-            draft = { ...applied };
-            renderDraft();
-        });
-        picker.addEventListener("hidden.bs.dropdown", () => {
-            draft = { ...applied };
-            renderDraft();
-        });
+            this.renderVisibility();
+            this.renderDraft();
+            this.presets = new api.PresetPanel(this);
+            this.interactions = new api.ColumnInteractions(this);
+            this.timeline = new api.TableTimeline(this);
+            this.timeline.initialise();
+            picker.dataset.columnsReady = "true";
+        }
+        getLayout() { return api.clone(this.state.layout); }
+        commitLayout(layout, source = "manual") {
+            layout = this.model.normalise(layout);
+            if (!this.model.hasInformation(layout.visible)) return;
+            this.timeline.changeLayout(layout);
+            this.picker.dispatchEvent(new CustomEvent("columnlayout:change", { detail: { layout: this.getLayout(), source } }));
+        }
+        renderVisibility() {
+            const { visible, order } = this.state.layout;
+            this.table.querySelectorAll("tr").forEach(row => {
+                const cells = new Map(Array.from(row.children).filter(cell => cell.hasAttribute("data-column-key"))
+                    .map(cell => [cell.dataset.columnKey, cell]));
+                order.forEach(key => {
+                    const cell = cells.get(key);
+                    if (cell) { cell.hidden = !visible.includes(key); row.append(cell); }
+                });
+            });
+            this.table.querySelectorAll("[data-column-empty]").forEach(cell => { cell.colSpan = visible.length; });
+            this.interactions?.renderWidths();
+        }
+        renderDraft() {
+            this.tree.setValue(this.draft);
+            const valid = this.model.hasInformation(this.model.keys.filter(key => this.draft[key]));
+            this.error.hidden = valid;
+            this.applyButton.disabled = !valid;
+        }
+        notice(text) {
+            const node = this.picker.querySelector("[data-preset-notice]");
+            node.textContent = text;
+            node.hidden = !text;
+        }
+    }
 
-        renderVisibility();
-        renderDraft();
+    api.controllers = new Map();
+    document.querySelectorAll("[data-column-picker]").forEach(picker => {
+        const controller = new ColumnController(picker);
+        api.controllers.set(controller.config.id, controller);
     });
 })();

@@ -126,7 +126,7 @@
         <span>Вільно: <strong>{{ vacant }}</strong></span>
     </div>
 
-    {{ column_visibility(table_columns) }}
+    {{ column_visibility(table_columns, table_column_filters) }}
 
     <div class="table-responsive">
         <div class="table-container">
@@ -138,7 +138,7 @@
                     <th scope="col" data-column-key="{{ key }}"{% if not column.default_visible %} hidden{% endif %}>
                         {% if key in sort_urls %}
                         <div class="position-column-heading d-flex align-items-center text-nowrap">
-                            <a href="{{ sort_urls[key] }}" class="text-decoration-none">
+                            <a href="{{ sort_urls[key] }}" class="text-decoration-none" title="{{ column.label }}">
                                 {{ column.label }}
                                 {% if sort_by == key %}
                                 <small>{{ "" if direction == "asc" else "" }}</small>
@@ -194,7 +194,7 @@
                             </div>
                         </div>
                         {% else %}
-                        {{ column.label }}
+                        <span data-column-value title="{{ column.label }}">{{ column.label }}</span>
                         {% endif %}
                     </th>
                     {% endfor %}
@@ -241,7 +241,7 @@
                             <button type="submit" class="btn btn-sm btn-primary align-self-start">Зберегти</button>
                         </form>
                         {% else %}
-                        {{ values[column.key] }}
+                        <span data-column-value title="{{ values[column.key] }}">{{ values[column.key] }}</span>
                         {% endif %}
                     </td>
                     {% endfor %}
@@ -257,6 +257,12 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/table_state.js"></script>
+    <script src="/static/js/column_tree.js"></script>
+    <script src="/static/js/column_presets.js"></script>
+    <script src="/static/js/column_interactions.js"></script>
+    <script src="/static/js/table_filters.js"></script>
+    <script src="/static/js/table_history.js"></script>
     <script src="/static/js/column_visibility.js"></script>
     <script>
         document.querySelectorAll(".person-assignment-form").forEach(form => {

@@ -126,6 +126,11 @@ def get_person_positions_page(
             "sort_commands": sort_commands,
             "people": people,
             "table_columns": PERSON_POSITIONS_COLUMNS,
+            "table_column_filters": {
+                "keys": list(FILTER_KEYS),
+                "order_parameter": "filter_order",
+                "extra": {"occupancy": "all"},
+            },
         },
     )
 
