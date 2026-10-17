@@ -16,6 +16,7 @@
 | Видимість колонок, Checkbox Tree | `app/table_columns.py`, `app/templates/components/column_visibility.html`, `app/static/js/column_*.js`, `app/static/js/table_*.js`, `app/static/css/column_visibility.css`, `tests/test_table_columns.py`, `tests/js/`, `tests/browser/` |
 | Події | `app/services/service_for_person_event.py`, `app/services/service_common_event_func.py`, `app/models/person_event.py`, `app/validators/event_validatotor.py` |
 | Довідники та початкові дані | `app/models/reference_book.py`, `app/seeds/seed_structure.py`, `app/seeds/seed_reference.py`, `app/config.py`, `reference_data.xlsx` |
+| Окреме засівання тестових людей | `app/services/seed_test_people.py`, аркуш `persons` у `reference_data.xlsx`, `tests/test_seed_test_people.py` |
 | Підключення застосунку, БД, тестів | `app/main.py`, `app/database/`, `requirements.txt`, `tests/conftest.py` |
 
 ## Компоненти та потік запиту
@@ -192,8 +193,14 @@ GET-маршрути зазвичай самі виконують ORM-запит
 
 Посади завантажуються з кореневого `reference_data.xlsx`: `app/config.py::EXCEL_PATH`, аркуш `positions`, заголовок першого рядка, пропуск другого рядка, читання значень як тексту. `seed_reference.py` нормалізує назви колонок і значення та додає/оновлює записи за `position_number`; відсутні в Excel посади автоматично не видаляє. `app/utils/json_loader.py` — загальна утиліта; для наявних JSON-файлів у `app/seeds/` підключеного імпортера в проаналізованому коді немає.
 
+`app/services/seed_test_people.py` — незалежний від `seed_all_structure` імпортер аркуша `persons`. `seed_test_people(session_factory, excel_path)` перевіряє заголовки до відкриття сесій, читає через openpyxl всі заповнені рядки починаючи з другого й повертає `SeedReport` з лічильниками та `RowIssue` з номерами помилкових рядків. Назви обов'язкових колонок визначені в `REQUIRED_COLUMNS`; зайві колонки ігноруються. Команда й обмеження даних описані в [CURRENT_STATE.md](CURRENT_STATE.md#засівання-тестових-військовослужбовців).
+
+Імпортер використовує `PersonValidator`, `DataGroupValidate` і фабрику `ServicePersonCreate.add_name`. Повні та неповні дати проходять чинний `validate_date_components` і зберігаються в трьох полях `Person`; окремого запису персональних даних немає. Звання зіставляється тільки з існуючим `Rank.code` або `Rank.nominative` без урахування регістру й зайвих пробілів. Для нового РНОКПП створюються `Person`, активний `PersonName` та активний `PersonRank` в **одній транзакції рядка**. Сервіси `create_person` / `add_rank` із власними `commit` тут не викликаються; інші рядки можуть успішно зберегтися після відкату некоректного. Повторний РНОКПП пропускається без оновлення даних. Команда не створює схеми, звань, паспортів, призначень або історії служби.
+
 `reset.py` видаляє робочу БД та створює/заповнює її заново; `reset_test_db.py` аналогічно працює з тестовою. Кореневий `test_seed_positions.py` оновлює **робочу** БД при виконанні/імпорті. `test1.py` і `test2.py` — окремі утиліти звіряння Excel з папками/документами з жорстко заданими Windows-шляхами.
 
 Автоматизовані тести розташовано в `tests/`: створення людини й історії ПІБ, неповні дати, валідатори, вибірка/фільтри/сортування та перенесення/звільнення посад. Фікстура `db` у `tests/conftest.py` викликає `drop_all` / `create_all` для тестової БД перед кожним тестом, що її використовує. Команди та межі перевірки — у [CURRENT_STATE.md](CURRENT_STATE.md).
+
+`tests/test_seed_test_people.py` створює власні Excel-файли зі штучними даними та SQLite-бази в `tmp_path`, вмикає перевірку зовнішніх ключів і не використовує руйнівну фікстуру `db`. Перевіряє також CLI через subprocess і відкат після примусового збою запису звання.
 
 `tests/test_table_columns.py` перевіряє конфігурацію, системну колонку, відповідність заголовків/комірок і опис URL-фільтрів. `tests/js/*.test.cjs` перевіряють чисті модулі стану, пресетів, фільтрів та історії. `tests/browser/column_visibility.cjs` запускає Chromium через Playwright і тестовий сервер `tests/browser/serve_column_visibility.py`: реальні маршрути з dependency override на SQLite в пам'яті й згенерованими даними. Окремий тестовий маршрут із двома іншими таблицями перевіряє повторне використання макросу; у production він не реєструється.
