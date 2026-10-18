@@ -12,6 +12,7 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h2 mb-0">Люди</h1>
         <a class="btn btn-primary" href="/persons/new">Додати людину</a>
+        <a class="btn btn-primary" href="/person-positions">Штатка</a>
     </div>
     <form method="get" action="/persons" class="row g-2 mb-3">
         <div class="col-auto">
@@ -108,8 +109,9 @@
                 <td class="col-surname">{{ item.name.surname if item.name else "—" }}</td>
                 <td>{{ item.name.name if item.name else "—" }}</td>
                 <td>{{ item.person.tax_number or "—" }}</td>
-                <td>{{ format_partial_date(item.person.birth_day, item.person.birth_month, item.person.birth_year) or "—" }}</td>
-                <td class="col-rank">{{  item.rank.rank.nominative if item.rank and item.rank.rank else "—" }}</td>
+                <td>{{ format_partial_date(item.person.birth_day, item.person.birth_month, item.person.birth_year) or
+                    "—" }}</td>
+                <td class="col-rank">{{ item.rank.rank.nominative if item.rank and item.rank.rank else "—" }}</td>
                 <td class="col-rank_order_number">{{ item.rank.rank_order_number if item.rank else "—" }}</td>
             </tr>
             {% endfor %}

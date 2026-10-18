@@ -41,6 +41,20 @@ PERSON_POSITIONS_COLUMNS = {
             "label": "Військовослужбовець",
             "columns": [
                 _column("rank", "Звання"),
+                _column("full_name", "ПІБ"),
+                _column("surname", "Прізвище"),
+                _column("name", "Ім'я"),
+                _column("patronymic", "По батькові"),
+            ],
+        },
+        {
+            "key": "ranks",
+            "label": "Звання",
+            "columns": [
+                _column("rank", "Звання"),
+                _column("rank", "Звання"),
+                _column("rank", "Звання"),
+                _column("full_name", "ПІБ"),
                 _column("surname", "Прізвище"),
                 _column("name", "Ім'я"),
                 _column("patronymic", "По батькові"),
