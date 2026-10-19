@@ -1,14 +1,12 @@
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.database.db import get_db
-from app.models.person import Person
-from app.models.person_identity import PersonName
-from app.services.service_person_positions import FILTER_COLUMNS, DATE_FILTER_COLUMNS, ServicePersonPositionFunc
+from app.services.service_person_positions import FILTER_COLUMNS, DATE_FILTER_COLUMNS, SORT_COLUMNS, ServicePersonPositionFunc
 from app.table_columns import PERSON_POSITIONS_COLUMNS
 from app.utils.date_query import DateFilter, date_priority
 from app.utils.date_utils import register_date_globals
@@ -19,6 +17,7 @@ templates = Jinja2Templates(directory="app/templates")
 register_date_globals(templates.env)
 
 FILTER_KEYS = (*FILTER_COLUMNS, *DATE_FILTER_COLUMNS)
+SORT_KEYS = (*SORT_COLUMNS, *DATE_FILTER_COLUMNS)
 
 
 def normalise_filter_order(filter_order, column_filters):
@@ -44,43 +43,21 @@ def build_query_string(sort_by, direction, occupancy, column_filters, filter_ord
 
 
 @router.get("/person-positions")
-def get_person_positions_page(
-    request: Request,
-    occupancy: str = "all",
-    sort_by: str = "position_number",
-    direction: str = "asc",
-    filter_order: str = "",
-    position_number: list[str] = Query(default=[]),
-    unit_short: list[str] = Query(default=[]),
-    name_short: list[str] = Query(default=[]),
-    name_nominative: list[str] = Query(default=[]),
-    rank: list[str] = Query(default=[]),
-    surname: list[str] = Query(default=[]),
-    name: list[str] = Query(default=[]),
-    patronymic: list[str] = Query(default=[]),
-    birth_date: list[str] = Query(default=[]),
-    birth_date_priority: str = "year,month,day",
-    rank_order_date: list[str] = Query(default=[]),
-    rank_order_date_priority: str = "year,month,day",
-    db: Session = Depends(get_db),
-):
-    column_filters = {
-        "position_number": position_number,
-        "unit_short": unit_short,
-        "name_short": name_short,
-        "name_nominative": name_nominative,
-        "rank": rank,
-        "surname": surname,
-        "name": name,
-        "patronymic": patronymic,
-        "birth_date": birth_date,
-        "rank_order_date": rank_order_date,
-    }
+def person_positions_endpoint(request: Request, occupancy: str = "all", sort_by: str = "position_number",
+                              direction: str = "asc", filter_order: str = "", db: Session = Depends(get_db)):
+    return get_person_positions_page(request, occupancy=occupancy, sort_by=sort_by, direction=direction,
+                                     filter_order=filter_order, db=db)
+
+
+def get_person_positions_page(request, occupancy="all", sort_by="position_number", direction="asc",
+                              filter_order="", db=None, **field_values):
+    # Read only fields allowed by this table, not arbitrary model attributes.
+    column_filters = {key: field_values.get(key, request.query_params.getlist(key)) for key in FILTER_KEYS}
     try:
-        priorities = {"birth_date": date_priority(birth_date_priority), "rank_order_date": date_priority(rank_order_date_priority)}
+        priorities = {key: date_priority(field_values.get(f"{key}_priority", request.query_params.get(f"{key}_priority", "year,month,day")))
+                      for key in DATE_FILTER_COLUMNS}
         date_filters = {}
         for key in DATE_FILTER_COLUMNS:
-            # Direct Python route calls can omit FastAPI Query defaults.
             raw_date = column_filters[key] if isinstance(column_filters[key], list) else []
             if len(raw_date) > 1:
                 raise ValueError("Фільтр дати має бути заданий один раз.")
@@ -96,7 +73,7 @@ def get_person_positions_page(
     }
     order = normalise_filter_order(filter_order, column_filters)
     filter_order = ",".join(order)
-    sort_by = sort_by if sort_by in FILTER_KEYS else "position_number"
+    sort_by = sort_by if sort_by in SORT_KEYS else "position_number"
     direction = "desc" if direction == "desc" else "asc"
     occupancy = occupancy if occupancy in ("all", "occupied", "vacant") else "all"
     data = ServicePersonPositionFunc.get_positions(
@@ -108,22 +85,12 @@ def get_person_positions_page(
         date_sort_priority=priorities,
     )
 
-    people_records = (
-        db.query(Person, PersonName)
-        .outerjoin(
-            PersonName,
-            (PersonName.person_id == Person.person_id)
-            & PersonName.is_active.is_(True),
-        )
-        .order_by(PersonName.surname, PersonName.name)
-        .all()
-    )
-    people = [{"person": person, "name": name} for person, name in people_records]
+    people = ServicePersonPositionFunc.get_people(db)
 
     active_query = build_query_string(sort_by, direction, occupancy, column_filters, filter_order, priorities)
     sort_urls = {}
     sort_commands = {}
-    for key in FILTER_KEYS:
+    for key in SORT_KEYS:
         next_direction = "desc" if sort_by == key and direction == "asc" else "asc"
         sort_urls[key] = "?" + build_query_string(
             key,

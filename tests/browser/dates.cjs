@@ -13,7 +13,7 @@ module.exports = async ({context,base}) => {
         await page.goto(base+'/person-positions'); await page.evaluate(()=>localStorage.clear()); await page.reload();
         await scenario('range possible match includes partial dates and excludes unassigned positions',async()=>{
             assert.equal(await count(),3);
-            assert.deepEqual((await table.locator('tbody [data-column-key="birth_date"]').allTextContents()).map(t=>t.trim()),['15.03.1993','15._.1993','—']);
+            assert.deepEqual((await table.locator('tbody [data-column-key="birth_date"]').allTextContents()).map(t=>t.trim()),['15.03.1993','15._.1993','-']);
             await open(); await menu.locator('[data-date-mode]').selectOption('range');
             await menu.locator('[data-date-boundary="start"]').fill('1993-03-10');
             await menu.locator('[data-date-boundary="end"]').fill('1993-03-20'); await apply();

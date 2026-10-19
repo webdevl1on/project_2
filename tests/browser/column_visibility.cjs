@@ -53,7 +53,7 @@ async function main() {
             const version = route.request().url().split("bootstrap@")[1].split("/")[0];
             return route.fulfill({ body: assets[`${version}/${file}`], contentType: file.endsWith(".js") ? "application/javascript" : "text/css" });
         });
-        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates"];
+        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog"];
         if (process.env.COLUMN_STAGE) {
             assert.ok(suites.includes(process.env.COLUMN_STAGE));
             await require(`./${process.env.COLUMN_STAGE}.cjs`)({ context, base });
@@ -84,10 +84,11 @@ async function main() {
             await toggle.click();
             const positionGroup = group("position");
             const checkbox = positionGroup.locator("[data-column-group-choice]");
+            await checkbox.check();
             await checkbox.uncheck();
             assert.equal(await positionGroup.locator("[data-column-choice]:checked").count(), 0);
             await checkbox.check();
-            assert.equal(await positionGroup.locator("[data-column-choice]:checked").count(), 4);
+            assert.equal(await positionGroup.locator("[data-column-choice]:checked").count(), 11);
             await checkbox.uncheck();
             assert.equal(await visibleHeaders(), 12); // Draft does not change the table yet.
             await choice("position_number").check();
@@ -120,9 +121,12 @@ async function main() {
 
         await scenario("cannot hide every informational column; show all", async () => {
             await toggle.click();
+            await group("position").locator("[data-column-group-choice]").check();
             await group("position").locator("[data-column-group-choice]").uncheck();
             await group("person").locator("[data-column-group-choice]").check();
             await group("person").locator("[data-column-group-choice]").uncheck();
+            await group("rank").locator("[data-column-group-choice]").check();
+            await group("rank").locator("[data-column-group-choice]").uncheck();
             assert.equal(await picker.locator("[data-column-apply]").isDisabled(), true);
             assert.equal(await picker.locator("[data-column-error]").isVisible(), true);
             assert.equal(await choice("row_number").isChecked(), true);

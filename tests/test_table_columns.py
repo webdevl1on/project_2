@@ -1,8 +1,8 @@
 from copy import deepcopy
-from types import SimpleNamespace
+from app.models.reference_book import Position
 
 from app.routers.person_positions import templates
-from app.table_columns import PERSON_POSITIONS_COLUMNS
+from app.table_columns import PERSON_POSITIONS_COLUMNS, PERSON_POSITIONS_FIELDS
 
 
 def test_column_metadata_covers_real_columns_with_unique_keys():
@@ -11,9 +11,10 @@ def test_column_metadata_covers_real_columns_with_unique_keys():
     columns = [column for group in groups for column in group["columns"]]
     assert config["id"] == "person-positions"
     assert len({group["key"] for group in groups}) == len(groups)
-    assert len(columns) == len({column["key"] for column in columns}) == 13
-    assert sum(column["informational"] for column in columns) == 11
-    assert [column["key"] for column in columns if not column["default_visible"]] == ["rank_order_date"]
+    assert len(columns) == len({column["key"] for column in columns}) == len(PERSON_POSITIONS_FIELDS) + 2
+    assert sum(column["informational"] for column in columns) == len(PERSON_POSITIONS_FIELDS)
+    assert sum(column["default_visible"] for column in columns) == 12
+    assert all(not column["default_visible"] for column in groups[-2]["columns"])
     assert [column["key"] for column in columns if column["system"]] == ["row_number"]
 
 
@@ -24,7 +25,7 @@ def test_table_headers_and_cells_follow_config_order_and_labels():
     config["groups"][1]["columns"][0]["label"] = "Нова назва з конфігурації"
     config["groups"][1]["columns"][0]["default_visible"] = False
     columns = [column for group in config["groups"] for column in group["columns"]]
-    position = SimpleNamespace(
+    position = Position(
         position_id=1, position_number=10, unit_short="Підрозділ",
         name_short="Посада", name_nominative="Повна назва",
     )
@@ -33,6 +34,7 @@ def test_table_headers_and_cells_follow_config_order_and_labels():
     rendered = templates.env.get_template("person_positions.html").render(
         table_columns=config, rows=[{
             "position": position, "rank": None, "name": None, "assignment": None,
+            "values": {key: field.display({"position": position}) for key, field in PERSON_POSITIONS_FIELDS.items()},
         }], people=[], total=1, occupied=0, vacant=1,
         active_filters={}, sort_urls={}, filter_numbers={}, sort_commands={},
         active_query="", filter_order="", occupancy="all", sort_by="position_number", direction="asc",

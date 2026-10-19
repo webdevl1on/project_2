@@ -146,6 +146,14 @@
         <span>Вільно: <strong>{{ vacant }}</strong></span>
     </div>
 
+    {% if data_warnings %}
+    <div class="alert alert-warning" role="alert" data-history-warnings>
+        <strong>Неоднозначні історичні дані:</strong>
+        <ul class="mb-0">{% for warning in data_warnings %}
+            <li>Посада № {{ warning.position_number }}: {{ warning.messages|join(' ') }}</li>
+        {% endfor %}</ul>
+    </div>
+    {% endif %}
     {{ column_visibility(table_columns, table_column_filters) }}
 
     <div class="table-responsive">
@@ -171,6 +179,7 @@
                                     {% endif %}
                                 </a>
 
+                                {% if column.filterable %}
                                 <div class="dropdown">
                                     <button
                                         class="btn btn-sm filter-toggle {{ 'filter-toggle-active border-primary text-primary' if key in filter_numbers else 'text-secondary' }}"
@@ -224,6 +233,7 @@
                                         </div>
                                     </div>
                                 </div>
+                                {% endif %}
                             </div>
                             {% else %}
                             <span data-column-value title="{{ column.label }}">{{ column.label }}</span>
@@ -235,22 +245,8 @@
 
                 <tbody>
                     {% for item in rows %}
+                    {% set row_number = loop.index %}
                     <tr>
-                        {% set values = {
-                        "row_number": loop.index,
-                        "position_number": item.position.position_number,
-                        "unit_short": item.position.unit_short,
-                        "name_short": item.position.name_short,
-                        "name_nominative": item.position.name_nominative,
-                        "rank": item.rank.nominative if item.rank else "—",
-                        "birth_date": format_partial_date(item.person.birth_day, item.person.birth_month, item.person.birth_year) if item.person else "—",
-                        "rank_order_date": format_partial_date(item.person_rank.rank_order_day, item.person_rank.rank_order_month, item.person_rank.rank_order_year) if item.person_rank else "—",
-                        "surname": item.name.surname if item.name else "—",
-                        "name": item.name.name if item.name else "—",
-                        "patronymic": item.name.patronymic if item.name and item.name.patronymic else "—",
-                        "full_name": ([item.name.surname, item.name.name, item.name.patronymic]
-                        |select|join(" ")) if item.name else "—"
-                        } %}
                         {% for column in columns %}
                         <td data-column-key="{{ column.key }}" {% if not column.default_visible %} hidden{% endif %}>
                             {% if column.key == "assignment" %}
@@ -278,7 +274,7 @@
                                 <button type="submit" class="btn btn-sm btn-primary align-self-start">Зберегти</button>
                             </form>
                             {% else %}
-                            <span data-column-value title="{{ values[column.key] }}">{{ values[column.key] }}</span>
+                            <span data-column-value title="{{ row_number if column.key == "row_number" else item["values"][column.key] }}">{{ row_number if column.key == "row_number" else item["values"][column.key] }}</span>
                             {% endif %}
                         </td>
                         {% endfor %}

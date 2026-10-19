@@ -12,7 +12,7 @@ import uvicorn
 from app.database.base import Base
 from app.database.db import get_db
 from app.main import app
-from app.models import Person, PersonName, PersonPosition, PersonRank
+from app.models import Person, PersonName, PersonPosition, PersonRank, Passport, PersonServiceHistory
 from app.routers.person_positions import templates
 from tests.test_person_positions import make_position, make_rank
 
@@ -27,8 +27,8 @@ with Session() as db:
         make_position(30, "Другий", "Медик", "Медик"),
     ]
     rank = make_rank()
-    people = [Person(birth_day=15, birth_month=3, birth_year=1993),
-              Person(birth_day=15, birth_month=None, birth_year=1993)]
+    people = [Person(tax_number="0000000001", birth_day=15, birth_month=3, birth_year=1993),
+              Person(tax_number="0000000002", birth_day=15, birth_month=None, birth_year=1993)]
     db.add_all([*positions, rank, *people])
     db.flush()
     for person, position, surname in zip(people, positions, ("Альфа", "Бета")):
@@ -37,6 +37,15 @@ with Session() as db:
             PersonRank(person_id=person.person_id, rank_id=rank.rank_id),
             PersonPosition(person_id=person.person_id, position_id=position.position_id),
         ])
+    db.add_all([
+        Passport(person_id=people[0].person_id, passport_type="Тестовий", passport_number="000123",
+                 passport_issued_by="Тестовий орган", passport_issued_year=2015, is_active=False),
+        Passport(person_id=people[1].person_id, passport_number="000456", passport_issued_day=20,
+                 passport_issued_month=6, passport_issued_year=2020, is_active=True),
+        Passport(person_id=people[1].person_id, passport_number="OLD", is_active=False),
+        PersonServiceHistory(person_id=people[0].person_id, military_unit="Тестова частина", service_type="Контракт",
+                             position_year=2019, is_active=False),
+    ])
     db.commit()
 
 

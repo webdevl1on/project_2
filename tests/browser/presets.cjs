@@ -79,11 +79,12 @@ module.exports = async ({context,base}) => {
             const group = editor.locator('[data-column-group]:has([aria-controls$="-group-position"])');
             assert.equal(await group.locator('[data-column-group-choice]').evaluate(node=>node.indeterminate),true);
             await editor.locator('[data-column-choice="unit_short"]').check();
-            assert.equal(await group.locator('[data-column-group-choice]').isChecked(),true);
+            assert.equal(await group.locator('[data-column-group-choice]').evaluate(node=>node.indeterminate),true);
             assert.equal(await editor.locator('[data-preset-selected-key]').last().getAttribute('data-preset-selected-key'),'unit_short');
             await editor.locator('[data-preset-up="unit_short"]').click();
             const selected = editor.locator('[data-preset-selected-key]');
             assert.equal(await selected.nth((await selected.count())-2).getAttribute('data-preset-selected-key'),'unit_short');
+            await group.locator('[data-column-group-choice]').check();
             await group.locator('[data-column-group-choice]').uncheck();
             assert.equal(await editor.locator('[data-preset-selected-key="unit_short"]').count(),0);
             await group.locator('[data-column-group-choice]').check();
@@ -93,7 +94,7 @@ module.exports = async ({context,base}) => {
             assert.deepEqual(await snapshot(),before);
             const updated = (await stored())[0];
             assert.equal(updated.name,'Оновлений');
-            assert.equal(updated.columns.at(-1),'name_nominative');
+            assert.equal(updated.columns.at(-1),'name_vocative');
             await picker.locator('[data-preset-apply]').first().click();
             assert.deepEqual(await snapshot(),updated.columns);
         });
