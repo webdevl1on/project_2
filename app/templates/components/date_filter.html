@@ -1,0 +1,53 @@
+{% macro date_filter(column, table_id, spec, options, priority, number=none) %}
+{% if column.date.system %}
+<span data-column-value>{{ column.label }}</span>
+{% else %}
+<div class="position-column-heading d-flex align-items-center">
+    <span data-column-value title="{{ column.label }}">{{ column.label }}</span>
+    <div class="dropdown">
+        <button class="btn btn-sm filter-toggle {{ 'filter-toggle-active border-primary' if number else '' }}"
+            type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-label="Фільтр: {{ column.label }}">
+            <span class="filter-toggle-triangle">▼{% if number %}<span class="filter-number">{{ number }}</span>{% endif %}</span>
+        </button>
+        <div class="dropdown-menu p-2 date-filter-menu" data-date-menu data-date-column-key="{{ column.key }}"
+            data-date-table-id="{{ table_id }}" data-date-field='{{ column.date | tojson }}'
+            data-date-state='{{ spec | tojson }}' data-date-options='{{ options | tojson }}'
+            data-date-priority='{{ priority | tojson }}'>
+            <div class="d-flex gap-1 mb-2">
+                <button type="button" class="btn btn-sm btn-outline-primary" data-date-sort="asc">За зростанням ↑</button>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-date-sort="desc">За спаданням ↓</button>
+            </div>
+            <strong class="small">Пріоритет складових дати</strong>
+            <div data-date-priority-list class="mb-2"></div>
+            <label class="form-label small">Режим
+                <select class="form-select form-select-sm" data-date-mode>
+                    <option value="parts">За складовими</option><option value="range">Діапазон</option>
+                </select>
+            </label>
+            <div data-date-parts>
+                {% for part, label in [('years', 'Рік'), ('months', 'Місяць'), ('days', 'День')] %}
+                <details class="mb-1" {% if part == 'years' %}open{% endif %}>
+                    <summary>{{ label }}</summary>
+                    <input type="search" class="form-control form-control-sm" data-date-search="{{ part }}" aria-label="Пошук: {{ label }}" placeholder="Пошук...">
+                    <div data-date-choices="{{ part }}" class="date-choices"></div>
+                </details>
+                {% endfor %}
+            </div>
+            <div data-date-range hidden>
+                <label class="form-label small">Від <input type="date" class="form-control form-control-sm" data-date-boundary="start"></label>
+                <label class="form-label small">До <input type="date" class="form-control form-control-sm" data-date-boundary="end"></label>
+            </div>
+            {% if column.date.allow_partial %}
+            <label class="form-check-label d-block my-2"><input type="checkbox" class="form-check-input" data-date-incomplete> Тільки неповні дати</label>
+            {% endif %}
+            <p class="text-danger small" data-date-error hidden role="alert"></p>
+            <div class="d-flex gap-1 flex-wrap mt-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-date-clear>Очистити</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-date-cancel>Скасувати</button>
+                <button type="button" class="btn btn-sm btn-primary" data-date-apply>Застосувати</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endmacro %}

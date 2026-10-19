@@ -1,3 +1,4 @@
+{% from "components/date_input.html" import date_input %}
 <!-- Modal for new name-->
 <div class="modal fade" id="addNewName" tabindex="-1" aria-labelledby="addNewNameLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -66,10 +67,7 @@
                         <label for="rank_order_number">Номер наказу</label>
                         <input id="rank_order_number" name="rank_order_number">
                     </div>
-                    <div class="col-md-6">
-                        <label for="rank_order_date">Дата наказу</label>
-                        <input id="rank_order_date" class="date-mask" name="rank_order_date">
-                    </div>
+                    {{ date_input(rank_order_date_field, 'rank_order', id_prefix='new_rank_order') }}
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         <button type="submit" class="btn btn-primary">Зберегти</button>

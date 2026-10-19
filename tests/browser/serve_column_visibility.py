@@ -27,7 +27,8 @@ with Session() as db:
         make_position(30, "Другий", "Медик", "Медик"),
     ]
     rank = make_rank()
-    people = [Person(), Person()]
+    people = [Person(birth_day=15, birth_month=3, birth_year=1993),
+              Person(birth_day=15, birth_month=None, birth_year=1993)]
     db.add_all([*positions, rank, *people])
     db.flush()
     for person, position, surname in zip(people, positions, ("Альфа", "Бета")):

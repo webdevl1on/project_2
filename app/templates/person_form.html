@@ -1,3 +1,4 @@
+{% from "components/date_input.html" import date_input %}
 <!DOCTYPE html>
 <html lang="uk">
 
@@ -31,26 +32,7 @@
             <input class="form-control" id="tax_number" name="tax_number" inputmode="numeric"
                 value="{{ form_data.get('tax_number', '') }}">
         </div>
-        <div class="col-md-12">
-            <label class="form-label">Дата народження</label>
-            <div class="row g-2" id="birth-date-fields">
-                <div class="col-md-3">
-                    <input class="form-control birth-date-part" id="birth_day" name="birth_day"
-                        inputmode="numeric" maxlength="2" list="birth-days" placeholder="День"
-                        value="{{ form_data.get('birth_day', '') }}">
-                </div>
-                <div class="col-md-3">
-                    <input class="form-control birth-date-part" id="birth_month" name="birth_month"
-                        inputmode="numeric" maxlength="2" list="birth-months" placeholder="Місяць"
-                        value="{{ form_data.get('birth_month', '') }}">
-                </div>
-                <div class="col-md-3">
-                    <input class="form-control birth-date-part" id="birth_year" name="birth_year"
-                        inputmode="numeric" maxlength="4" list="birth-years" placeholder="Рік"
-                        value="{{ form_data.get('birth_year', '') }}">
-                </div>
-            </div>
-        </div>
+        {{ date_input(birth_date_field, "birth", form_data) }}
         <div class="col-12">
             <button class="btn btn-primary" type="submit">{{ submit_label or "Зберегти" }}</button>
             <a class="btn btn-outline-secondary" href="{{ cancel_url or '/persons' }}">Скасувати</a>
@@ -58,51 +40,5 @@
     </form>
 </body>
 
-<datalist id="birth-days">
-    {% for value in range(1, 32) %}
-    <option value="{{ '%02d'|format(value) }}"></option>
-    {% endfor %}
-</datalist>
-<datalist id="birth-months">
-    {% for value in range(1, 13) %}
-    <option value="{{ '%02d'|format(value) }}"></option>
-    {% endfor %}
-</datalist>
-<datalist id="birth-years"></datalist>
-
-<script>
-    const birthDateParts = Array.from(document.querySelectorAll(".birth-date-part"));
-    const birthYears = document.getElementById("birth-years");
-    for (let year = new Date().getFullYear(); year >= 1; year -= 1) {
-        const option = document.createElement("option");
-        option.value = year;
-        birthYears.appendChild(option);
-    }
-
-    birthDateParts.forEach((input, index) => {
-        input.addEventListener("input", () => {
-            input.value = input.value.replace(/\D/g, "");
-            if (index < birthDateParts.length - 1 && input.value.length === input.maxLength) {
-                birthDateParts[index + 1].focus();
-            }
-        });
-    });
-
-    document.querySelector("form").addEventListener("submit", (event) => {
-        const [day, month, year] = birthDateParts.map((input) => input.value.trim());
-        const values = [day, month, year].filter(Boolean);
-
-        if (!values.length) {
-            return;
-        }
-
-        if ((day && (Number(day) < 1 || Number(day) > 31)) ||
-            (month && (Number(month) < 1 || Number(month) > 12)) ||
-            (year && (Number(year) < 1 || Number(year) > new Date().getFullYear()))) {
-            event.preventDefault();
-            alert("Перевірте компоненти дати народження.");
-        }
-    });
-</script>
-
+<script src="/static/js/date_input.js"></script>
 </html>

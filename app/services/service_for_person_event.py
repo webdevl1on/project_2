@@ -71,7 +71,7 @@ class PersonEventService:
             event_type_id=event_type.event_type_id,
             event_subtype_id=event_subtype.event_subtype_id if event_subtype else None,
             date_start=EventValidator.validate_event_date(
-                date_start
+                date_start, required=True
             ),
             duration=EventValidator.validate_event_duration(
                 duration
@@ -271,4 +271,3 @@ class PersonEventService:
             return False
         finally:
             db.close()
-        

@@ -1,4 +1,5 @@
 from datetime import datetime
+from app.utils.date_utils import parse_exact_date
 
 class PersonValidator:
 #person name data validation
@@ -27,19 +28,7 @@ class PersonValidator:
     
     @staticmethod
     def validate_date(date):
-        if not date:
-            return None 
-        try:
-            return datetime.strptime(
-                date,
-                "%d.%m.%Y"
-            ).date()
-
-        except ValueError:
-
-            raise ValueError(
-                "Невірний формат дати. Використовуйте ДД.ММ.РРРР"
-            )
+        return parse_exact_date(date)
     
     @staticmethod
     def validate_person_rank(rank):
@@ -142,4 +131,3 @@ class PersonValidator:
 
             raise ValueError("PIB cannot exceed 255 characters.")
         return pib
-    

@@ -1,3 +1,4 @@
+{% from "components/date_input.html" import date_input %}
 <h2 class="h4 mt-4">Історія звань</h2>
 <!-- Button trigger modal -->
 <button type=" button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addNewRank">
@@ -23,7 +24,7 @@
             <td>{{loop.index}}</td>
             <td>{{ person_rank.rank.nominative }}</td>
             <td>{{ person_rank.rank_order_number }}</td>
-            <td>{{ person_rank.rank_order_date.strftime("%d.%m.%Y") if person_rank.rank_order_date else "" }}</td>
+            <td>{{ format_partial_date(person_rank.rank_order_day, person_rank.rank_order_month, person_rank.rank_order_year) }}</td>
             <td><button class="btn btn-sm btn-warning" data-bs-toggle="modal"
                     data-bs-target="#editRankModal{{ person_rank.person_rank_id }}">Ред</button>
                 <!-- Modal for change ranks-->
@@ -51,11 +52,7 @@
                                         <input id="rank_order_number" name="rank_order_number"
                                             value="{{ person_rank.rank_order_number or '' }}">
                                     </div>
-                                    <div class="col-md-6">
-                                        <label for="rank_order_date">Дата наказу</label>
-                                        <input id="rank_order_date" class="date-mask" name="rank_order_date"
-                                            value="{{ person_rank.rank_order_date.strftime('%d.%m.%Y') if person_rank.rank_order_date else '' }}">
-                                    </div>
+                                    {{ date_input(rank_order_date_field, 'rank_order', person_rank.date_components('rank_order').as_dict('rank_order'), id_prefix='rank_order_' ~ person_rank.person_rank_id) }}
 
 
                                     <div class="modal-footer">

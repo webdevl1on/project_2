@@ -11,9 +11,9 @@ def test_column_metadata_covers_real_columns_with_unique_keys():
     columns = [column for group in groups for column in group["columns"]]
     assert config["id"] == "person-positions"
     assert len({group["key"] for group in groups}) == len(groups)
-    assert len(columns) == len({column["key"] for column in columns}) == 10
-    assert sum(column["informational"] for column in columns) == 8
-    assert all(column["default_visible"] for column in columns)
+    assert len(columns) == len({column["key"] for column in columns}) == 13
+    assert sum(column["informational"] for column in columns) == 11
+    assert [column["key"] for column in columns if not column["default_visible"]] == ["rank_order_date"]
     assert [column["key"] for column in columns if column["system"]] == ["row_number"]
 
 

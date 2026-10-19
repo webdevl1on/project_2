@@ -1,4 +1,5 @@
 from datetime import datetime, date
+from app.utils.date_utils import parse_exact_date
 
 class EventValidator:
     
@@ -12,18 +13,8 @@ class EventValidator:
         return name
     
     @staticmethod
-    def validate_event_date(event_date: str | None) -> date | None:
-        if not event_date:
-            return None 
-        try:
-            return datetime.strptime(
-                event_date,
-                "%d.%m.%Y"
-            ).date()
-        except ValueError:
-            raise ValueError(
-                "Invalid date format. Use DD.MM.YYYY"
-            )
+    def validate_event_date(event_date: str | None, *, required=False) -> date | None:
+        return parse_exact_date(event_date, required=required)
        
     @staticmethod
     def validate_event_duration(event_duration)->int | None:
@@ -54,4 +45,3 @@ class EventValidator:
         if description and len(description) > 1000:
             raise ValueError("Event note cannot exceed 1000 characters.")
         return description
-   

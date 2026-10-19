@@ -1,0 +1,21 @@
+{% macro date_input(field, prefix, values={}, id_prefix=none) %}
+{% if not field.system %}
+<fieldset class="col-12" data-date-input data-date-policy='{{ field | tojson }}'>
+    <legend class="form-label fs-6">{{ field.label }}</legend>
+    <div class="row g-2">
+        {% for part, label, maximum in [('day', 'День', 31), ('month', 'Місяць', 12), ('year', 'Рік', field.max_year)] %}
+        {% set name = prefix ~ '_' ~ part %}
+        {% set input_id = (id_prefix or prefix) ~ '_' ~ part %}
+        <div class="col-4">
+            <label class="visually-hidden" for="{{ input_id }}">{{ label }}</label>
+            <input class="form-control" type="number" inputmode="numeric" step="1"
+                id="{{ input_id }}" name="{{ name }}" data-date-part="{{ part }}"
+                min="{{ field.min_year if part == 'year' else 1 }}" max="{{ maximum }}"
+                placeholder="{{ label }}" value="{{ values.get(name, '') or '' }}" {% if field.required %}required{% endif %}>
+        </div>
+        {% endfor %}
+    </div>
+    <small class="text-body-secondary">{{ 'Невідомі складові можна залишити порожніми.' if field.allow_partial else 'Задана дата має бути повною.' }}</small>
+</fieldset>
+{% endif %}
+{% endmacro %}

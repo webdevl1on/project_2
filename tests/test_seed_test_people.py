@@ -78,11 +78,14 @@ def test_import_links_values_and_repeat_does_not_overwrite(isolated_db, tmp_path
         assert person.ranks[0].rank.code == "SOLDIER"
         assert person.ranks[0].rank_order_number is None
         assert person.ranks[0].rank_order_date is None
+        assert (person.ranks[0].rank_order_day, person.ranks[0].rank_order_month, person.ranks[0].rank_order_year) == (None, None, None)
         assert person.positions == person.service_history == []
         # Збережені дані не повинні замінюватися навіть значеннями з Excel.
         person.birth_year = 2004
         name.surname = "Зміненко"
         person.ranks[0].rank = db.scalar(select(Rank).where(Rank.code == "SENIOR_SOLDIER"))
+        person.ranks[0].rank_order_year = 1995
+        person.ranks[0].rank_order_month = 3
     again = seed_test_people(factory, path)
     assert (again.found, again.created, again.existing, again.skipped, again.issues) == (1, 0, 1, 1, [])
     assert counts(factory) == (1, 1, 1)
@@ -91,6 +94,8 @@ def test_import_links_values_and_repeat_does_not_overwrite(isolated_db, tmp_path
         assert person.birth_year == 2004
         assert person.names[0].surname == "Зміненко"
         assert person.ranks[0].rank.code == "SENIOR_SOLDIER"
+        assert (person.ranks[0].rank_order_day, person.ranks[0].rank_order_month, person.ranks[0].rank_order_year) == (None, 3, 1995)
+        assert person.ranks[0].rank_order_date is None
 
 
 @pytest.mark.parametrize("day,month,year", [

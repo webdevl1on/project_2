@@ -56,15 +56,18 @@ module.exports = async ({context,base}) => {
             assert.ok(Math.abs((await header(key).boundingBox()).width-100)<2);
         });
         await scenario('presets save drag order but leave current widths untouched', async()=>{
-            const savedOrder=await order();
+            // Keep both drag endpoints visible; dragTo does not emulate scrollbar dragging.
+            await page.setViewportSize({width:2600,height:1000});
+            const visibleOrder=()=>table.locator('thead th:visible').evaluateAll(nodes=>nodes.map(node=>node.dataset.columnKey));
+            const savedOrder=await visibleOrder();
             await picker.locator('.column-toolbar > [data-preset-create]').click();
             const modal=picker.locator('[data-preset-save-modal]');
             await modal.locator('[data-preset-name]').fill('Порядок');
             await modal.locator('[type=submit]').click();await modal.waitFor({state:'hidden'});
             await drag('surname','name_short');
-            assert.notDeepEqual(await order(),savedOrder);
+            assert.notDeepEqual(await visibleOrder(),savedOrder);
             await picker.locator('[data-preset-apply]').click();
-            assert.deepEqual(await order(),savedOrder);
+            assert.deepEqual(await visibleOrder(),savedOrder);
             assert.ok(Math.abs((await header('name_nominative').boundingBox()).width-100)<2);
             const presets=await page.evaluate(()=>JSON.parse(localStorage.getItem('project2:table-presets:person-positions')).presets);
             assert.equal(Object.hasOwn(presets[0],'widths'),false);

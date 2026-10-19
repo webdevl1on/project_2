@@ -1,0 +1,6 @@
+.date-filter-menu { width: 340px; max-width: calc(100vw - 24px); white-space: normal; }
+.date-filter-menu [hidden] { display: none !important; }
+.date-choices { max-height: 140px; overflow: auto; }
+.date-choice { display: block; padding: .15rem .3rem; }
+.date-priority-row { display: flex; gap: .3rem; align-items: center; margin: .2rem 0; }
+.date-priority-row span { flex: 1; }

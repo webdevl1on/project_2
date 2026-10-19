@@ -11,12 +11,16 @@ from app.models.person_military_service import PersonRank
 from app.models.reference_book import Rank
 from app.services.service_person_create import ServicePersonCreate
 from app.services.service_person_checking import ServicePersonCheck
-from app.utils.date_utils import format_partial_date
+from app.utils.date_utils import register_date_globals
+from app.date_fields import BIRTH_DATE, DATE_FIELDS
+from app.utils.date_query import DateBinding
 
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
-templates.env.globals["format_partial_date"] = format_partial_date
+register_date_globals(templates.env)
+templates.env.globals["birth_date_field"] = BIRTH_DATE.metadata()
+templates.env.globals["rank_order_date_field"] = DATE_FIELDS["rank.rank_order_date"].metadata()
 
 
 def format_form_date(value):
@@ -45,6 +49,8 @@ def get_persons_page(request: Request,
         order = sort_column.desc()
     else:
         order = sort_column.asc()
+    # Keep the existing URL key while sorting the whole domain date correctly.
+    orders = DateBinding(BIRTH_DATE, Person.birth_day, Person.birth_month, Person.birth_year).order_by(direction=direction) if sort_by == "birth_year" else [order]
 
     records = (
         db.query(Person, PersonName, PersonRank)
@@ -63,7 +69,7 @@ def get_persons_page(request: Request,
             ),
         )
         .outerjoin(Rank, PersonRank.rank_id == Rank.rank_id)
-        .order_by(order, Person.person_id)
+        .order_by(*orders, Person.person_id)
         .all()
     )
     persons = [

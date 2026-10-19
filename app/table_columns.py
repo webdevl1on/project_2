@@ -2,10 +2,11 @@
 
 SQL filter/sort allowlists remain independent of this configuration.
 """
+from app.date_fields import BIRTH_DATE, DATE_FIELDS
 
 
-def _column(key, label, *, informational=True, default_visible=True, system=False):
-    return {
+def _column(key, label, *, informational=True, default_visible=True, system=False, date_field=None):
+    column = {
         "key": key,
         "label": label,
         "informational": informational,
@@ -16,6 +17,9 @@ def _column(key, label, *, informational=True, default_visible=True, system=Fals
         "min_width": 100 if informational else 56,
         "width": 56 if system else (180 if informational else 360),
     }
+    if date_field is not None:
+        column["date"] = date_field.metadata()
+    return column
 
 
 PERSON_POSITIONS_COLUMNS = {
@@ -45,19 +49,9 @@ PERSON_POSITIONS_COLUMNS = {
                 _column("surname", "Прізвище"),
                 _column("name", "Ім'я"),
                 _column("patronymic", "По батькові"),
-            ],
-        },
-        {
-            "key": "ranks",
-            "label": "Звання",
-            "columns": [
-                _column("rank", "Звання"),
-                _column("rank", "Звання"),
-                _column("rank", "Звання"),
-                _column("full_name", "ПІБ"),
-                _column("surname", "Прізвище"),
-                _column("name", "Ім'я"),
-                _column("patronymic", "По батькові"),
+                _column("birth_date", BIRTH_DATE.label, date_field=BIRTH_DATE),
+                _column("rank_order_date", DATE_FIELDS["rank.rank_order_date"].label,
+                        date_field=DATE_FIELDS["rank.rank_order_date"], default_visible=False),
             ],
         },
         {

@@ -9,7 +9,7 @@
 | Завдання | Основні файли |
 | --- | --- |
 | Список, створення, базове редагування людини | `app/routers/persons.py`, `app/services/service_person_create.py`, `app/templates/persons.html`, `app/templates/person_form.html` |
-| Неповна дата народження | `app/utils/date_utils.py`, `app/services/service_person_group_data_validation.py`, `app/models/person.py`, `tests/test_birth_date.py` |
+| Предметні дати, фільтри та системний час | `app/date_fields.py`, `app/utils/date_utils.py`, `app/utils/date_query.py`, `app/templates/components/date_*.html`, `app/static/js/date_*.js`, `docs/DATE_SYSTEM.md`, `tests/test_date_system.py` |
 | Історія ПІБ | `app/routers/person_name.py`, `app/services/service_person_name.py`, `app/models/person_identity.py`, `app/templates/person/components/names_history.html` |
 | Історія звань | `app/routers/person_rank.py`, `app/services/service_person_rank.py`, `app/models/person_military_service.py`, `app/templates/person/components/rank_history.html` |
 | Посади, призначення, фільтри | `app/routers/person_positions.py`, `app/services/service_person_positions.py`, `app/models/person_positions.py`, `app/templates/person_positions.html`, `tests/test_person_positions.py` |
@@ -43,7 +43,7 @@ GET-маршрути зазвичай самі виконують ORM-запит
 - [app/database/db.py](../app/database/db.py): SQLite `data/database/project2.db`, `engine`, `SessionLocal`, залежність FastAPI `get_db()`. Вона відкриває сесію на запит і закриває її у `finally`.
 - `app/database/db_test.py`: окремі `engine_test`, `SessionLocal_test`, `get_test_db()` для `data/database/project2_test.db`.
 - Обидва шляхи БД відносні до робочого каталогу. Шаблони також шукаються відносно нього: `app/templates`.
-- `app/database/init_db.py` та `init_test_db.py` імпортують реєстр моделей і викликають `create_all`. Це створення відсутніх таблиць, а не міграція існуючих. Механізму версійних міграцій у репозиторії немає.
+- `app/database/init_db.py` та `init_test_db.py` імпортують реєстр моделей і викликають `create_all`. CLI `init_db` створює лише новий файл; пересоздання вимагає `--recreate` з явним `--database`. `schema_check.py` перед засіванням лише перевіряє наявність поточних таблиць/колонок. Механізму версійних міграцій немає: на етапі розробки погоджено ручне пересоздання тестових даних, а не автоматичне оновлення існуючої БД.
 - Активні сервіси персон, ПІБ, звань і посад отримують `db` від виклику та самі виконують `commit`. Сервіс посад має `rollback` при помилці; єдиного транзакційного обгортання всіх сервісів немає. Сервіс подій відкриває власні сесії.
 
 ## Моделі та зв'язки
@@ -52,9 +52,9 @@ GET-маршрути зазвичай самі виконують ORM-запит
 | --- | --- | --- |
 | `person.py` / `Person` | `persons` | Базова людина: ID, nullable унікальний `tax_number`, окремі nullable `birth_day`, `birth_month`, `birth_year`. ORM-колекції `names`, `ranks`, `service_history`, `positions`. |
 | `person_identity.py` / `PersonName` | `person_names` | ПІБ та необов'язкові латинські варіанти; FK на `Person`, зворотний ORM-зв'язок `person`. |
-| `person_identity.py` / `Passport` | `passports` | Тип, серія, номер, орган і дати видачі/закінчення; FK на `Person`. ORM-колекції паспортів у `Person` не оголошено. |
-| `person_military_service.py` / `PersonRank` | `person_ranks` | FK на `Person` і довідник `Rank`, номер та дата наказу; ORM-зв'язки `person`, `rank`. |
-| `person_military_service.py` / `PersonServiceHistory` | `person_service_history` | Вид служби, частина, текстова посада, дати й наказ; FK та ORM-зв'язок на `Person`. Це окрема сутність від штатного призначення. |
+| `person_identity.py` / `Passport` | `passports` | Тип, серія, номер, орган, компоненти дат видачі/закінчення та сумісні Date-проєкції; FK на `Person`. ORM-колекції паспортів у `Person` не оголошено. |
+| `person_military_service.py` / `PersonRank` | `person_ranks` | FK на `Person` і довідник `Rank`, номер та три nullable компоненти дати наказу; ORM-зв'язки `person`, `rank`. |
+| `person_military_service.py` / `PersonServiceHistory` | `person_service_history` | Вид служби, частина, текстова посада, компоненти дат посади/наказу; FK та ORM-зв'язок на `Person`. Це окрема сутність від штатного призначення. |
 | `reference_book.py` / `Rank` | `ranks` | Унікальний `code` і сім відмінкових форм звання. |
 | `reference_book.py` / `Position` | `positions` | Унікальний `position_number`, код, підрозділ, коротка назва та сім відмінкових форм посади. Колекція `persons` містить об'єкти `PersonPosition`. |
 | `person_positions.py` / `PersonPosition` | `person_positions` | FK `person_id` і `position_id` мають **окремі** `unique=True`: одна людина займає щонайбільше одну посаду, одна посада має щонайбільше одного призначеного. Зв'язки `person`, `position`. Історію призначень не зберігає. |
@@ -85,7 +85,21 @@ GET-маршрути зазвичай самі виконують ORM-запит
 
 `PersonValidator` нормалізує ПІБ через `strip()` / `capitalize()`, дозволяє лише літери та довжину 3–25 символів, перевіряє десятизначний ІПН, повні дати `DD.MM.YYYY` і окремі паспортні поля. Наявність паспортних валідаторів не означає готовий паспортний інтерфейс.
 
-`app/utils/date_utils.py` повертає `DateComponents` із nullable компонентами, перевіряє календарні межі та форматує неповні дати. Невідомий рік допускає 29 лютого; відомий рік обмежено поточним. `format_partial_date` зареєстровано як глобальну функцію в Jinja-середовищі роутера `persons`. Для наказів і подій залишаються окремі валідатори повних дат. Збережено фактичне написання модуля `event_validatotor.py`.
+`app/date_fields.py` містить явні `DateField`-політики: неповнота дозволена для народження, дат паспорта, наказу про звання та історії служби. Рік народження не більший за поточний; для решти цих дат допустимий календар Python 1–9999. Подія має обов'язковий точний початок; кінець/наказ можуть бути відсутніми, але задані значення повні. `HistoryModel.created_at/updated_at` лишаються точними системними DateTime з чинною UTC-політикою. Поточна схема й команди створення/пересоздання — у [DATE_SYSTEM.md](DATE_SYSTEM.md).
+
+`PartialDateMixin` (`app/models/partial_date_mixin.py`) додає спільну ORM-перевірку для `Passport`, `PersonRank`, `PersonServiceHistory`. У них 15 нових nullable Integer; компоненти — джерело значення. П'ять SQL Date збережено як сумісні проєкції: точне значення лише для повної дати, інакше NULL. Hybrid-властивості старих назв підтримують повний date/None ввід; на insert/update проєкції синхронізуються з перевіреними компонентами. `date_components(prefix)` та `date_binding(prefix)` підключають кожне поле до спільного форматування, possible match і сортування; raw SQL/bulk-записи обходять ці ORM-події.
+
+`app/utils/date_utils.py` розширює наявні `DateComponents` та календарний валідатор; `validate_field_date` застосовує політику, `parse_exact_date` повторно використовується наявними валідаторами. `format_partial_date` завжди повертає три складові з `_`, наприклад `15._.1995`, `_._._`. Jinja-функції підключаються через `register_date_globals`; компоненти введення `date_input.html` / `date_input.js` інтегровані у форму людини та модальні форми звання. Унікальний `id_prefix` запобігає конфліктам ID кількох форм. `date_values_from_input` читає компоненти/старий точний ввід, зберігає пропущені частини при сервісному редагуванні й відхиляє змішані формати. Уточнення дати оновлює поточний `Person` або `PersonRank`, без додавання історії лише через уточнення.
+
+`app/utils/date_query.py`: `DateFilter` перевіряє параметри пошуку, `possible_match` перевіряє існування повної календарно допустимої дати без доповнення даних у БД. `DateBinding` отримує **явно дозволені ORM-вирази** для трьох компонентів; `exact` адаптує чинний SQL `Date`. Метадані HTML не використовуються для довільного SQL. Для SQLite binding реєструє детерміновану функцію `project2_date_match` на поточному підключенні; це не зміна схеми. Для іншої СУБД потрібен окремий адаптер; великий обсяг даних може потребувати оптимізації, оскільки перевірка неповних дат виконується на рядках через Python-функцію SQLite.
+
+Сортування використовує SQL-вирази: точні дати → неповні → повністю невідомі; всередині — три компоненти в обраному пріоритеті з NULL після відомих значень при обох напрямках. Текстове відображення не бере участі в порівнянні. Точні системні DateTime зберігають автоматичну UTC-логіку `HistoryModel`; SQLite повертає naive datetime, форматування явно показує UTC з часом і мікросекундами. Audit Log не реалізовано.
+
+У списку `/persons` чинний URL-ключ `sort_by=birth_year` залишено для сумісності; він також використовує спільне сортування повної дати за роком/місяцем/днем. Інші ключі сортування не змінені. Перестановка компонентів однієї дати не є багаторівневим сортуванням різних колонок.
+
+`components/date_filter.html`, `date_filter.js` і `date_fields.css` — спільне Bootstrap-меню за `column.date`: пошук років із checkbox, незалежні множинні компоненти, відкриті/закриті діапазони, тільки неповні дати та керування пріоритетом. Пошук дозволяє вибрати рік, якого немає серед відомих компонентів записів, щоб не виключати потенційний збіг невідомого року. Системна політика не створює меню предметної дати.
+
+У посад підключено `birth_date` та типово приховану `rank_order_date`. Фільтри — окремі JSON-параметри цих назв у чинних `FILTER_KEYS` і `filter_order`; `DATE_FILTER_COLUMNS` має явні bindings, а `DATE_FILTER_RECORDS` відрізняє невідому дату наявної людини/звання від відсутності самого запису. Каскадні варіанти враховують решту фільтрів. Пріоритети `<column-key>_priority` передаються й зберігаються незалежно за колонками як `project2:date-priority:<table-id>:<column-key>` (`version: 1`). Вони не входять до пресетів чи історії фільтрів. Наявні `QueryFilterAdapter` / `TableTimeline` очищають фільтр прихованої колонки й відновлюють його через undo/redo.
 
 ### Посади та фільтри
 
@@ -97,7 +111,7 @@ GET-маршрути зазвичай самі виконують ORM-запит
 
 ### Колонки, пресети та історія
 
-[app/table_columns.py](../app/table_columns.py) — єдине джерело українських назв, групування, порядку й типової видимості. `PERSON_POSITIONS_COLUMNS` має ID `person-positions` і 10 колонок. Метадані `system`, `draggable`, `resizable`, `min_width`, `width` визначають можливості відображення. Системна `row_number` («№») завжди перша, видима та нерухома; `position_number` («№ посади за штатом») — звичайна інформаційна колонка. Усі вісім інформаційних полів можна переставляти й змінювати їхню ширину. Форма призначення є окремою неінформаційною колонкою.
+[app/table_columns.py](../app/table_columns.py) — єдине джерело українських назв, групування, порядку й типової видимості. `PERSON_POSITIONS_COLUMNS` має ID `person-positions` і 13 колонок, включно з ПІБ, датою народження й типово прихованою датою наказу про звання; типово видимі 12. Повторні ключі експериментальної групи звань усунуто: кожен ключ оголошений один раз. Метадані `system`, `draggable`, `resizable`, `min_width`, `width` визначають можливості відображення, `date` підключає спільне меню предметної дати. Системна `row_number` («№») завжди перша, видима та нерухома; `position_number` («№ посади за штатом») — звичайна інформаційна колонка. Одинадцять інформаційних полів можна переставляти й змінювати їхню ширину. Форма призначення є окремою неінформаційною колонкою.
 
 Роутер передає `table_columns` і окремий опис URL-фільтрів `table_column_filters`: ключі з чинного `FILTER_KEYS`, назву параметра порядку та додатковий фільтр зайнятості. Метадані колонок не імпортують ORM і не формують SQL; allowlist `FILTER_COLUMNS` та бізнес-логіка залишаються окремими.
 
@@ -175,7 +189,7 @@ GET-маршрути зазвичай самі виконують ORM-запит
 | --- | --- |
 | `persons.html` | Список людей, вибір сортування, локальне приховування окремих колонок через JavaScript. |
 | `person_form.html` | Створення й базове редагування; три поля дати народження, підказки та клієнтські перевірки. |
-| `person_detail.html` | Коротка картка й історія ПІБ; частина полів історії застаріла. |
+| `person_detail.html` | Коротка картка й історія ПІБ; системні часи створення/оновлення показуються точно в UTC, стан — через `is_active`. |
 | `person_full_info.html` | Повна картка; включає навігацію, модальні форми, історію ПІБ і звань. Інші вкладки — заглушки. |
 | `person/components/full_info_top_navigation.html` | Посилання на коротку картку та список. |
 | `person/components/modal_windows.html` | Форми додавання ПІБ і звання. |
@@ -189,13 +203,13 @@ GET-маршрути зазвичай самі виконують ORM-запит
 
 ## Довідники, утиліти та тести
 
-`app/seeds/seed_structure.py::seed_all_structure(db)` послідовно додає типи й підтипи подій, звання та посади й виконує `commit`. Звання беруться з `app/models/reference_data/ranks.py::ReferenceRanks.RANKS`; порожній `ReferencePositions.POSITIONS` не є джерелом штатних посад.
+`app/seeds/seed_structure.py::seed_all_structure(db, excel_path=EXCEL_PATH)` послідовно додає типи й підтипи подій, звання та посади й виконує `commit`. CLI `python -m app.seeds.seed_structure --database PATH` працює з уже підготовленою схемою, підтримує `--excel` та rollback при помилці; тестових людей не додає. Звання беруться з `app/models/reference_data/ranks.py::ReferenceRanks.RANKS`; порожній `ReferencePositions.POSITIONS` не є джерелом штатних посад.
 
 Посади завантажуються з кореневого `reference_data.xlsx`: `app/config.py::EXCEL_PATH`, аркуш `positions`, заголовок першого рядка, пропуск другого рядка, читання значень як тексту. `seed_reference.py` нормалізує назви колонок і значення та додає/оновлює записи за `position_number`; відсутні в Excel посади автоматично не видаляє. `app/utils/json_loader.py` — загальна утиліта; для наявних JSON-файлів у `app/seeds/` підключеного імпортера в проаналізованому коді немає.
 
 `app/services/seed_test_people.py` — незалежний від `seed_all_structure` імпортер аркуша `persons`. `seed_test_people(session_factory, excel_path)` перевіряє заголовки до відкриття сесій, читає через openpyxl всі заповнені рядки починаючи з другого й повертає `SeedReport` з лічильниками та `RowIssue` з номерами помилкових рядків. Назви обов'язкових колонок визначені в `REQUIRED_COLUMNS`; зайві колонки ігноруються. Команда й обмеження даних описані в [CURRENT_STATE.md](CURRENT_STATE.md#засівання-тестових-військовослужбовців).
 
-Імпортер використовує `PersonValidator`, `DataGroupValidate` і фабрику `ServicePersonCreate.add_name`. Повні та неповні дати проходять чинний `validate_date_components` і зберігаються в трьох полях `Person`; окремого запису персональних даних немає. Звання зіставляється тільки з існуючим `Rank.code` або `Rank.nominative` без урахування регістру й зайвих пробілів. Для нового РНОКПП створюються `Person`, активний `PersonName` та активний `PersonRank` в **одній транзакції рядка**. Сервіси `create_person` / `add_rank` із власними `commit` тут не викликаються; інші рядки можуть успішно зберегтися після відкату некоректного. Повторний РНОКПП пропускається без оновлення даних. Команда не створює схеми, звань, паспортів, призначень або історії служби.
+Імпортер використовує `PersonValidator`, `DataGroupValidate` і фабрику `ServicePersonCreate.add_name`. Повні та неповні дати проходять чинний `validate_date_components` і зберігаються в трьох полях `Person`; окремого запису персональних даних немає. Звання зіставляється тільки з існуючим `Rank.code` або `Rank.nominative` без урахування регістру й зайвих пробілів. Для нового РНОКПП створюються `Person`, активний `PersonName` та активний `PersonRank` в **одній транзакції рядка**. Сервіси `create_person` / `add_rank` із власними `commit` тут не викликаються; інші рядки можуть успішно зберегтися після відкату некоректного. Повторний РНОКПП пропускається без оновлення даних. Команда спершу перевіряє поточну схему й не створює схеми, звань, паспортів, призначень або історії служби. Аркуш persons не має дати наказу; усі її компоненти в новому `PersonRank` залишаються NULL. Повторний імпорт не очищає внесені компоненти існуючих записів.
 
 `reset.py` видаляє робочу БД та створює/заповнює її заново; `reset_test_db.py` аналогічно працює з тестовою. Кореневий `test_seed_positions.py` оновлює **робочу** БД при виконанні/імпорті. `test1.py` і `test2.py` — окремі утиліти звіряння Excel з папками/документами з жорстко заданими Windows-шляхами.
 
@@ -204,3 +218,5 @@ GET-маршрути зазвичай самі виконують ORM-запит
 `tests/test_seed_test_people.py` створює власні Excel-файли зі штучними даними та SQLite-бази в `tmp_path`, вмикає перевірку зовнішніх ключів і не використовує руйнівну фікстуру `db`. Перевіряє також CLI через subprocess і відкат після примусового збою запису звання.
 
 `tests/test_table_columns.py` перевіряє конфігурацію, системну колонку, відповідність заголовків/комірок і опис URL-фільтрів. `tests/js/*.test.cjs` перевіряють чисті модулі стану, пресетів, фільтрів та історії. `tests/browser/column_visibility.cjs` запускає Chromium через Playwright і тестовий сервер `tests/browser/serve_column_visibility.py`: реальні маршрути з dependency override на SQLite в пам'яті й згенерованими даними. Окремий тестовий маршрут із двома іншими таблицями перевіряє повторне використання макросу; у production він не реєструється.
+
+`tests/test_partial_date_models.py` перевіряє SQLite round-trip усіх комбінацій невідомих частин п'яти нових дат, ORM-валідацію, проєкції, сортування та HTTP-форми. `tests/test_database_commands.py` перевіряє захист існуючих файлів, відмову старій схемі, rollback довідників і повторне окреме засівання людей. `tests/browser/domain_dates.cjs` перевіряє модальні форми звання та дві незалежні колонки дат.

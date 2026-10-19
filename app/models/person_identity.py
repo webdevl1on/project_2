@@ -11,6 +11,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.person_history_model import HistoryModel
+from app.models.partial_date_mixin import PartialDateMixin, date_projection
+from app.date_fields import DATE_FIELDS
 
 if TYPE_CHECKING:
     from app.models.person import Person
@@ -55,8 +57,12 @@ class PersonName(HistoryModel):
     )
 
 
-class Passport(HistoryModel):
+class Passport(PartialDateMixin, HistoryModel):
     __tablename__ = "passports"
+    __date_fields__ = {
+        "passport_issued": DATE_FIELDS["passport.passport_issued_date"],
+        "passport_expire": DATE_FIELDS["passport.passport_expire_date"],
+    }
 
     passport_id: Mapped[int] = mapped_column(
         Integer,
@@ -73,5 +79,13 @@ class Passport(HistoryModel):
     passport_series: Mapped[Optional[str]]= mapped_column(String)
     passport_number: Mapped[Optional[str]]= mapped_column(String)
     passport_issued_by: Mapped[Optional[str]] = mapped_column(String)
-    passport_issued_date: Mapped[Optional[date]] = mapped_column(Date)
-    passport_expire_date: Mapped[Optional[date]] = mapped_column(Date)
+    passport_issued_day: Mapped[int | None] = mapped_column(Integer)
+    passport_issued_month: Mapped[int | None] = mapped_column(Integer)
+    passport_issued_year: Mapped[int | None] = mapped_column(Integer)
+    passport_expire_day: Mapped[int | None] = mapped_column(Integer)
+    passport_expire_month: Mapped[int | None] = mapped_column(Integer)
+    passport_expire_year: Mapped[int | None] = mapped_column(Integer)
+    _passport_issued_date: Mapped[date | None] = mapped_column("passport_issued_date", Date)
+    _passport_expire_date: Mapped[date | None] = mapped_column("passport_expire_date", Date)
+    passport_issued_date = date_projection("passport_issued")
+    passport_expire_date = date_projection("passport_expire")

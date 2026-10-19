@@ -1,5 +1,6 @@
 from app.validators.person_validator import PersonValidator
-from app.utils.date_utils import validate_date_components
+from app.utils.date_utils import validate_field_date
+from app.date_fields import BIRTH_DATE
 
 
 class DataGroupValidate:
@@ -7,11 +8,11 @@ class DataGroupValidate:
 
     @staticmethod
     def validate_person_base_data(data):
-        birth_components = validate_date_components(
+        birth_components = validate_field_date(
+            BIRTH_DATE,
             data.get("birth_day"),
             data.get("birth_month"),
             data.get("birth_year"),
-            full=False,
         )
         return {
             "tax_number" : PersonValidator.validate_tax_number(data.get("tax_number")),

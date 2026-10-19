@@ -1,3 +1,4 @@
+{% from "components/date_filter.html" import date_filter %}
 {% from "components/column_visibility.html" import column_visibility %}
 {% set columns = table_columns.groups | map(attribute="columns") | sum(start=[]) %}
 <!DOCTYPE html>
@@ -9,6 +10,7 @@
     <title>Штатні посади</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="/static/css/column_visibility.css" rel="stylesheet">
+    <link href="/static/css/date_fields.css" rel="stylesheet">
 </head>
 <style>
     .table-container {
@@ -114,6 +116,9 @@
         <input type="hidden" name="sort_by" value="{{ sort_by }}">
         <input type="hidden" name="direction" value="{{ direction }}">
         <input type="hidden" name="filter_order" value="{{ filter_order }}">
+        {% for key, priority in (date_priorities|default({})).items() %}
+        <input type="hidden" name="{{ key }}_priority" value="{{ priority|join(',') }}">
+        {% endfor %}
         <div id="active-column-filters" hidden>
             {% for key, values in active_filters.items() %}
             {% for value in values %}
@@ -152,7 +157,12 @@
                         {% set key = column.key %}
                         <th scope="col" data-column-key="{{ key }}" {% if not column.default_visible %} hidden{% endif
                             %}>
-                            {% if key in sort_urls %}
+                            {% if column.date is defined %}
+                            {{ date_filter(column, table_columns.id,
+                                (date_filters|default({})).get(key, {"mode": "parts", "years": [], "months": [], "days": [], "start": none, "end": none, "incomplete_only": false}),
+                                (filter_options|default({})).get(key, {}),
+                                (date_priorities|default({})).get(key, ["year", "month", "day"]), filter_numbers.get(key)) }}
+                            {% elif key in sort_urls %}
                             <div class="position-column-heading d-flex align-items-center text-nowrap">
                                 <a href="{{ sort_urls[key] }}" class="text-decoration-none" title="{{ column.label }}">
                                     {{ column.label }}
@@ -233,6 +243,8 @@
                         "name_short": item.position.name_short,
                         "name_nominative": item.position.name_nominative,
                         "rank": item.rank.nominative if item.rank else "—",
+                        "birth_date": format_partial_date(item.person.birth_day, item.person.birth_month, item.person.birth_year) if item.person else "—",
+                        "rank_order_date": format_partial_date(item.person_rank.rank_order_day, item.person_rank.rank_order_month, item.person_rank.rank_order_year) if item.person_rank else "—",
                         "surname": item.name.surname if item.name else "—",
                         "name": item.name.name if item.name else "—",
                         "patronymic": item.name.patronymic if item.name and item.name.patronymic else "—",
@@ -273,8 +285,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td data-column-empty colspan="{{ columns | length }}" class="text-center">Штатних посад не
-                            знайдено.</td>
+                        <td data-column-empty colspan="{{ columns | length }}" class="text-center">Штатних посад не знайдено.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -290,6 +301,7 @@
     <script src="/static/js/table_filters.js"></script>
     <script src="/static/js/table_history.js"></script>
     <script src="/static/js/column_visibility.js"></script>
+    <script src="/static/js/date_filter.js"></script>
     <script>
         document.querySelectorAll(".person-assignment-form").forEach(form => {
             const search = form.querySelector(".person-search");

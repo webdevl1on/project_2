@@ -5,6 +5,8 @@ from app.services.service_person_checking import ServicePersonCheck
 from app.validators.person_validator import PersonValidator
 
 from app.services.service_person_group_data_validation import DataGroupValidate
+from app.date_fields import DATE_FIELDS
+from app.utils.date_utils import date_values_from_input
 
 
 
@@ -21,14 +23,12 @@ class ServicePersonRankFunc:
         return rank
 
     @staticmethod
-    def _get_rank_data(data):
+    def _get_rank_data(data, current=None):
         return {
             "rank_order_number": PersonValidator.validate_person_rank(
                 data.get("rank_order_number")
             ),
-            "rank_order_date": PersonValidator.validate_date(
-                data.get("rank_order_date")
-            ),
+            **date_values_from_input(DATE_FIELDS["rank.rank_order_date"], "rank_order", data, current=current),
         }
 
     @staticmethod
@@ -67,8 +67,7 @@ class ServicePersonRankFunc:
         person_rank = PersonRank(
             person_id=person_id,
             rank_id=rank_id,
-            rank_order_number=rank_data["rank_order_number"],
-            rank_order_date=rank_data["rank_order_date"],
+            **rank_data,
             is_active=False,
         )
 
@@ -99,11 +98,11 @@ class ServicePersonRankFunc:
 
         rank_id = data.get("rank_id")
         ServicePersonRankFunc._get_rank_or_raise(rank_id, db)
-        rank_data = ServicePersonRankFunc._get_rank_data(data)
+        rank_data = ServicePersonRankFunc._get_rank_data(data, current=person_rank)
 
         person_rank.rank_id = rank_id
-        person_rank.rank_order_number = rank_data["rank_order_number"]
-        person_rank.rank_order_date = rank_data["rank_order_date"]
+        for key, value in rank_data.items():
+            setattr(person_rank, key, value)
 
         db.commit()
         db.refresh(person_rank)

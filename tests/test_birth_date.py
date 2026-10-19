@@ -15,14 +15,14 @@ def test_validate_full_birth_date():
 @pytest.mark.parametrize(
     ("day", "month", "year", "expected"),
     [
-        (None, None, None, ""),
+        (None, None, None, "_._._"),
         ("11", "01", "1966", "11.01.1966"),
-        (None, "11", "1966", "11.1966"),
-        ("03", "11", None, "03.11."),
-        ("03", None, None, "03."),
-        (None, "03", None, ".03."),
+        (None, "11", "1966", "_.11.1966"),
+        ("03", "11", None, "03.11._"),
+        ("03", None, None, "03._._"),
+        (None, "03", None, "_.03._"),
         ("03", None, "1969", "03._.1969"),
-        (None, None, "1966", "1966"),
+        (None, None, "1966", "_._.1966"),
     ],
 )
 def test_format_partial_birth_date(day, month, year, expected):

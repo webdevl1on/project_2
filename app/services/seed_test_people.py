@@ -17,6 +17,9 @@ from app.models import Person, PersonRank, Rank
 from app.services.service_person_create import ServicePersonCreate
 from app.services.service_person_group_data_validation import DataGroupValidate
 from app.validators.person_validator import PersonValidator
+from app.database.schema_check import require_current_schema
+from app.date_fields import DATE_FIELDS
+from app.utils.date_utils import date_values_from_input
 
 
 REQUIRED_COLUMNS = (
@@ -138,7 +141,9 @@ def _create_row(db, data: dict) -> bool:
     db.add(person)
     db.flush()
     db.add(ServicePersonCreate.add_name(person.person_id, name_data, db))
-    db.add(PersonRank(person_id=person.person_id, rank_id=matches[0].rank_id, is_active=True))
+    # The persons sheet has no order date: keep all of its components unknown.
+    rank_date = date_values_from_input(DATE_FIELDS["rank.rank_order_date"], "rank_order", {})
+    db.add(PersonRank(person_id=person.person_id, rank_id=matches[0].rank_id, is_active=True, **rank_date))
     db.flush()
     return True
 
@@ -182,6 +187,7 @@ def main(argv=None) -> int:
 
     engine = create_engine(URL.create("sqlite", database=str(args.database.resolve())))
     try:
+        require_current_schema(engine)
         report = seed_test_people(sessionmaker(bind=engine, autoflush=False), args.excel)
     except (OSError, ValueError) as error:
         print(f"Помилка: {error}", file=sys.stderr)

@@ -5,6 +5,8 @@ from app.models.person_identity import PersonName
 from app.models.person_military_service import PersonRank
 from app.models.person_positions import PersonPosition
 from app.models.reference_book import Position, Rank
+from app.date_fields import BIRTH_DATE
+from app.utils.date_query import DateBinding, DateFilter, date_priority
 
 
 EMPTY_FILTER_VALUE = "__empty__"
@@ -18,6 +20,11 @@ FILTER_COLUMNS = {
     "name": PersonName.name,
     "patronymic": PersonName.patronymic,
 }
+DATE_FILTER_COLUMNS = {
+    "birth_date": DateBinding(BIRTH_DATE, Person.birth_day, Person.birth_month, Person.birth_year),
+    "rank_order_date": PersonRank.date_binding("rank_order"),
+}
+DATE_FILTER_RECORDS = {"birth_date": Person.person_id, "rank_order_date": PersonRank.person_rank_id}
 
 
 class ServicePersonPositionFunc:
@@ -95,6 +102,14 @@ class ServicePersonPositionFunc:
                 query = ServicePersonPositionFunc._apply_value_filter(
                     query, column, column_filters.get(key)
                 )
+        for key, binding in DATE_FILTER_COLUMNS.items():
+            if key != exclude_key and column_filters.get(key):
+                values = ServicePersonPositionFunc._normalise_values(column_filters[key])
+                if len(values) != 1:
+                    raise ValueError("Фільтр дати має бути заданий один раз.")
+                spec = DateFilter.from_json(values[0])
+                if spec.active:
+                    query = binding.filter(query.filter(DATE_FILTER_RECORDS[key].is_not(None)), spec)
         if occupancy == "occupied":
             query = query.filter(PersonPosition.person_position_id.is_not(None))
         elif occupancy == "vacant":
@@ -118,6 +133,11 @@ class ServicePersonPositionFunc:
                     "label": "Порожньо" if is_empty else str(value),
                 }
             options[key] = list(values.values())
+        for key, binding in DATE_FILTER_COLUMNS.items():
+            query = ServicePersonPositionFunc._apply_filters(base_query, column_filters, occupancy, exclude_key=key)
+            records = query.with_entities(binding.day, binding.month, binding.year).filter(DATE_FILTER_RECORDS[key].is_not(None)).distinct().all()
+            options[key] = {part: sorted({record[index] for record in records if record[index] is not None})
+                            for index, part in enumerate(("days", "months", "years"))}
         return options
 
     @staticmethod
@@ -128,6 +148,7 @@ class ServicePersonPositionFunc:
         sort_by: str = "position_number",
         direction: str = "asc",
         column_filters: dict[str, list[str]] | None = None,
+        date_sort_priority=None,
     ):
         sort_column = FILTER_COLUMNS.get(sort_by, Position.position_number)
         direction = "desc" if direction == "desc" else "asc"
@@ -138,7 +159,9 @@ class ServicePersonPositionFunc:
         if unit_short and not column_filters.get("unit_short"):
             column_filters["unit_short"] = unit_short
         query = ServicePersonPositionFunc._apply_filters(base_query, column_filters, occupancy)
-        records = query.order_by(order, Position.position_number, Position.position_id).all()
+        priority = date_sort_priority.get(sort_by) if isinstance(date_sort_priority, dict) else date_sort_priority
+        orders = DATE_FILTER_COLUMNS[sort_by].order_by(date_priority(priority), direction) if sort_by in DATE_FILTER_COLUMNS else [order]
+        records = query.order_by(*orders, Position.position_number, Position.position_id).all()
         rows = [
             {
                 "position": position,

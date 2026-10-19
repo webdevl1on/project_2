@@ -31,7 +31,7 @@ module.exports = async ({context,base}) => {
             await submit('Початковий');
             await save.waitFor({state:'hidden'});
             const [preset] = await stored();
-            assert.equal(preset.columns.length,10);
+            assert.equal(preset.columns.length,12);
             assert.equal(preset.version,1);
             assert.equal(preset.table_id,'person-positions');
             assert.ok(preset.id);
@@ -82,7 +82,8 @@ module.exports = async ({context,base}) => {
             assert.equal(await group.locator('[data-column-group-choice]').isChecked(),true);
             assert.equal(await editor.locator('[data-preset-selected-key]').last().getAttribute('data-preset-selected-key'),'unit_short');
             await editor.locator('[data-preset-up="unit_short"]').click();
-            assert.equal(await editor.locator('[data-preset-selected-key]').nth(8).getAttribute('data-preset-selected-key'),'unit_short');
+            const selected = editor.locator('[data-preset-selected-key]');
+            assert.equal(await selected.nth((await selected.count())-2).getAttribute('data-preset-selected-key'),'unit_short');
             await group.locator('[data-column-group-choice]').uncheck();
             assert.equal(await editor.locator('[data-preset-selected-key="unit_short"]').count(),0);
             await group.locator('[data-column-group-choice]').check();

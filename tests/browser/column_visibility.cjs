@@ -19,9 +19,11 @@ async function main() {
     });
     const base = `http://127.0.0.1:${port}`;
     const assets = {};
-    for (const file of ["js/bootstrap.bundle.min.js", "css/bootstrap.min.css"]) {
-        assets[file] = execFileSync("curl", ["--fail", "--silent", "--show-error", "--location",
-            `https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/${file}`]);
+    for (const version of ["5.3.3", "5.3.8"]) {
+        for (const file of ["js/bootstrap.bundle.min.js", "css/bootstrap.min.css"]) {
+            assets[`${version}/${file}`] = execFileSync("curl", ["--fail", "--silent", "--show-error", "--location",
+                `https://cdn.jsdelivr.net/npm/bootstrap@${version}/dist/${file}`]);
+        }
     }
     const server = spawn(process.env.PYTHON || "python3",
         ["-m", "tests.browser.serve_column_visibility", String(port)], { cwd: root });
@@ -46,11 +48,12 @@ async function main() {
         const context = await browser.newContext();
         context.setDefaultTimeout(10000);
         context.setDefaultNavigationTimeout(20000);
-        await context.route("https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/**", route => {
+        await context.route("https://cdn.jsdelivr.net/npm/bootstrap@*/dist/**", route => {
             const file = route.request().url().split("/dist/")[1];
-            return route.fulfill({ body: assets[file], contentType: file.endsWith(".js") ? "application/javascript" : "text/css" });
+            const version = route.request().url().split("bootstrap@")[1].split("/")[0];
+            return route.fulfill({ body: assets[`${version}/${file}`], contentType: file.endsWith(".js") ? "application/javascript" : "text/css" });
         });
-        const suites = ["presets", "layout", "filters", "history", "integration"];
+        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates"];
         if (process.env.COLUMN_STAGE) {
             assert.ok(suites.includes(process.env.COLUMN_STAGE));
             await require(`./${process.env.COLUMN_STAGE}.cjs`)({ context, base });
@@ -72,7 +75,7 @@ async function main() {
 
         await scenario("defaults without saved settings", async () => {
             await visit();
-            assert.equal(await visibleHeaders(), 10);
+            assert.equal(await visibleHeaders(), 12);
             assert.equal(await table.locator("tbody tr").count(), 3);
             assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("project2:table-history:person-positions")).entries.length), 1);
         });
@@ -86,7 +89,7 @@ async function main() {
             await checkbox.check();
             assert.equal(await positionGroup.locator("[data-column-choice]:checked").count(), 4);
             await checkbox.uncheck();
-            assert.equal(await visibleHeaders(), 10); // Draft does not change the table yet.
+            assert.equal(await visibleHeaders(), 12); // Draft does not change the table yet.
             await choice("position_number").check();
             assert.equal(await checkbox.evaluate(element => element.indeterminate), true);
             await positionGroup.locator("[data-column-expand]").click();
@@ -94,14 +97,14 @@ async function main() {
             await positionGroup.locator("[data-column-expand]").click();
             assert.equal(await choice("position_number").isChecked(), true);
             await apply();
-            assert.equal(await visibleHeaders(), 7);
+            assert.equal(await visibleHeaders(), 9);
             assert.equal(await table.locator('td[data-column-key="unit_short"]:visible').count(), 0);
             assert.equal(await table.locator("tbody tr").count(), 3);
         });
 
         await scenario("reload persistence and closing without applying", async () => {
             await page.reload();
-            assert.equal(await visibleHeaders(), 7);
+            assert.equal(await visibleHeaders(), 9);
             await toggle.click();
             await choice("surname").uncheck();
             await page.keyboard.press("Escape");
@@ -109,15 +112,16 @@ async function main() {
             await toggle.click();
             assert.equal(await choice("surname").isChecked(), true);
             await picker.locator("[data-column-reset]").click();
-            assert.equal(await picker.locator("[data-visibility-tree] [data-column-choice]:checked").count(), 10);
-            assert.equal(await visibleHeaders(), 7);
+            assert.equal(await picker.locator("[data-visibility-tree] [data-column-choice]:checked").count(), 12);
+            assert.equal(await visibleHeaders(), 9);
             await apply();
-            assert.equal(await visibleHeaders(), 10);
+            assert.equal(await visibleHeaders(), 12);
         });
 
         await scenario("cannot hide every informational column; show all", async () => {
             await toggle.click();
             await group("position").locator("[data-column-group-choice]").uncheck();
+            await group("person").locator("[data-column-group-choice]").check();
             await group("person").locator("[data-column-group-choice]").uncheck();
             assert.equal(await picker.locator("[data-column-apply]").isDisabled(), true);
             assert.equal(await picker.locator("[data-column-error]").isVisible(), true);
@@ -132,11 +136,11 @@ async function main() {
             const values = ["broken json", "null", "[]", JSON.stringify({ version: 99 }),
                 JSON.stringify({ version: 1, visibility: { removed: false, surname: "wrong" } }),
                 JSON.stringify({ version: 1, visibility: Object.fromEntries(
-                    ["position_number", "unit_short", "name_short", "name_nominative", "rank", "surname", "name", "patronymic"].map(key => [key, false])) })];
+                    ["position_number", "unit_short", "name_short", "name_nominative", "rank", "full_name", "surname", "name", "patronymic", "birth_date"].map(key => [key, false])) })];
             for (const value of values) {
                 await page.evaluate(value => localStorage.setItem("project2:table-columns:person-positions", value), value);
                 await page.reload();
-                assert.equal(await visibleHeaders(), 10);
+                assert.equal(await visibleHeaders(), 12);
             }
         });
 
@@ -170,7 +174,7 @@ async function main() {
             await Promise.all([page.waitForNavigation(), table.locator("tbody tr").first().locator('[type="submit"]').click()]);
             assert.equal(await table.locator("tbody tr").first().locator(".person-select").inputValue(), "");
             assert.equal(page.url(), url);
-            assert.equal(await visibleHeaders(), 7);
+            assert.equal(await visibleHeaders(), 9);
         });
 
         await scenario("empty-table colspan follows visibility", async () => {

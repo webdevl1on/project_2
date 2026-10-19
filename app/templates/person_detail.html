@@ -34,9 +34,7 @@
         <dt class="col-sm-3">Наказ про звання</dt>
         <dd class="col-sm-9">
             {{ current_rank.rank_order_number or "-" }}
-            {% if current_rank.rank_order_date %}
-            від {{ current_rank.rank_order_date }}
-            {% endif %}
+            від {{ format_partial_date(current_rank.rank_order_day, current_rank.rank_order_month, current_rank.rank_order_year) }}
         </dd>
         {% endif %}
     </dl>
@@ -47,8 +45,9 @@
             <tr>
                 <th>Прізвище</th>
                 <th>Ім'я</th>
-                <th>Від</th>
-                <th>До</th>
+                <th>Створено (UTC)</th>
+                <th>Оновлено (UTC)</th>
+                <th>Стан</th>
             </tr>
         </thead>
         <tbody>
@@ -56,8 +55,9 @@
             <tr>
                 <td>{{ name.surname }}</td>
                 <td>{{ name.name }}</td>
-                <td>{{ name.date_from }}</td>
-                <td>{{ name.date_to or "поточне" }}</td>
+                <td>{{ format_system_timestamp(name.created_at) }}</td>
+                <td>{{ format_system_timestamp(name.updated_at) }}</td>
+                <td>{{ "Поточне" if name.is_active else "Неактивне" }}</td>
             </tr>
             {% endfor %}
         </tbody>
