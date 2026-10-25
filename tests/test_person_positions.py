@@ -248,8 +248,15 @@ def test_assignment_transfer_and_release_still_work(positions_data):
     source = db.query(Position).filter_by(position_number=2).one()
     target = db.query(Position).filter_by(position_number=40).one()
     person_id = db.query(PersonPosition).filter_by(position_id=source.position_id).one().person_id
-    ServicePersonPositionFunc.assign_person_to_position(target.position_id, person_id, db)
-    assert db.query(PersonPosition).filter_by(position_id=source.position_id).first() is None
-    assert db.query(PersonPosition).filter_by(person_id=person_id).one().position_id == target.position_id
-    ServicePersonPositionFunc.assign_person_to_position(target.position_id, None, db)
-    assert db.query(PersonPosition).filter_by(position_id=target.position_id).first() is None
+    from app.services.staff_service import StaffService, assignments_at
+    from datetime import date
+    on=date(2020,1,1)
+    expected=StaffService.assignment_snapshot(db,target.position_id,person_id,on)
+    ServicePersonPositionFunc.assign_person_to_position(target.position_id,person_id,db,on=on,expected=expected,confirmed=True)
+    assert assignments_at(db,on).filter(PersonPosition.position_id==source.position_id).first() is None
+    assert assignments_at(db,on).filter(PersonPosition.person_id==person_id).one().position_id==target.position_id
+    release=date(2020,1,2)
+    expected=StaffService.assignment_snapshot(db,target.position_id,None,release)
+    ServicePersonPositionFunc.assign_person_to_position(target.position_id,None,db,on=release,expected=expected,confirmed=True)
+    assert assignments_at(db,release).filter(PersonPosition.position_id==target.position_id).first() is None
+    assert db.query(PersonPosition).filter_by(person_id=person_id).count()==2

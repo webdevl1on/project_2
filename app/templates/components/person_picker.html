@@ -1,0 +1,21 @@
+{% macro person_picker(people, selected=none, prefix='person') %}
+<div class="person-picker dropdown flex-grow-1" data-person-picker>
+    <input type="hidden" name="person_id" data-person-value value="{{ selected or '' }}">
+    <button type="button" class="btn btn-outline-secondary dropdown-toggle w-100 text-start" data-bs-toggle="dropdown" data-bs-auto-close="outside" data-person-label>Оберіть військовослужбовця</button>
+    <div class="dropdown-menu person-picker-menu p-2">
+        <input type="search" class="form-control form-control-sm mb-2 person-search" placeholder="Пошук за ПІБ або датою народження..." aria-label="Пошук військовослужбовця" autocomplete="off">
+        <div class="person-picker-options" role="group" aria-label="Військовослужбовці">
+            <button type="button" class="dropdown-item text-wrap" data-person-option="" data-person-search="">— Звільнити посаду —</button>
+            {% for item in people %}
+            <button type="button" class="dropdown-item text-wrap border-top py-2" data-person-option="{{ item.id }}" data-person-search="{{ item.search }}" data-person-position="{{ item.position_id or '' }}" data-person-name="{{ item.label }}">
+                <strong class="d-block">{{ item.label }}</strong>
+                <span class="d-block small">{{ item.rank }} · {{ item.birth }}</span>
+                <span class="d-block small {{ 'text-success' if not item.position_id else 'text-body-secondary' }}"><span aria-hidden="true">{{ '✓' if not item.position_id else '▣' }}</span> {{ item.status }}</span>
+                {% if item.disambiguation %}<span class="d-block small">{{ item.disambiguation }}</span>{% endif %}
+            </button>
+            {% endfor %}
+        </div>
+        <p class="small text-body-secondary" data-person-no-results hidden>Нікого не знайдено.</p>
+    </div>
+</div>
+{% endmacro %}

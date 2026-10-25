@@ -1,9 +1,10 @@
-from sqlalchemy import case, func, or_
+from sqlalchemy import case, func, or_, and_
 
 from app.models.person import Person
 from app.models.person_identity import Passport, PersonName
 from app.models.person_military_service import PersonRank, PersonServiceHistory
-from app.models.person_positions import PersonPosition
+from app.models.staff import PersonAssignment as PersonPosition, StaffVersion
+from app.services.staff_service import active, today, StaffService
 from app.models.reference_book import Position, Rank
 from app.table_columns import PERSON_POSITIONS_FIELDS
 from app.utils.date_query import DateFilter, date_priority
@@ -52,10 +53,13 @@ def _row(record):
 
 class ServicePersonPositionFunc:
     @staticmethod
-    def _base_query(db):
+    def _base_query(db, version_id=None, on=None):
+        on = on or today()
         selections = [(model, history_selection(model)) for _, model, _ in HISTORY_SOURCES]
         query = (db.query(Position, PersonPosition, Person, PersonName, PersonRank, Rank, Passport, PersonServiceHistory)
-                 .outerjoin(PersonPosition, Position.position_id == PersonPosition.position_id)
+                 .join(StaffVersion, StaffVersion.id == Position.staff_version_id)
+                 .filter(StaffVersion.id == version_id if version_id is not None else active(StaffVersion,"valid_from","valid_to",on))
+                 .outerjoin(PersonPosition, and_(Position.position_id == PersonPosition.position_id, active(PersonPosition,"assigned_from","assigned_to",on)))
                  .outerjoin(Person, PersonPosition.person_id == Person.person_id))
         for model, selection in selections:
             query = (query.outerjoin(selection, selection.c.person_id == Person.person_id)
@@ -64,13 +68,9 @@ class ServicePersonPositionFunc:
         return query.outerjoin(Rank, PersonRank.rank_id == Rank.rank_id)
 
     @staticmethod
-    def get_people(db):
-        selection = history_selection(PersonName)
-        records = (db.query(Person, PersonName)
-                   .outerjoin(selection, selection.c.person_id == Person.person_id)
-                   .outerjoin(PersonName, PersonName.person_name_id == selection.c.chosen_id)
-                   .order_by(PersonName.surname, PersonName.name, Person.person_id).all())
-        return [{"person": person, "name": name} for person, name in records]
+    def get_people(db, on=None):
+        from app.services.person_picker import person_options
+        return person_options(db, on or today())
 
     @staticmethod
     def _normalise_values(values):
@@ -152,9 +152,9 @@ class ServicePersonPositionFunc:
 
     @staticmethod
     def get_positions(db, unit_short=None, occupancy="all", sort_by="position_number", direction="asc",
-                      column_filters=None, date_sort_priority=None):
+                      column_filters=None, date_sort_priority=None, version_id=None, on=None):
         direction = "desc" if direction == "desc" else "asc"
-        base_query = ServicePersonPositionFunc._base_query(db)
+        base_query = ServicePersonPositionFunc._base_query(db, version_id, on)
         column_filters = dict(column_filters or {})
         if unit_short and not column_filters.get("unit_short"):
             column_filters["unit_short"] = unit_short
@@ -174,52 +174,5 @@ class ServicePersonPositionFunc:
                                   for row in rows if row["warnings"]]}
 
     @staticmethod
-    def assign_person_to_position(position_id: int, person_id: int | None, db):
-        position = db.get(Position, position_id)
-        if not position:
-            raise ValueError("Штатну позицію не знайдено")
-
-        if person_id is not None:
-            person = db.get(Person, person_id)
-            if not person:
-                raise ValueError("Військовослужбовця не знайдено")
-
-        try:
-            target_assignment = (
-                db.query(PersonPosition)
-                .filter(PersonPosition.position_id == position_id)
-                .first()
-            )
-            if person_id is None:
-                if target_assignment:
-                    db.delete(target_assignment)
-                db.commit()
-                return None
-
-            previous_assignment = (
-                db.query(PersonPosition)
-                .filter(
-                    PersonPosition.person_id == person_id,
-                    PersonPosition.position_id != position_id,
-                )
-                .first()
-            )
-            if previous_assignment:
-                db.delete(previous_assignment)
-                db.flush()
-
-            if target_assignment:
-                target_assignment.person_id = person_id
-            else:
-                target_assignment = PersonPosition(
-                    person_id=person_id,
-                    position_id=position_id,
-                )
-                db.add(target_assignment)
-
-            db.commit()
-            db.refresh(target_assignment)
-            return target_assignment
-        except Exception:
-            db.rollback()
-            raise
+    def assign_person_to_position(position_id, person_id, db, *, on, expected, confirmed=False):
+        return StaffService.assign(db,position_id,person_id,on,expected,confirmed)

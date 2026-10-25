@@ -1,14 +1,14 @@
-from turtle import position
 from typing import Optional
 
-from sqlalchemy import Integer, String
+from sqlalchemy import Integer, String, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.base import Base
+from app.models.staff import SystemTimestamps
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from app.models.person_positions import PersonPosition
+    from app.models.staff import PersonAssignment
 
 
 class Rank(Base):
@@ -60,8 +60,11 @@ class Rank(Base):
         nullable=False,
     )    
 
-class Position(Base):
+class Position(SystemTimestamps, Base):
     __tablename__ = "positions"
+    __table_args__ = (UniqueConstraint("staff_version_id", "position_number"),)
+    staff_version_id: Mapped[int] = mapped_column(ForeignKey("staff_versions.id"), index=True)
+    staff_version: Mapped["StaffVersion"] = relationship(back_populates="positions")
 
     position_id: Mapped[int] = mapped_column(
         Integer,
@@ -71,7 +74,6 @@ class Position(Base):
 
     position_number: Mapped[int] = mapped_column(
         Integer,
-        unique = True,
     )
     
     code: Mapped[str] = mapped_column(
@@ -117,6 +119,6 @@ class Position(Base):
         String,
         nullable=False,
     )
-    persons: Mapped[list["PersonPosition"]] = relationship(
+    persons: Mapped[list["PersonAssignment"]] = relationship(
     back_populates="position"
     )

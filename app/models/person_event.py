@@ -7,7 +7,7 @@ from sqlalchemy import (
     ForeignKey,
     Text
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, validates
 from app.database.base import Base
 
 
@@ -60,3 +60,8 @@ class PersonEvent(Base):
     note: Mapped[Optional[str]]= mapped_column(Text)
 
     event_status: Mapped[Optional[str]]= mapped_column(String)
+
+    @validates("date_start", "date_end", "order_date")
+    def validate_exact_dates(self, key, value):
+        from app.utils.date_utils import parse_exact_date
+        return parse_exact_date(value, required=key == "date_start")

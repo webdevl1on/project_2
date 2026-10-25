@@ -55,7 +55,7 @@ def test_catalogue_covers_all_displayable_mapped_attributes():
                   PersonRank: {"person_rank_id", "person_id", "rank_id", "rank_order_date"},
                   Passport: {"passport_id", "person_id", "passport_issued_date", "passport_expire_date"},
                   PersonServiceHistory: {"person_service_history_id", "person_id", "position_date", "order_date"},
-                  Position: {"position_id"}, Rank: {"rank_id"}}
+                  Position: {"position_id", "staff_version_id", "created_at", "updated_at", "revision"}, Rank: {"rank_id"}}
     for model, excluded in exclusions.items():
         covered = {attr for field in FIELDS.values() if field.metadata()["source"]["model"] == model.__name__
                    for attr in field.metadata()["source"]["attributes"]}

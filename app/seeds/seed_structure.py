@@ -4,7 +4,7 @@ from app.seeds.seed_reference import seed_ranks
 from app.config import EXCEL_PATH
 from app.seeds.seed_reference import seed_positions
 
-def seed_all_structure(db, excel_path=EXCEL_PATH):
+def seed_all_structure(db, excel_path=EXCEL_PATH, *, version_name=None, valid_from=None, valid_to=None, structure_code="main"):
 
     seed_event_types(db)
     db.flush()
@@ -13,7 +13,9 @@ def seed_all_structure(db, excel_path=EXCEL_PATH):
 
     seed_ranks(db)
 
-    seed_positions(db, excel_path)
+    if version_name:
+        if valid_from is None: raise ValueError("Вкажіть точну дату початку версії.")
+        seed_positions(db, excel_path, version_name=version_name, valid_from=valid_from, valid_to=valid_to, structure_code=structure_code)
 
     print("=== COMMIT ===")
     db.commit()
@@ -33,7 +35,14 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="Окреме засівання довідників без створення або очищення БД.")
     parser.add_argument("--database", type=Path, default=DB_PATH)
     parser.add_argument("--excel", type=Path, default=EXCEL_PATH)
+    from datetime import date
+    parser.add_argument("--version-name")
+    parser.add_argument("--valid-from", type=date.fromisoformat)
+    parser.add_argument("--valid-to", type=date.fromisoformat)
+    parser.add_argument("--structure-code", default="main")
     args = parser.parse_args(argv)
+    if bool(args.version_name) != bool(args.valid_from):
+        parser.error("--version-name та --valid-from потрібно вказати разом")
     if not args.database.is_file():
         print("Помилка: файл SQLite не існує; спочатку створіть поточну схему.", file=sys.stderr)
         return 2
@@ -42,7 +51,7 @@ def main(argv=None):
         require_current_schema(selected_engine)
         with sessionmaker(bind=selected_engine, autoflush=False)() as db:
             try:
-                seed_all_structure(db, args.excel)
+                seed_all_structure(db, args.excel, version_name=args.version_name, valid_from=args.valid_from, valid_to=args.valid_to, structure_code=args.structure_code)
             except Exception:
                 db.rollback()
                 raise

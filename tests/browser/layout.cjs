@@ -76,9 +76,10 @@ module.exports = async ({context,base}) => {
             await header('unit_short').locator('[data-bs-toggle=dropdown]').click();
             assert.equal(await page.locator('[data-filter-key="unit_short"]').isVisible(),true);
             await page.keyboard.press('Escape');
+            await table.locator('[data-person-label]').first().click();
             const search=table.locator('.person-search').first();
             await search.fill('Бета');
-            assert.equal(await table.locator('.person-select').first().locator('option[value="1"]').evaluate(n=>n.hidden),true);
+            assert.equal(await table.locator('[data-person-picker]').first().locator('[data-person-option="1"]').evaluate(n=>n.hidden),true);
             assert.deepEqual(errors,[]);
         });
     } finally {await page.close();}

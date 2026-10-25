@@ -14,6 +14,7 @@ module.exports=async({context,base})=>{
         }});
     });}
     try{
+        await page.setViewportSize({width:1280,height:1500});
         await page.goto(base+'/person-positions');await page.evaluate(()=>localStorage.clear());await page.reload();
         await mockClipboard();
         await scenario('drag directly over surname text selects a vertical column, never browser text',async()=>{
@@ -73,9 +74,10 @@ module.exports=async({context,base})=>{
             assert.deepEqual(await page.evaluate(()=>shortcuts),[false,false]);
             assert.ok(await page.evaluate(()=>window.getSelection().toString().length>0));
             await page.keyboard.press('Escape');
+            await table.locator('[data-person-label]').first().click();
             const input=table.locator('.person-search').first();await input.fill('Тест');await input.press('Control+a');
             assert.equal(await selected(),0);assert.equal(await input.evaluate(n=>n.selectionEnd-n.selectionStart),4);
-            await input.fill('');
+            await input.fill('');await page.keyboard.press('Escape');
         });
         await scenario('Word writes HTML and plain MIME, format persists, dates and empty values are copied',async()=>{
             await picker.locator('[data-copy-format][value="word"]').check();

@@ -18,35 +18,51 @@ from tests.test_person_positions import make_position, make_rank
 
 
 engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-Base.metadata.create_all(engine)
-Session = sessionmaker(bind=engine)
-with Session() as db:
-    positions = [
-        make_position(10, "Перший", "Водій", "Командир відділення безпілотних комплексів"),
-        make_position(20, "Перший", "Стрілець", "Стрілець"),
-        make_position(30, "Другий", "Медик", "Медик"),
-    ]
-    rank = make_rank()
-    people = [Person(tax_number="0000000001", birth_day=15, birth_month=3, birth_year=1993),
-              Person(tax_number="0000000002", birth_day=15, birth_month=None, birth_year=1993)]
-    db.add_all([*positions, rank, *people])
-    db.flush()
-    for person, position, surname in zip(people, positions, ("Альфа", "Бета")):
+from tests.staff_fixtures import install_legacy_staff_fixture
+install_legacy_staff_fixture()
+Session = sessionmaker(bind=engine, info={"legacy_staff_fixture":True})
+def reset_data():
+    Base.metadata.drop_all(engine)
+    Base.metadata.create_all(engine)
+    with Session() as db:
+        positions = [
+            make_position(10, "Перший", "Водій", "Командир відділення безпілотних комплексів"),
+            make_position(20, "Перший", "Стрілець", "Стрілець"),
+            make_position(30, "Другий", "Медик", "Медик"),
+        ]
+        rank = make_rank()
+        people = [Person(tax_number="0000000001", birth_day=15, birth_month=3, birth_year=1993),
+                  Person(tax_number="0000000002", birth_day=15, birth_month=None, birth_year=1993)]
+        db.add_all([*positions, rank, *people])
+        db.flush()
+        for person, position, surname in zip(people, positions, ("Альфа", "Бета")):
+            db.add_all([
+                PersonName(person_id=person.person_id, surname=surname, name="Тест"),
+                PersonRank(person_id=person.person_id, rank_id=rank.rank_id),
+                PersonPosition(person_id=person.person_id, position_id=position.position_id),
+            ])
         db.add_all([
-            PersonName(person_id=person.person_id, surname=surname, name="Тест"),
-            PersonRank(person_id=person.person_id, rank_id=rank.rank_id),
-            PersonPosition(person_id=person.person_id, position_id=position.position_id),
+            Passport(person_id=people[0].person_id, passport_type="Тестовий", passport_number="000123",
+                     passport_issued_by="Тестовий орган", passport_issued_year=2015, is_active=False),
+            Passport(person_id=people[1].person_id, passport_number="000456", passport_issued_day=20,
+                     passport_issued_month=6, passport_issued_year=2020, is_active=True),
+            Passport(person_id=people[1].person_id, passport_number="OLD", is_active=False),
+            PersonServiceHistory(person_id=people[0].person_id, military_unit="Тестова частина", service_type="Контракт",
+                                 position_year=2019, is_active=False),
         ])
-    db.add_all([
-        Passport(person_id=people[0].person_id, passport_type="Тестовий", passport_number="000123",
-                 passport_issued_by="Тестовий орган", passport_issued_year=2015, is_active=False),
-        Passport(person_id=people[1].person_id, passport_number="000456", passport_issued_day=20,
-                 passport_issued_month=6, passport_issued_year=2020, is_active=True),
-        Passport(person_id=people[1].person_id, passport_number="OLD", is_active=False),
-        PersonServiceHistory(person_id=people[0].person_id, military_unit="Тестова частина", service_type="Контракт",
-                             position_year=2019, is_active=False),
-    ])
-    db.commit()
+        free=Person(birth_day=28,birth_month=2,birth_year=2001)
+        db.add(free); db.flush()
+        db.add_all([PersonName(person_id=free.person_id,surname="Гамма",name="Тест"),
+                    PersonRank(person_id=free.person_id,rank_id=rank.rank_id)])
+        db.commit()
+
+
+reset_data()
+
+@app.post("/_column-test/reset")
+def reset_fixture():
+    reset_data()
+    return {"ok":True}
 
 
 def memory_db():

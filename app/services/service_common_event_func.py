@@ -1,4 +1,5 @@
 from app import models
+from sqlalchemy import select
 
 
 class CommonEventFunc:
@@ -6,7 +7,7 @@ class CommonEventFunc:
     #Get list of all person's events
     @staticmethod
     def get_all_person_event(person_id,db):
-        stmt = db.select(models.PersonEvent).filter(
+        stmt = select(models.PersonEvent).filter(
             models.PersonEvent.person_id == person_id).order_by(
                 models.PersonEvent.date_start.asc()
             )

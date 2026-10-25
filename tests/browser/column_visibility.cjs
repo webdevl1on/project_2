@@ -53,7 +53,7 @@ async function main() {
             const version = route.request().url().split("bootstrap@")[1].split("/")[0];
             return route.fulfill({ body: assets[`${version}/${file}`], contentType: file.endsWith(".js") ? "application/javascript" : "text/css" });
         });
-        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy"];
+        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff"];
         if (process.env.COLUMN_STAGE) {
             assert.ok(suites.includes(process.env.COLUMN_STAGE));
             await require(`./${process.env.COLUMN_STAGE}.cjs`)({ context, base });
@@ -169,15 +169,19 @@ async function main() {
             await apply();
             assert.equal(page.url(), url);
             const form = table.locator("tbody tr").first().locator("form");
-            await form.locator(".person-select").selectOption("1");
-            await Promise.all([page.waitForNavigation(), form.locator('[type="submit"]').click()]);
-            assert.equal(page.url(), url);
-            assert.equal(await table.locator("tbody tr").first().locator(".person-select").inputValue(), "1");
-            assert.equal(await table.locator("tbody tr").nth(1).locator(".person-select").inputValue(), "");
-            await table.locator("tbody tr").first().locator(".person-select").selectOption("");
-            await Promise.all([page.waitForNavigation(), table.locator("tbody tr").first().locator('[type="submit"]').click()]);
-            assert.equal(await table.locator("tbody tr").first().locator(".person-select").inputValue(), "");
-            assert.equal(page.url(), url);
+            await form.locator('[data-person-label]').click();
+            await form.locator('[data-person-option=""]').click();
+            await form.locator('[type=submit]').click();
+            await page.locator('#staff-assignment-confirm').waitFor({state:'visible'});
+            await Promise.all([page.waitForNavigation(),page.locator('[data-assignment-confirm-yes]').click()]);
+            assert.equal(await table.locator("tbody tr").first().locator('[data-person-value]').inputValue(), "");
+            const restored=table.locator("tbody tr").first().locator("form");
+            await restored.locator('[data-person-label]').click();
+            await restored.locator('[data-person-option="2"]').click();
+            await Promise.all([page.waitForNavigation(),restored.locator('[type=submit]').click()]);
+            assert.equal(await table.locator("tbody tr").first().locator('[data-person-value]').inputValue(), "2");
+            assert.equal(new URL(page.url()).searchParams.get('filter_order'),'unit_short');
+            assert.equal(new URL(page.url()).searchParams.get('direction'),'desc');
             assert.equal(await visibleHeaders(), 9);
         });
 
@@ -232,7 +236,7 @@ async function main() {
             assert.ok(box.x >= 0 && box.x + box.width <= 390);
             assert.deepEqual(errors, []);
         });
-        for (const suite of suites) await require(`./${suite}.cjs`)({ context, base });
+        for (const suite of suites) { await context.request.post(base+"/_column-test/reset"); await require(`./${suite}.cjs`)({ context, base }); }
     } finally {
         if (browser) await browser.close();
         server.kill();

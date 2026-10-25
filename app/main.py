@@ -18,3 +18,6 @@ app.include_router(person_name.router)
 app.include_router(person_rank.router)
 #app.include_router(person_service.router)
 app.include_router(person_positions.router)
+
+from app.routers import staff
+app.include_router(staff.router)

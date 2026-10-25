@@ -12,6 +12,7 @@
 | Предметні дати, фільтри та системний час | `app/date_fields.py`, `app/utils/date_utils.py`, `app/utils/date_query.py`, `app/templates/components/date_*.html`, `app/static/js/date_*.js`, `docs/DATE_SYSTEM.md`, `tests/test_date_system.py` |
 | Історія ПІБ | `app/routers/person_name.py`, `app/services/service_person_name.py`, `app/models/person_identity.py`, `app/templates/person/components/names_history.html` |
 | Історія звань | `app/routers/person_rank.py`, `app/services/service_person_rank.py`, `app/models/person_military_service.py`, `app/templates/person/components/rank_history.html` |
+| Версії штатів, історія, імпорт Excel | `docs/STAFF_HISTORY.md`, `app/models/staff.py`, `app/services/staff_*.py`, `app/services/person_picker.py`, `app/services/assignment_events.py`, `app/routers/staff.py`, `app/templates/staff_*.html` |
 | Посади, призначення, фільтри | `app/routers/person_positions.py`, `app/services/service_person_positions.py`, `app/models/person_positions.py`, `app/templates/person_positions.html`, `tests/test_person_positions.py` |
 | Каталог полів, видимість колонок, Checkbox Tree | `app/table_fields.py`, `docs/TABLE_FIELDS.md`, `app/table_columns.py`, `app/templates/components/column_visibility.html`, `app/static/js/column_*.js`, `app/static/js/table_*.js`, `app/static/css/column_visibility.css`, `tests/test_table_columns.py`, `tests/js/`, `tests/browser/` |
 | Події | `app/services/service_for_person_event.py`, `app/services/service_common_event_func.py`, `app/models/person_event.py`, `app/validators/event_validatotor.py` |
@@ -21,7 +22,7 @@
 
 ## Компоненти та потік запиту
 
-Вебзастосунок — FastAPI з серверним рендерингом Jinja2. [app/main.py](../app/main.py) створює `app` і підключає чотири роутери: `persons`, `person_name`, `person_rank`, `person_positions`. JavaScript і CSS сторінок переважно розміщені в HTML; спільний компонент видимості колонок має файли в `app/static/`. `StaticFiles` у `app/main.py` обслуговує `/static` з абсолютного шляху `BASE_DIR / "static"`. Bootstrap завантажується з `cdn.jsdelivr.net`. Окремого frontend-збирання у репозиторії немає. PySide6 є в залежностях, але не є точкою входу поточного вебінтерфейсу.
+Вебзастосунок — FastAPI з серверним рендерингом Jinja2. [app/main.py](../app/main.py) створює `app` і підключає п’ять роутерів: `persons`, `person_name`, `person_rank`, `person_positions`, `staff`. JavaScript і CSS сторінок переважно розміщені в HTML; спільний компонент видимості колонок має файли в `app/static/`. `StaticFiles` у `app/main.py` обслуговує `/static` з абсолютного шляху `BASE_DIR / "static"`. Bootstrap завантажується з `cdn.jsdelivr.net`. Окремого frontend-збирання у репозиторії немає. PySide6 є в залежностях, але не є точкою входу поточного вебінтерфейсу.
 
 ```mermaid
 flowchart LR
@@ -43,8 +44,8 @@ GET-маршрути зазвичай самі виконують ORM-запит
 - [app/database/db.py](../app/database/db.py): SQLite `data/database/project2.db`, `engine`, `SessionLocal`, залежність FastAPI `get_db()`. Вона відкриває сесію на запит і закриває її у `finally`.
 - `app/database/db_test.py`: окремі `engine_test`, `SessionLocal_test`, `get_test_db()` для `data/database/project2_test.db`.
 - Обидва шляхи БД відносні до робочого каталогу. Шаблони також шукаються відносно нього: `app/templates`.
-- `app/database/init_db.py` та `init_test_db.py` імпортують реєстр моделей і викликають `create_all`. CLI `init_db` створює лише новий файл; пересоздання вимагає `--recreate` з явним `--database`. `schema_check.py` перед засіванням лише перевіряє наявність поточних таблиць/колонок. Механізму версійних міграцій немає: на етапі розробки погоджено ручне пересоздання тестових даних, а не автоматичне оновлення існуючої БД.
-- Активні сервіси персон, ПІБ, звань і посад отримують `db` від виклику та самі виконують `commit`. Сервіс посад має `rollback` при помилці; єдиного транзакційного обгортання всіх сервісів немає. Сервіс подій відкриває власні сесії.
+- `app/database/init_db.py` та `init_test_db.py` імпортують реєстр моделей і викликають `create_all`. CLI `init_db` створює лише новий файл; пересоздання вимагає `--recreate` з явним `--database`. `schema_check.py` перед засіванням лише перевіряє поточні таблиці/колонки, SQLite-тригери та відсутність застарілої фізичної person_positions. Механізму версійних міграцій немає: на етапі розробки погоджено ручне пересоздання тестових даних, а не автоматичне оновлення існуючої БД.
+- Активні сервіси персон, ПІБ, звань і посад отримують `db` від виклику та самі виконують `commit`. StaffService використовує write_unit, BEGIN IMMEDIATE та rollback; єдиного транзакційного обгортання всіх сервісів немає. Сервіс подій відкриває власні сесії.
 
 ## Моделі та зв'язки
 
@@ -56,15 +57,17 @@ GET-маршрути зазвичай самі виконують ORM-запит
 | `person_military_service.py` / `PersonRank` | `person_ranks` | FK на `Person` і довідник `Rank`, номер та три nullable компоненти дати наказу; ORM-зв'язки `person`, `rank`. |
 | `person_military_service.py` / `PersonServiceHistory` | `person_service_history` | Вид служби, частина, текстова посада, компоненти дат посади/наказу; FK та ORM-зв'язок на `Person`. Це окрема сутність від штатного призначення. |
 | `reference_book.py` / `Rank` | `ranks` | Унікальний `code` і сім відмінкових форм звання. |
-| `reference_book.py` / `Position` | `positions` | Унікальний `position_number`, код, підрозділ, коротка назва та сім відмінкових форм посади. Колекція `persons` містить об'єкти `PersonPosition`. |
-| `person_positions.py` / `PersonPosition` | `person_positions` | FK `person_id` і `position_id` мають **окремі** `unique=True`: одна людина займає щонайбільше одну посаду, одна посада має щонайбільше одного призначеного. Зв'язки `person`, `position`. Історію призначень не зберігає. |
+| `reference_book.py` / `Position` | `positions` | Посада конкретного StaffVersion, унікальна пара staff_version_id/position_number; реквізити, системні UTC-поля, revision. Колекція persons містить історичні PersonAssignment. |
+| `staff.py` / `StaffStructure`, `StaffVersion` | `staff_structures`, `staff_versions` | Структура та її непересічні точні періоди; версія має власні Position. |
+| `staff.py` / `PersonAssignment` | `person_assignments` | Єдине джерело історичних і поточних призначень; person_id, staff_position_id, assigned_from/to, UTC-поля, revision. |
+| `person_positions.py` / `PersonPosition` | Немає окремої таблиці | Deprecated alias PersonAssignment; друге джерело поточного стану не створюється. |
 | `event_type.py` / `EventType` | `event_types` | Код і назва типу події, колір, ознаки активності та виключності. |
 | `event_subtype.py` / `EventSubtype` | `event_subtypes` | Код, назва, активність; FK на `EventType`. |
 | `person_event.py` / `PersonEvent` | `person_events` | FK на `Person`, `EventType`, необов'язковий `EventSubtype`; початок, тривалість, кінець, наказ, мета, місце, примітка, статус. ORM-колекцію `Person.events` не оголошено. |
 
-Файли моделей у таблиці розташовані в `app/models/`. `HistoryModel` у `person_history_model.py` — абстрактний базовий клас для `PersonName`, `Passport`, `PersonRank`, `PersonServiceHistory`: додає `created_at`, `updated_at`, `is_active`. Він **не** додає `date_from` / `date_to` й не є журналом усіх змін. Базові `Person`, `PersonPosition` і `PersonEvent` від нього не успадковуються.
+Файли моделей у таблиці розташовані в `app/models/`. `HistoryModel` у `person_history_model.py` — абстрактний базовий клас для `PersonName`, `Passport`, `PersonRank`, `PersonServiceHistory`: додає `created_at`, `updated_at`, `is_active`. Він **не** додає `date_from` / `date_to` й не є журналом усіх змін. Нові StaffStructure/StaffVersion/PersonAssignment та Position використовують SystemTimestamps із тією самою точною UTC-політикою, без is_active. Базові Person і PersonEvent від HistoryModel не успадковуються.
 
-Основні зв'язки: `Person → PersonName[]`, `Person → PersonRank[] → Rank`, `Person → PersonServiceHistory[]`, `Person ↔ PersonPosition ↔ Position`. Паспорт і подія посилаються на людину через FK; підтип події — на її тип. Назви колекцій не скасовують обмежень унікальності в `PersonPosition`.
+Основні зв'язки: `Person → PersonName[]`, `Person → PersonRank[] → Rank`, `Person → PersonServiceHistory[]`, `Person → PersonAssignment[] → Position → StaffVersion → StaffStructure`. Паспорт і подія посилаються на людину через FK; підтип події — на її тип. Поточність призначення визначається його фактичними датами та періодом версії.
 
 ## Сервіси та правила даних
 
@@ -75,9 +78,9 @@ GET-маршрути зазвичай самі виконують ORM-запит
 | `service_person_group_data_validation.py` / `DataGroupValidate` | Нормалізує базові дані та ПІБ через `PersonValidator` і `validate_date_components`. |
 | `service_person_name.py` / `ServicePersonNameFunc` | Додавання нового ПІБ деактивує поточний; редагування працює з конкретним записом, зокрема частковими даними. Є перемикання активного запису та видалення неактивного з підтвердженням `DELETE`. |
 | `service_person_rank.py` / `ServicePersonRankFunc` | Звання обирається з `Rank`. Перше стає активним, наступне додається неактивним; активність перемикається окремо. Додавання перевіряє повтор того самого звання в історії. Є редагування та видалення неактивного запису з `DELETE`. |
-| `service_person_positions.py` / `ServicePersonPositionFunc` | Вибірка штатних посад, каскадні фільтри, сортування, лічильники; призначення, переведення, заміна та звільнення посади. |
-| `service_common_event_func.py` / `CommonEventFunc` | Пошук подій, типів і підтипів; перевірка належності підтипу до типу. Містить відомий дефект вибірки. |
-| `service_for_person_event.py` / `PersonEventService` | Підготовка, створення, зміна, видалення події, пошук за датами та конфліктами. У вебмаршрутах не використовується; реалізація має дефекти, наведені в `CURRENT_STATE.md`. |
+| `service_person_positions.py` / `ServicePersonPositionFunc` | Вибірка за версією/датою, каскадні фільтри, сортування; кадрові записи делеговано StaffService. |
+| `service_common_event_func.py` / `CommonEventFunc` | Пошук подій, типів і підтипів; перевірка належності підтипу до типу. Читання подій за person_id, незалежно від посад. |
+| `service_for_person_event.py` / `PersonEventService` | Підготовка, створення, зміна, видалення події, пошук за датами та конфліктами. У вебмаршрутах не використовується; підтримує backdated створення/редагування точних дат; історичні посади читає assignment_events.py. |
 | `service_common_person_func.py` / `CommonPersonFunc` | Застарілий шлях загального оновлення та фабрика `add_pasport`; містить посилання на відсутні API. Активне редагування використовує `ServicePersonCreate`. |
 | `check_events.py`, `check_person_events.py` | Діагностичні скрипти читання БД, які виконують запити при імпорті. |
 
@@ -103,13 +106,13 @@ GET-маршрути зазвичай самі виконують ORM-запит
 
 ### Посади та фільтри
 
-Базова вибірка починається з `Position`, додає призначення й людину та через агреговані підзапити обирає ПІБ, звання, паспорт і службу. Погоджене правило: єдиний запис загалом → він, інакше єдиний активний → він; кілька записів без єдиного активного → порожні поля й попередження. Кожен підзапит повертає максимум один ID на людину; outerjoin не множить посади та зберігає вакансії. Звання з довідника й реквізити наказу належать одному вибраному PersonRank. Список людей для призначення використовує той самий вибір ПІБ.
+Базова вибірка починається з Position конкретної StaffVersion, додає PersonAssignment на вибрану as_of дату й людину та через агреговані підзапити обирає ПІБ, звання, паспорт і службу. Погоджене правило: єдиний запис загалом → він, інакше єдиний активний → він; кілька записів без єдиного активного → порожні поля й попередження. Кожен підзапит повертає максимум один ID на людину; outerjoin не множить посади та зберігає вакансії. Звання з довідника й реквізити наказу належать одному вибраному PersonRank. Список людей для призначення використовує той самий вибір ПІБ/звання та обчислений статус на дату.
 
 `app/table_fields.py` явно прив’язує 54 поля до довірених ORM-джерел, їхніх типів, форматування й SQL-виразів; `app/table_columns.py` вибирає поля поточної таблиці. Сервіс формує allowlist: 40 скалярних фільтрів, шість DateBinding та сортування всіх 54 полів. Вісім точних системних DateTime доступні лише для сортування. ПІБ має узгоджене SQL-вираження; числа й дати не сортуються як відформатований текст. Повний перелік моделей, джерел, nullable, історичності й обмежень — у [TABLE_FIELDS.md](TABLE_FIELDS.md).
 
 Варіанти фільтра колонки враховують решту фільтрів та зайнятість, виключаючи власний фільтр. Для неактивних колонок вони виводяться з уже отриманих рядків, для кожного активного фільтра потрібен один додатковий SQL-запит. Кількість запитів незалежна від кількості людей/колонок: 1 + число активних колонкових фільтрів для результату/варіантів та один запит для людей. Значення готуються в `row["values"]`; предметного словника чи логіки вибору запису в HTML немає.
 
-`filter_order` зберігає порядок увімкнення фільтрів для URL та номерів у заголовках; це не пріоритет багаторівневого сортування. Є один вибраний ключ сортування та додаткові ключі стабілізації порядку. Призначення видаляє попередню прив'язку людини, а зайняту цільову посаду перепризначає; порожній `person_id` звільняє цільову посаду.
+`filter_order` зберігає порядок увімкнення фільтрів для URL та номерів у заголовках; це не пріоритет багаторівневого сортування. Є один вибраний ключ сортування та додаткові ключі стабілізації порядку. Перепризначення закриває попередній період без видалення; зайнята ціль дає конфлікт. Звільнення завершує період.
 
 ### Колонки, пресети та історія
 
@@ -222,7 +225,7 @@ ClipboardItem/write використовується для HTML, writeText — 
 
 `app/seeds/seed_structure.py::seed_all_structure(db, excel_path=EXCEL_PATH)` послідовно додає типи й підтипи подій, звання та посади й виконує `commit`. CLI `python -m app.seeds.seed_structure --database PATH` працює з уже підготовленою схемою, підтримує `--excel` та rollback при помилці; тестових людей не додає. Звання беруться з `app/models/reference_data/ranks.py::ReferenceRanks.RANKS`; порожній `ReferencePositions.POSITIONS` не є джерелом штатних посад.
 
-Посади завантажуються з кореневого `reference_data.xlsx`: `app/config.py::EXCEL_PATH`, аркуш `positions`, заголовок першого рядка, пропуск другого рядка, читання значень як тексту. `seed_reference.py` нормалізує назви колонок і значення та додає/оновлює записи за `position_number`; відсутні в Excel посади автоматично не видаляє. `app/utils/json_loader.py` — загальна утиліта; для наявних JSON-файлів у `app/seeds/` підключеного імпортера в проаналізованому коді немає.
+Посади завантажуються з кореневого `reference_data.xlsx`: `app/config.py::EXCEL_PATH`, аркуш `positions`, заголовок першого рядка, пропуск другого рядка, читання значень як тексту. staff_import.py зберігає чинне зіставлення колонок і нормалізацію. seed_reference.py повторно використовує його, вимагає явних періодів і не перезаписує вже збережені версії. Без параметрів версії seed_structure засіває лише довідники. `app/utils/json_loader.py` — загальна утиліта; для наявних JSON-файлів у `app/seeds/` підключеного імпортера в проаналізованому коді немає.
 
 `app/services/seed_test_people.py` — незалежний від `seed_all_structure` імпортер аркуша `persons`. `seed_test_people(session_factory, excel_path)` перевіряє заголовки до відкриття сесій, читає через openpyxl всі заповнені рядки починаючи з другого й повертає `SeedReport` з лічильниками та `RowIssue` з номерами помилкових рядків. Назви обов'язкових колонок визначені в `REQUIRED_COLUMNS`; зайві колонки ігноруються. Команда й обмеження даних описані в [CURRENT_STATE.md](CURRENT_STATE.md#засівання-тестових-військовослужбовців).
 
@@ -241,3 +244,5 @@ ClipboardItem/write використовується для HTML, writeText — 
 `tests/test_table_field_catalog.py` перевіряє повноту каталогу за ORM-атрибутами, ізоляцію конфігурацій, одиничні неактивні та неоднозначні історичні записи, відповідність звання/наказу, типізовані фільтри/сортування, лічильник SQL, HTTP і попередження. `tests/browser/catalog.cjs` перевіряє 56 keyed-колонок, нові джерела/дати, undo фільтра та старий пресет. Події/підподії в цьому етапі не змінювалися.
 
 `tests/js/table_selection.test.cjs` перевіряє TSV і екранування HTML. `tests/browser/copy.cjs` перевіряє виділення, клавіші, формати, fallback/відмову доступу, фактичні MIME у буфері Chromium, приховування з очищенням фільтра/історією та незалежність двох таблиць.
+
+Повна схема, транзакції, маршрути /staff, компонент вибору, захист імпорту, точність PersonEvent та команди БД — у [STAFF_HISTORY.md](STAFF_HISTORY.md). Старий POST /person-positions/assign із довільним person_id замінено prepare → підписане підтвердження; це навмисна зміна серверного контракту.

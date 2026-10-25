@@ -106,7 +106,7 @@ def test_full_cli_setup_and_repeat_reference_and_person_seeding(tmp_path):
     assert cli("app.database.init_db", path).returncode == 0
     first_counts = None
     for attempt in (1, 2):
-        references = cli("app.seeds.seed_structure", path, "--excel", str(excel))
+        references = cli("app.seeds.seed_structure", path, "--excel", str(excel), "--version-name", "Synthetic", "--valid-from", "2000-01-01")
         assert references.returncode == 0, references.stderr
         if attempt == 1:
             assert table_counts(path)["persons"] == 0  # Test people remain a separate command.
@@ -130,7 +130,7 @@ def test_reference_seed_failure_rolls_back_the_whole_reference_transaction(tmp_p
     path = tmp_path / "fresh.sqlite3"
     excel = sample_excel(tmp_path, bad_position=True)
     assert cli("app.database.init_db", path).returncode == 0
-    assert cli("app.seeds.seed_structure", path, "--excel", str(excel)).returncode == 2
+    assert cli("app.seeds.seed_structure", path, "--excel", str(excel), "--version-name", "Synthetic", "--valid-from", "2000-01-01").returncode == 2
     assert all(count == 0 for count in table_counts(path).values())
 
 

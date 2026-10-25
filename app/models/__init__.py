@@ -24,6 +24,8 @@ __all__ = [
     "PersonServiceHistory",
     "Rank",
     "Position",
-    "PersonPosition",
+    "PersonPosition", "StaffStructure", "StaffVersion", "PersonAssignment",
     
 ]
+
+from app.models.staff import StaffStructure, StaffVersion, PersonAssignment

@@ -17,6 +17,16 @@ def require_current_schema(engine):
             continue
         columns = {column["name"] for column in inspector.get_columns(table.name)}
         missing.extend(f"{table.name}.{column.name}" for column in table.columns if column.name not in columns)
+    if "person_positions" in tables:
+        missing.append("застаріла фізична person_positions — підготуйте нову БД без другого джерела призначень")
+    if engine.dialect.name == "sqlite" and not missing:
+        from sqlalchemy import text
+        required={f"guard_{table}_{action}" for table in ("staff_versions","person_assignments") for action in ("insert","update","delete")}
+        required.update(("guard_position_version","guard_position_delete"))
+        required.update(f"exact_{table}_{action}" for table in ("staff_versions","person_assignments","person_events") for action in ("insert","update"))
+        with engine.connect() as connection:
+            installed=set(connection.execute(text("SELECT name FROM sqlite_master WHERE type='trigger'")).scalars())
+        missing.extend("trigger:"+name for name in sorted(required-installed))
     if missing:
         raise ValueError("Схема SQLite застаріла або неповна. Відсутні: " + ", ".join(missing)
                          + ". Підготуйте нову базу або явно пересоздайте тестову; автоматичного оновлення немає.")

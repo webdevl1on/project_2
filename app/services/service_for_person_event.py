@@ -5,7 +5,7 @@ from typing import final
 from sqlalchemy import select, or_, and_
 from app.database.db import SessionLocal    
 from app import models
-from app.services.service_common_person_func import CommonPersonFunc
+from app.services.service_person_checking import ServicePersonCheck
 from app.services.service_common_event_func import CommonEventFunc
 from app.validators.event_validatotor import EventValidator
 
@@ -16,7 +16,7 @@ class PersonEventService:
     def get_conflicting_events(person_id, date_start, date_end, db, exclude_event_id=None):
         conditions = [models.PersonEvent.person_id == person_id]
         if exclude_event_id is not None:
-            conditions.append(models.PersonEvent.event_id ==exclude_event_id)
+            conditions.append(models.PersonEvent.event_id !=exclude_event_id)
         if date_end is None:
             conditions.append(
                 or_(
@@ -47,6 +47,8 @@ class PersonEventService:
 
     @staticmethod
     def compare_date_end_and_duration(person_event):
+        if person_event.date_end is not None and person_event.date_end < person_event.date_start:
+            raise ValueError("Дата завершення не може передувати початку.")
         if person_event.duration is not None and person_event.date_end is not None:
             if (person_event.date_end - person_event.date_start).days+1 != person_event.duration: 
                 raise ValueError("Incorrect duration and end date")
@@ -107,11 +109,12 @@ class PersonEventService:
         purpose=None,
         location=None,
         note=None,
-        event_status=None
+        event_status=None,
+        *, session_factory=None
     ):
-        db = SessionLocal()
+        db = (session_factory or SessionLocal)()
         try:
-            person = CommonPersonFunc.get_person_or_raise(person_id,db)
+            person = ServicePersonCheck.get_person_or_raise(person_id,db)
             event_type = CommonEventFunc.get_event_type_or_raise(event_type_id,db)
             event_subtype = CommonEventFunc.get_event_subtype_or_raise(event_subtype_id,db) if event_subtype_id else None
             CommonEventFunc.validate_event_subtype_belongs_to_type(
@@ -129,9 +132,7 @@ class PersonEventService:
                     location,
                     note,
                     event_status)
-            person_event = models.PersonEvent(
-                person_id = person.person_id
-            )
+            person_event.person_id = person.person_id
             PersonEventService.compare_date_end_and_duration(person_event)
             conflicts = PersonEventService.get_conflicting_events(person_id, person_event.date_start, person_event.date_end, db)
             if conflicts:
@@ -141,8 +142,11 @@ class PersonEventService:
             db.refresh(person_event)
             db.close()
             return person_event
+        except Exception:
+            db.rollback()
+            raise
         finally:
-            db.close
+            db.close()
     
     @staticmethod
     def change_person_event(
@@ -157,9 +161,10 @@ class PersonEventService:
         purpose=None,
         location=None,
         note=None,
-        event_status=None
+        event_status=None,
+        *, session_factory=None
     ):
-        db = SessionLocal()
+        db = (session_factory or SessionLocal)()
         try:
             person_event_old = CommonEventFunc.get_event_or_raise(event_id, db)
             event_type = CommonEventFunc.get_event_type_or_raise(event_type_id,db)
@@ -215,7 +220,7 @@ class PersonEventService:
     def get_person_event_by_date(person_id: int, date_start: str, date_end: str | None = None, duration: str | None = None,):
         db = SessionLocal()
         try:
-            CommonPersonFunc.get_person_or_raise(person_id, db)
+            ServicePersonCheck.get_person_or_raise(person_id, db)
             start_date=EventValidator.validate_event_date(date_start)
             assert start_date is not None
             end_date=EventValidator.validate_event_date(date_end)

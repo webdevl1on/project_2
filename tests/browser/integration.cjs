@@ -41,11 +41,17 @@ module.exports=async({context,base})=>{
             await page.waitForURL(url=>url.searchParams.get('direction')==='desc');
             const url=page.url();
             const historyBefore=await page.evaluate(()=>localStorage.getItem('project2:table-history:person-positions'));
-            for(const [number,person] of [[20,'2'],[10,'1']]){
-                await row(number).locator('.person-select').selectOption(person);
-                await Promise.all([page.waitForNavigation(),row(number).locator('form [type=submit]').click()]);
-                assert.equal(page.url(),url);assert.equal(await row(number).locator('.person-select').inputValue(),person);
-            }
+            // Release the existing historical assignment, then restore it with a real POST.
+            await row(20).locator('[data-person-label]').click();
+            await row(20).locator('[data-person-option=""]').click();
+            await row(20).locator('form [type=submit]').click();
+            await page.locator('#staff-assignment-confirm').waitFor({state:'visible'});
+            await Promise.all([page.waitForNavigation(),page.locator('[data-assignment-confirm-yes]').click()]);
+            await row(20).locator('[data-person-label]').click();
+            await row(20).locator('[data-person-option="2"]').click();
+            await Promise.all([page.waitForNavigation(),row(20).locator('form [type=submit]').click()]);
+            assert.equal(await row(20).locator('[data-person-value]').inputValue(),'2');
+            assert.equal(new URL(page.url()).searchParams.get('direction'),'desc');
             assert.equal(await page.evaluate(()=>localStorage.getItem('project2:table-history:person-positions')),historyBefore);
             assert.deepEqual((await table.locator('tbody [data-column-key="position_number"]').allTextContents()).map(n=>n.trim()),['30','20','10']);
         });
@@ -53,13 +59,13 @@ module.exports=async({context,base})=>{
             await picker.locator('[data-table-back]').click();await page.waitForURL(url=>url.searchParams.has('unit_short'));
             assert.deepEqual(await visible(),before);assert.equal(new URL(page.url()).searchParams.get('direction'),'desc');
             assert.equal(await table.locator('tbody tr').count(),2);
-            assert.equal(await row(20).locator('.person-select').inputValue(),'2');
-            assert.equal(await row(10).locator('.person-select').inputValue(),'1');
+            assert.equal(await row(20).locator('[data-person-value]').inputValue(),'2');
+            assert.equal(await row(10).locator('[data-person-value]').inputValue(),'1');
             assert.ok(Math.abs((await header('surname').boundingBox()).width-170)<2);
             await picker.locator('[data-table-forward]').click();await page.waitForURL(url=>!url.searchParams.has('unit_short'));
             assert.equal(await table.locator('tbody tr').count(),3);
             await page.reload();assert.equal((await visible()).includes('unit_short'),false);
-            assert.equal(await row(20).locator('.person-select').inputValue(),'2');
+            assert.equal(await row(20).locator('[data-person-value]').inputValue(),'2');
             assert.deepEqual(errors,[]);
         });
     }finally{await page.close();}

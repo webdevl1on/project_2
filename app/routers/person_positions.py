@@ -1,4 +1,8 @@
 from urllib.parse import urlencode
+from datetime import date
+from app.models.staff import StaffStructure, StaffVersion
+from app.services.staff_service import today, active
+from app.services.person_picker import picker_json
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
@@ -51,6 +55,24 @@ def person_positions_endpoint(request: Request, occupancy: str = "all", sort_by:
 
 def get_person_positions_page(request, occupancy="all", sort_by="position_number", direction="asc",
                               filter_order="", db=None, **field_values):
+    structures=db.query(StaffStructure).order_by(StaffStructure.code).all()
+    versions=db.query(StaffVersion).order_by(StaffVersion.valid_from.desc(),StaffVersion.id).all()
+    try:
+        raw_version=request.query_params.get("version_id")
+        version_id=int(raw_version) if raw_version else None
+        chosen=next((version for version in versions if version.id==version_id),None)
+        if version_id is not None and chosen is None: raise ValueError("Версія не існує.")
+        if chosen is None and structures:
+            preferred=sorted(structures,key=lambda item:(item.code!='main',item.code))
+            chosen=next((version for structure in preferred for version in versions if version.staff_structure_id==structure.id
+                         and version.valid_from<=today() and (version.valid_to is None or version.valid_to>=today())),None)
+        raw_date=request.query_params.get("as_of")
+        on=date.fromisoformat(raw_date) if raw_date else today()
+        if chosen and not raw_date: on=max(chosen.valid_from,min(on,chosen.valid_to or date.max))
+        if chosen and not (chosen.valid_from<=on<=(chosen.valid_to or date.max)):
+            raise ValueError("Дата перегляду не належить періоду версії.")
+    except ValueError as error: raise HTTPException(400,str(error)) from error
+    version_id=chosen.id if chosen else -1
     # Read only fields allowed by this table, not arbitrary model attributes.
     column_filters = {key: field_values.get(key, request.query_params.getlist(key)) for key in FILTER_KEYS}
     try:
@@ -82,10 +104,13 @@ def get_person_positions_page(request, occupancy="all", sort_by="position_number
         sort_by=sort_by,
         direction=direction,
         column_filters=column_filters,
-        date_sort_priority=priorities,
+        date_sort_priority=priorities, version_id=version_id, on=on,
     )
 
-    people = ServicePersonPositionFunc.get_people(db)
+    people = ServicePersonPositionFunc.get_people(db,on)
+
+    def contextual(query):
+        return query + "&" + urlencode({"version_id":version_id,"as_of":on.isoformat()}) if chosen else query
 
     active_query = build_query_string(sort_by, direction, occupancy, column_filters, filter_order, priorities)
     sort_urls = {}
@@ -105,6 +130,10 @@ def get_person_positions_page(request, occupancy="all", sort_by="position_number
             for value in ("asc", "desc")
         }
 
+    active_query=contextual(active_query)
+    sort_urls={key:contextual(value) for key,value in sort_urls.items()}
+    sort_commands={key:{direction:contextual(value) for direction,value in commands.items()} for key,commands in sort_commands.items()}
+
     return templates.TemplateResponse(
         request=request,
         name="person_positions.html",
@@ -119,7 +148,9 @@ def get_person_positions_page(request, occupancy="all", sort_by="position_number
             "filter_order": filter_order,
             "filter_numbers": {key: index + 1 for index, key in enumerate(order)},
             "sort_commands": sort_commands,
-            "people": people,
+            "people": people, "people_json":picker_json(people),
+            "staff_versions":versions,"staff_structures":structures,"structure_names":{item.id:f"{item.name} ({item.code})" for item in structures},"chosen_version":chosen,"as_of":on,
+            "staff_message":request.query_params.get("staff_message", ""),
             "table_columns": PERSON_POSITIONS_COLUMNS,
             "date_filters": date_filters,
             "date_priorities": {key: list(value) for key, value in priorities.items()},
@@ -132,21 +163,4 @@ def get_person_positions_page(request, occupancy="all", sort_by="position_number
     )
 
 
-@router.post("/person-positions/assign")
-def assign_person_to_position(
-    position_id: int = Form(),
-    person_id: str = Form(""),
-    return_query: str | None = Form(None),
-    db: Session = Depends(get_db),
-):
-    selected_person_id = int(person_id) if person_id else None
-    ServicePersonPositionFunc.assign_person_to_position(
-        position_id=position_id,
-        person_id=selected_person_id,
-        db=db,
-    )
-
-    url = "/person-positions"
-    if return_query:
-        url += "?" + return_query.lstrip("?")
-    return RedirectResponse(url=url, status_code=303)
+# Assignment requests are handled by the shared staff router with signed previews.

@@ -1,0 +1,26 @@
+<div class="d-flex gap-2 flex-wrap mb-3">
+<button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#staff-import-modal">Завантажити штатну структуру</button>
+<a href="/staff/history{% if chosen_version %}?version_id={{ chosen_version.id }}{% endif %}" class="btn btn-outline-secondary">Версії та історія призначень</a>
+</div>
+{% if staff_message %}<div class="alert alert-info" role="status">{{ staff_message }}</div>{% endif %}
+<div class="modal fade" id="staff-import-modal" tabindex="-1" aria-labelledby="staff-import-title" aria-hidden="true">
+<div class="modal-dialog"><div class="modal-content">
+<form method="post" action="/staff/import/preview" enctype="multipart/form-data">
+<div class="modal-header"><h2 class="modal-title fs-5" id="staff-import-title">Завантажити штатну структуру</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button></div>
+<div class="modal-body">
+<label class="form-label d-block">Структура<select name="structure_id" class="form-select">
+{% for structure in staff_structures %}<option value="{{ structure.id }}" {% if chosen_version and chosen_version.staff_structure_id==structure.id %}selected{% endif %}>{{ structure.name }} ({{ structure.code }})</option>{% else %}<option value="">Основний штат (буде створено після підтвердження)</option>{% endfor %}
+</select></label>
+<label class="form-label d-block">Excel-файл .xlsx<input name="file" type="file" accept=".xlsx" required class="form-control"></label>
+<label class="form-label d-block">Назва версії<input name="name" maxlength="150" required class="form-control"></label>
+<label class="form-label d-block">Дата початку<input name="valid_from" type="date" required class="form-control"></label>
+<label class="form-label d-block">Дата завершення<input name="valid_to" type="date" required class="form-control"></label>
+<label><input name="current" type="checkbox" value="true" data-current-version> Поточна штатна структура</label>
+<p class="small text-body-secondary mt-2">Імпортується лише аркуш positions. Спочатку буде показано перевірку; призначення людей не переносяться.</p>
+</div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button><button class="btn btn-primary">Перевірити файл</button></div>
+</form></div></div></div>
+<div class="modal fade" id="staff-assignment-confirm" tabindex="-1" aria-labelledby="staff-confirm-title" aria-hidden="true"><div class="modal-dialog"><div class="modal-content">
+<div class="modal-header"><h2 class="fs-5 modal-title" id="staff-confirm-title">⚠ Підтвердження перепризначення</h2></div>
+<div class="modal-body"><p data-assignment-confirm-message></p></div>
+<div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Ні</button><button type="button" class="btn btn-warning" data-assignment-confirm-yes>Так, підтверджую</button></div>
+</div></div></div>
