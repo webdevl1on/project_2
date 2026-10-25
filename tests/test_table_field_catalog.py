@@ -260,3 +260,32 @@ def test_ambiguous_history_is_reported_in_html_and_people_are_not_duplicated(cat
             assert response.context["total"] == 1
     finally:
         app.dependency_overrides.clear()
+
+
+def test_copy_controls_and_header_hide_actions_match_column_capabilities(catalog_db):
+    from lxml import html
+    populate(catalog_db)
+    def isolated(): yield catalog_db
+    app.dependency_overrides[get_db] = isolated
+    try:
+        with TestClient(app) as client:
+            response = client.get('/person-positions')
+            assert response.status_code == 200
+            document = html.fromstring(response.text)
+            assert document.xpath('//input[@data-copy-format]/@value') == ['excel', 'word']
+            assert document.xpath('//input[@data-copy-format and @checked]/@value') == ['excel']
+            assert document.xpath('//button[@data-table-copy and @disabled]')
+            assert document.xpath('//script[@src="/static/js/table_selection.js"]')
+            for header in document.xpath('//table/thead/tr/th'):
+                key = header.get('data-column-key')
+                actions = header.xpath('.//button[@data-column-hide]')
+                assert len(actions) == (0 if key in ('row_number', 'assignment') else 1), key
+                if actions:
+                    menu = actions[0].getparent()
+                    siblings = list(menu)
+                    assert siblings[siblings.index(actions[0])-1].tag == 'hr'
+                    if key == 'birth_date':
+                        assert menu.get('data-date-menu') is not None
+                        assert menu.xpath('.//*[@data-date-sort="asc"]')
+    finally:
+        app.dependency_overrides.clear()

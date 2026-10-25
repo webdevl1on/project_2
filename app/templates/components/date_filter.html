@@ -17,6 +17,11 @@
                 <button type="button" class="btn btn-sm btn-outline-primary" data-date-sort="asc">За зростанням ↑</button>
                 <button type="button" class="btn btn-sm btn-outline-primary" data-date-sort="desc">За спаданням ↓</button>
             </div>
+            {% if not column.system %}
+            <hr class="dropdown-divider">
+            <button type="button" class="dropdown-item" data-column-hide><span aria-hidden="true">⊘</span> Приховати колонку</button>
+            <hr class="dropdown-divider">
+            {% endif %}
             <strong class="small">Пріоритет складових дати</strong>
             <div data-date-priority-list class="mb-2"></div>
             <label class="form-label small">Режим

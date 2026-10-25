@@ -91,6 +91,7 @@ def two_tables():
         <script src="/static/js/column_interactions.js"></script>
         <script src="/static/js/table_filters.js"></script>
         <script src="/static/js/table_history.js"></script>
+        <script src="/static/js/table_selection.js"></script>
         <script src="/static/js/column_visibility.js"></script>
     ''').render(configs=[first, second])
 

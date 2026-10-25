@@ -52,3 +52,17 @@
 .column-dragging { opacity: .45; }
 .column-drop-before { box-shadow: inset 4px 0 #0d6efd; }
 .column-drop-after { box-shadow: inset -4px 0 #0d6efd; }
+
+[data-column-table] {
+    --table-selection-bg: var(--bs-primary-bg-subtle, #cfe2ff);
+    --table-selection-border: var(--bs-primary, #0d6efd);
+    --table-selection-text: var(--bs-body-color, #212529);
+}
+[data-column-table] td.table-cell-selected {
+    background-color: var(--table-selection-bg);
+    color: var(--table-selection-text);
+    box-shadow: inset 0 0 0 1px var(--table-selection-border);
+    --bs-table-bg-state: var(--table-selection-bg);
+    --bs-table-color-state: var(--table-selection-text);
+}
+.column-actions-menu { min-width: 270px; }

@@ -52,6 +52,21 @@
             this.interactions = new api.ColumnInteractions(this);
             this.timeline = new api.TableTimeline(this);
             this.timeline.initialise();
+            if (api.TableSelection) this.selection = new api.TableSelection(this);
+            this.table.addEventListener("click", event => {
+                const button = event.target.closest("[data-column-hide]");
+                if (!button) return;
+                const key = button.closest("[data-column-key]")?.dataset.columnKey;
+                const column = this.model.columns.find(column => column.key === key);
+                if (!column || column.system) return;
+                const layout = this.getLayout();
+                layout.visible = layout.visible.filter(value => value !== key);
+                if (!this.model.hasInformation(layout.visible)) {
+                    this.notice("Залиште видимою хоча б одну інформаційну колонку."); return;
+                }
+                bootstrap.Dropdown.getOrCreateInstance(button.closest(".dropdown").querySelector("[data-bs-toggle=dropdown]")).hide();
+                this.commitLayout(layout, "header-hide");
+            });
             picker.dataset.columnsReady = "true";
         }
         getLayout() { return api.clone(this.state.layout); }
@@ -62,6 +77,7 @@
             this.picker.dispatchEvent(new CustomEvent("columnlayout:change", { detail: { layout: this.getLayout(), source } }));
         }
         renderVisibility() {
+            this.selection?.clear();
             const { visible, order } = this.state.layout;
             this.table.querySelectorAll("tr").forEach(row => {
                 const cells = new Map(Array.from(row.children).filter(cell => cell.hasAttribute("data-column-key"))

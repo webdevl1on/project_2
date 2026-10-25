@@ -36,7 +36,8 @@ module.exports = async ({context, base}) => {
             assert.deepEqual(await cells('service_type'), ['Контракт', '-', '-']);
             assert.deepEqual(await cells('service_position_date'), ['_._.2019', '-', '-']);
             assert.match((await cells('name_created_at'))[0], /\d{2}:\d{2}:\d{2}\.\d{6} UTC$/);
-            assert.equal(await header('name_created_at').locator('[data-bs-toggle=dropdown]').count(), 0);
+            assert.equal(await header('name_created_at').locator('[data-column-hide]').count(), 1);
+            assert.equal(await header('name_created_at').locator('[data-filter-key]').count(), 0);
             await page.reload(); assert.equal(await header('passport_number').isVisible(), true);
         });
         await scenario('new scalar filter cascades, hidden filter clears, undo restores it', async () => {

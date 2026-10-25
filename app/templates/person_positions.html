@@ -179,7 +179,7 @@
                                     {% endif %}
                                 </a>
 
-                                {% if column.filterable %}
+                                {% if not column.system %}
                                 <div class="dropdown">
                                     <button
                                         class="btn btn-sm filter-toggle {{ 'filter-toggle-active border-primary text-primary' if key in filter_numbers else 'text-secondary' }}"
@@ -192,11 +192,14 @@
                                             {% endif %}
                                         </span>
                                     </button>
-                                    <div class="dropdown-menu p-2 filter-menu" data-filter-key="{{ key }}">
+                                    <div class="dropdown-menu p-2 {{ 'filter-menu' if column.filterable else 'column-actions-menu' }}" {% if column.filterable %}data-filter-key="{{ key }}"{% endif %}>
                                         <a class="dropdown-item sort-command px-1"
                                             href="{{ sort_commands[key]['asc'] }}">Сортувати за зростанням</a>
                                         <a class="dropdown-item sort-command px-1"
                                             href="{{ sort_commands[key]['desc'] }}">Сортувати за спаданням</a>
+                                        <hr class="dropdown-divider">
+                                        <button type="button" class="dropdown-item px-1" data-column-hide><span aria-hidden="true">⊘</span> Приховати колонку</button>
+                                        {% if column.filterable %}
                                         <hr class="dropdown-divider">
                                         <input type="search" class="form-control form-control-sm mb-2 filter-search"
                                             placeholder="Пошук значень...">
@@ -231,6 +234,7 @@
                                                 Застосувати
                                             </button>
                                         </div>
+                                        {% endif %}
                                     </div>
                                 </div>
                                 {% endif %}
@@ -296,6 +300,7 @@
     <script src="/static/js/column_interactions.js"></script>
     <script src="/static/js/table_filters.js"></script>
     <script src="/static/js/table_history.js"></script>
+    <script src="/static/js/table_selection.js"></script>
     <script src="/static/js/column_visibility.js"></script>
     <script src="/static/js/date_filter.js"></script>
     <script>
