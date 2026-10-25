@@ -16,12 +16,33 @@ module.exports=async({context,base})=>{
     try{
         await page.goto(base+'/person-positions');await page.evaluate(()=>localStorage.clear());await page.reload();
         await mockClipboard();
-        await scenario('single cell, button and Ctrl+C use Excel TSV',async()=>{
+        await scenario('drag directly over surname text selects a vertical column, never browser text',async()=>{
+            await cell(1,'surname').scrollIntoViewIfNeeded();
+            const coords=await table.locator('tbody td[data-column-key="surname"] [data-column-value]').evaluateAll(nodes=>nodes.map(node=>{
+                const range=document.createRange();range.selectNodeContents(node);const r=range.getBoundingClientRect();
+                return {x:r.x+Math.min(12,r.width/2),y:r.y+r.height/2};
+            }));
+            await page.mouse.move(coords[0].x,coords[0].y);await page.mouse.down();
+            await page.mouse.move(coords[2].x,coords[2].y,{steps:20});await page.mouse.up();
+            assert.equal(await selected(),3);
+            assert.deepEqual(await matrix(),[['Альфа'],['Бета'],['-']]);
+            assert.equal(await page.evaluate(()=>window.getSelection().toString()),'');
+            await page.keyboard.press('Escape');
+        });
+        await scenario('header menu selects the entire column and the button copies only that column',async()=>{
+            await table.locator('th[data-column-key="surname"]').scrollIntoViewIfNeeded();
+            await table.locator('th[data-column-key="surname"] [data-bs-toggle]').click();
+            await table.locator('th[data-column-key="surname"] [data-column-select]').click();
+            assert.equal(await selected(),3);assert.deepEqual(await matrix(),[['Альфа'],['Бета'],['-']]);
+            await picker.locator('[data-table-copy]').click();await page.waitForFunction(()=>copied.length>0);
+            assert.equal(await page.evaluate(()=>copied.at(-1).text),'Альфа\nБета\n-');
+            await page.keyboard.press('Escape');await page.evaluate(()=>copied=[]);
+        });
+        await scenario('single cell and button use Excel TSV',async()=>{
             await cell(1,'unit_short').click();assert.equal(await selected(),1);
             await picker.locator('[data-table-copy]').click();
             assert.equal(await page.evaluate(()=>copied.at(-1).text),'Перший');
-            await table.focus();await page.keyboard.press('Control+c');
-            await page.waitForFunction(()=>copied.length===2);
+            assert.equal(await page.evaluate(()=>copied.length),1);
             assert.deepEqual(await matrix(),[['Перший']]);
         });
         await scenario('drag and Shift extend rectangles, Ctrl adds sparse cells, Escape clears',async()=>{
@@ -40,10 +61,17 @@ module.exports=async({context,base})=>{
             assert.deepEqual(await matrix(),[['10','Перший',''],['20','Перший','Стрілець']]);
             await page.keyboard.press('Escape');assert.equal(await picker.locator('[data-table-copy]').isDisabled(),true);
         });
-        await scenario('Ctrl+A uses current visible cells; form editing shortcuts are untouched',async()=>{
-            await table.focus();await page.keyboard.press('Control+a');
-            assert.equal(await selected(),33); // 11 copyable columns x 3 rows; assignment omitted
-            assert.ok(!(await matrix()).flat().some(v=>v.includes('Зберегти')));
+        await scenario('Ctrl+A and Ctrl+C remain native and do not change cell selection or invoke the exporter',async()=>{
+            await cell(1,'unit_short').click();
+            const before=await page.evaluate(()=>copied.length);
+            await page.evaluate(()=>{
+                window.shortcuts=[];
+                document.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&['a','c'].includes(event.key.toLowerCase())) shortcuts.push(event.defaultPrevented);});
+            });
+            await table.focus();await page.keyboard.press('Control+a');await page.keyboard.press('Control+c');
+            assert.equal(await selected(),1);assert.equal(await page.evaluate(()=>copied.length),before);
+            assert.deepEqual(await page.evaluate(()=>shortcuts),[false,false]);
+            assert.ok(await page.evaluate(()=>window.getSelection().toString().length>0));
             await page.keyboard.press('Escape');
             const input=table.locator('.person-search').first();await input.fill('Тест');await input.press('Control+a');
             assert.equal(await selected(),0);assert.equal(await input.evaluate(n=>n.selectionEnd-n.selectionStart),4);
@@ -57,7 +85,7 @@ module.exports=async({context,base})=>{
             assert.equal(await page.evaluate(()=>copied.at(-1).text),'15.03.1993');
             await page.reload();assert.equal(await picker.locator('[data-copy-format][value="word"]').isChecked(),true);
             await mockClipboard();await cell(2,'birth_date').click();await cell(3,'birth_date').click({modifiers:['Shift']});
-            await table.focus();await page.keyboard.press('Control+c');await page.waitForFunction(()=>copied.length>0);
+            await picker.locator('[data-table-copy]').click();await page.waitForFunction(()=>copied.length>0);
             assert.equal(await page.evaluate(()=>copied.at(-1).text),'15._.1993\n-');
         });
         await scenario('HTML unavailable falls back to plain with an explicit warning; total denial reports failure',async()=>{
@@ -91,7 +119,7 @@ module.exports=async({context,base})=>{
                 const c=TableColumns.controllers.get('person-positions');
                 c.commitLayout({visible:['row_number','birth_date','position_number'],order:['row_number','birth_date','position_number']});
             });
-            await table.focus();await page.keyboard.press('Control+a');
+            await cell(1,'row_number').click();await cell(1,'position_number').click({modifiers:['Shift']});
             assert.deepEqual((await matrix())[0],['1','15.03.1993','10']);
             await page.evaluate(()=>TableColumns.controllers.get('person-positions').commitLayout({visible:['row_number','position_number'],order:['row_number','position_number']}));
             await table.locator('th[data-column-key="position_number"] [data-bs-toggle]').click();

@@ -66,3 +66,15 @@
     --bs-table-color-state: var(--table-selection-text);
 }
 .column-actions-menu { min-width: 270px; }
+
+/* Enable only after TableSelection has actually initialized. */
+.table-cell-selection.table-selection-dragging td[data-column-key],
+.table-cell-selection.table-selection-dragging td[data-column-key] [data-column-value] {
+    user-select: none;
+    -webkit-user-select: none;
+}
+.table-cell-selection input, .table-cell-selection textarea,
+.table-cell-selection [contenteditable]:not([contenteditable="false"]) {
+    user-select: text;
+    -webkit-user-select: text;
+}
