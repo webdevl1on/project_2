@@ -19,3 +19,7 @@ app.include_router(person_positions.router)
 
 from app.routers import staff
 app.include_router(staff.router)
+
+from app.routers import name_cases, admin
+app.include_router(name_cases.router)
+app.include_router(admin.router)

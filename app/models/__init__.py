@@ -29,3 +29,5 @@ __all__ = [
 ]
 
 from app.models.staff import StaffStructure, StaffVersion, PersonAssignment
+from app.models.name_cases import NameDictionary, PersonNameCases, NameDictionaryImport
+__all__ += ["NameDictionary", "PersonNameCases", "NameDictionaryImport"]

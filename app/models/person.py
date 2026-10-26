@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
-from sqlalchemy import Integer, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Integer, String, CheckConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.database.base import Base
 
@@ -20,6 +20,15 @@ class Person(Base):
         primary_key=True,
         autoincrement=True
         )
+    sex: Mapped[str | None] = mapped_column(
+        String(6), CheckConstraint("sex IS NULL OR sex IN ('male','female')"), nullable=True
+    )
+
+    @validates("sex")
+    def validate_sex(self, key, value):
+        from app.validators.name_cases import sex
+        return sex(value, required=False)
+
     tax_number: Mapped[str] = mapped_column(
         String,
         unique=True,

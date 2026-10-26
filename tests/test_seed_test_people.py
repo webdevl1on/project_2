@@ -37,7 +37,7 @@ def person_row(**overrides):
     data = dict(
         surname="Тестенко", name="Тестослав", patronymic="Тестович",
         tax_number="0123456789", birth_day=29, birth_month=2,
-        birth_year=2000, rank="  СОЛДАТ  ",
+        birth_year=2000, rank="  СОЛДАТ  ", sex="male",
     )
     data.update(overrides)
     return [data[key] for key in REQUIRED_COLUMNS]
@@ -149,7 +149,9 @@ def test_excel_tax_representation(isolated_db, tmp_path, value, number_format, e
     ({"tax_number": True}, "логічне значення"),
     ({"tax_number": '=TEXT(123456789,"0000000000")'}, "формула"),
     ({"surname": None}, "ПІБ"),
-    ({"name": "О'тест"}, "ПІБ"),
+    ({"name": "О1тест"}, "ПІБ"),
+    ({"sex": None}, "стать"),
+    ({"sex": "unknown"}, "стать"),
     ({"birth_day": 31, "birth_month": 4}, "Дата народження"),
     ({"birth_year": 2001}, "Дата народження"),
     ({"birth_month": 13}, "Дата народження"),
@@ -223,7 +225,7 @@ def test_error_after_related_insert_rolls_back_entire_person(isolated_db, tmp_pa
 
 @pytest.mark.parametrize("sheet,headers,message", [
     ("positions", REQUIRED_COLUMNS, "немає аркуша persons"),
-    ("persons", REQUIRED_COLUMNS[:-1], "відсутні колонки: rank"),
+    ("persons", REQUIRED_COLUMNS[:-1], "відсутні колонки: sex"),
     ("persons", (*REQUIRED_COLUMNS, "rank"), "повторюються колонки: rank"),
     ("persons", (), "відсутні колонки"),
 ])

@@ -1,0 +1,106 @@
+"""Add sex and name-case tables without rebuilding or deleting existing tables."""
+import argparse
+import os
+from datetime import datetime, UTC
+from pathlib import Path
+import sqlite3
+import uuid
+from sqlalchemy.dialects import sqlite
+from sqlalchemy.schema import CreateTable, CreateIndex
+from app.database.base import Base
+from app import models
+from app.database.schema_check import required_sqlite_triggers
+
+NEW_TABLES = (models.NameDictionary.__table__, models.PersonNameCases.__table__, models.NameDictionaryImport.__table__)
+
+
+def columns(connection, table):
+    return {row[1] for row in connection.execute(f'PRAGMA table_info("{table}")')}
+
+
+def integrity(connection):
+    if connection.execute("PRAGMA integrity_check").fetchall() != [("ok",)]:
+        raise ValueError("SQLite не пройшла перевірку цілісності; міграцію не виконано.")
+    if connection.execute("PRAGMA foreign_key_check").fetchall():
+        raise ValueError("У БД є порушення зовнішніх ключів; спочатку виправте їх окремо.")
+
+
+def create_table(connection, table):
+    connection.execute(str(CreateTable(table).compile(dialect=sqlite.dialect())))
+    for index in table.indexes:
+        connection.execute(str(CreateIndex(index).compile(dialect=sqlite.dialect())))
+
+
+def migrate(database):
+    path = Path(database).resolve()
+    if not path.is_file():
+        raise ValueError("Вкажіть наявний файл SQLite. Нова БД цією командою не створюється.")
+    with path.open("rb") as stream:
+        if stream.read(16) != b"SQLite format 3\x00":
+            raise ValueError("Вибраний файл не є SQLite.")
+    connection = sqlite3.connect(path.as_uri() + "?mode=rw", uri=True, isolation_level=None)
+    backup = None
+    try:
+        connection.execute("PRAGMA foreign_keys=ON")
+        integrity(connection)
+        present = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        new_names = {table.name for table in NEW_TABLES}
+        for table in Base.metadata.sorted_tables:
+            if table.name in new_names:
+                continue
+            required = {column.name for column in table.columns} - ({"sex"} if table.name == "persons" else set())
+            if table.name not in present or not required <= columns(connection, table.name):
+                raise ValueError(f"Схема {table.name} не відповідає попередній штатній архітектурі. Потрібна окрема міграція цієї БД.")
+        if "person_positions" in present:
+            raise ValueError("Виявлено застарілу person_positions. Ця міграція її не перетворює.")
+        installed = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='trigger'")}
+        if not required_sqlite_triggers() <= installed:
+            raise ValueError("Відсутні чинні тригери кадрової історії або точних дат. Потрібна окрема перевірка цієї БД.")
+        for table in NEW_TABLES:
+            if table.name in present and not {column.name for column in table.columns} <= columns(connection, table.name):
+                raise ValueError(f"Неповна стороння таблиця {table.name}; автоматичне виправлення заборонено.")
+        needs_change = "sex" not in columns(connection, "persons") or not new_names <= present
+        if not needs_change:
+            return None
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+        backup = path.with_name(f"{path.stem}.before-name-cases-{stamp}-{uuid.uuid4().hex[:8]}.sqlite3")
+        # Exclusive target plus SQLite backup API keeps a consistent copy, including WAL.
+        descriptor = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        os.close(descriptor)
+        target = sqlite3.connect(backup)
+        try:
+            connection.backup(target)
+        finally:
+            target.close()
+        connection.execute("BEGIN IMMEDIATE")
+        try:
+            if "sex" not in columns(connection, "persons"):
+                connection.execute("ALTER TABLE persons ADD COLUMN sex VARCHAR(6) CHECK (sex IS NULL OR sex IN ('male','female'))")
+            for table in NEW_TABLES:
+                if table.name not in present:
+                    create_table(connection, table)
+            integrity(connection)
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        return backup
+    finally:
+        connection.close()
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--database", type=Path, required=True)
+    args = parser.parse_args(argv)
+    try:
+        backup = migrate(args.database)
+    except (OSError, ValueError, sqlite3.Error) as error:
+        print(f"Міграцію скасовано: {error}")
+        return 2
+    print(f"Міграцію завершено. Резервна копія: {backup}" if backup else "Схема вже оновлена; змін не внесено.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

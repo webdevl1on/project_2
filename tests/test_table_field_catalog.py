@@ -51,7 +51,8 @@ def populate(db, number=1):
 def test_catalogue_covers_all_displayable_mapped_attributes():
     # A new model attribute must be deliberately represented or excluded.
     # FK/PK link entities, date projections duplicate the canonical components.
-    exclusions = {Person: {"person_id"}, PersonName: {"person_name_id", "person_id"},
+    # Sex belongs to the new person form; adding a staff-table column is separate scope.
+    exclusions = {Person: {"person_id", "sex"}, PersonName: {"person_name_id", "person_id"},
                   PersonRank: {"person_rank_id", "person_id", "rank_id", "rank_order_date"},
                   Passport: {"passport_id", "person_id", "passport_issued_date", "passport_expire_date"},
                   PersonServiceHistory: {"person_service_history_id", "person_id", "position_date", "order_date"},

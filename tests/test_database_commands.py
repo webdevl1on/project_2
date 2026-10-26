@@ -85,9 +85,9 @@ def sample_excel(tmp_path, *, bad_position=False):
     positions.append(["notes"])
     positions.append(["bad" if bad_position else 10, "TEST", "Тестовий", "Посада", *["Тестова посада"] * 7])
     people = workbook.create_sheet("persons")
-    people.append(["surname", "name", "patronymic", "tax_number", "birth_day", "birth_month", "birth_year", "rank"])
-    people.append(["Тестенко", "Тестослав", None, "0012345678", 29, 2, 2000, "солдат"])
-    people.append(["Тестов", "Тестимир", None, "0123456789", None, 3, 1995, "SENIOR_SOLDIER"])
+    people.append(["surname", "name", "patronymic", "tax_number", "birth_day", "birth_month", "birth_year", "rank", "sex"])
+    people.append(["Тестенко", "Тестослав", None, "0012345678", 29, 2, 2000, "солдат", "male"])
+    people.append(["Тестов", "Тестимир", None, "0123456789", None, 3, 1995, "SENIOR_SOLDIER", "male"])
     path = tmp_path / "reference.xlsx"
     workbook.save(path)
     workbook.close()

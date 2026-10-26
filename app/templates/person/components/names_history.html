@@ -32,6 +32,7 @@
             <td>{{names.patronymic_latin}}</td>
             <td><button class="btn btn-sm btn-warning" data-bs-toggle="modal"
                     data-bs-target="#editNameModal{{names.person_name_id}}">Ред</button>
+                <a class="btn btn-sm btn-outline-primary" href="/person_name/{{ names.person_name_id }}/cases">Відмінки</a>
                 <!-- Modal for change name-->
                 <div class="modal fade" id="editNameModal{{names.person_name_id}}" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog">

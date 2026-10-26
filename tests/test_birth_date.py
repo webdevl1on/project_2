@@ -60,6 +60,7 @@ def test_partial_february_allows_day_29_without_year():
 def test_create_person_with_partial_birth_date(db):
     person = ServicePersonCreate.create_person(
         {
+            "sex": "male",
             "surname": "Іваненко",
             "name": "Іван",
             "patronymic": None,
@@ -82,6 +83,7 @@ def test_create_person_with_partial_birth_date(db):
 def test_update_person_birth_date_keeps_partial_components(db):
     person = ServicePersonCreate.create_person(
         {
+            "sex": "male",
             "surname": "Іваненко",
             "name": "Іван",
             "patronymic": None,

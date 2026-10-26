@@ -5,6 +5,15 @@ from sqlalchemy import inspect
 from app.database.base import Base
 
 
+def required_sqlite_triggers():
+    required = {f"guard_{table}_{action}" for table in ("staff_versions", "person_assignments")
+                for action in ("insert", "update", "delete")}
+    required.update(("guard_position_version", "guard_position_delete"))
+    required.update(f"exact_{table}_{action}" for table in ("staff_versions", "person_assignments", "person_events")
+                    for action in ("insert", "update"))
+    return required
+
+
 def require_current_schema(engine):
     from app import models  # Register all current tables before inspection.
 
@@ -21,12 +30,13 @@ def require_current_schema(engine):
         missing.append("застаріла фізична person_positions — підготуйте нову БД без другого джерела призначень")
     if engine.dialect.name == "sqlite" and not missing:
         from sqlalchemy import text
-        required={f"guard_{table}_{action}" for table in ("staff_versions","person_assignments") for action in ("insert","update","delete")}
-        required.update(("guard_position_version","guard_position_delete"))
-        required.update(f"exact_{table}_{action}" for table in ("staff_versions","person_assignments","person_events") for action in ("insert","update"))
+        required = required_sqlite_triggers()
         with engine.connect() as connection:
             installed=set(connection.execute(text("SELECT name FROM sqlite_master WHERE type='trigger'")).scalars())
         missing.extend("trigger:"+name for name in sorted(required-installed))
     if missing:
+        name_changes = {"persons.sex", "name_dictionaries", "person_name_cases", "name_dictionary_imports"}
+        if set(missing) <= name_changes:
+            raise ValueError("Потрібна безпечна міграція зі збереженням даних: python -m app.database.migrate_name_cases --database PATH. Автоматично БД не змінено.")
         raise ValueError("Схема SQLite застаріла або неповна. Відсутні: " + ", ".join(missing)
                          + ". Підготуйте нову базу або явно пересоздайте тестову; автоматичного оновлення немає.")

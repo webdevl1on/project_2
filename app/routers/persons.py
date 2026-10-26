@@ -4,7 +4,10 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from app.database.db import get_db
 from app.services.service_person_create import ServicePersonCreate
-from app.services.person_read import list_people, person_details
+from app.services.person_read import list_people, person_details, creation_choices
+from app.services.person_registration import register_person
+from app.name_cases import CASES, NAME_PARTS, SEXES
+from sqlalchemy.exc import SQLAlchemyError
 from app.templating import templates
 
 
@@ -35,19 +38,16 @@ def get_persons_page(request: Request,
 
 
 #Додати нову людину
+def render_create(request, db, data=None, error=None, status=200):
+    return templates.TemplateResponse(request=request, name="person_create.html", status_code=status,
+        context={"form_data": data or {}, "error": str(error) if error else None,
+                 "error_fields": getattr(error, "fields", []), "ranks": creation_choices(db),
+                 "parts": NAME_PARTS, "cases": CASES, "sexes": SEXES})
+
+
 @router.get("/persons/new")
-def get_create_person_page(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="person_form.html",
-        context={
-            "form_data": {},
-            "form_action": "/persons/new",
-            "page_title": "Додати людину",
-            "submit_label": "Зберегти",
-            "cancel_url": "/persons",
-        },
-    )
+def get_create_person_page(request: Request, db: Session = Depends(get_db)):
+    return render_create(request, db)
 
 
 def build_person_form_data(person, current_name):
@@ -55,6 +55,7 @@ def build_person_form_data(person, current_name):
         "surname": current_name.surname if current_name else "",
         "name": current_name.name if current_name else "",
         "patronymic": current_name.patronymic if current_name else "",
+        "sex": person.sex or "",
         "tax_number": person.tax_number or "",
         "birth_day": person.birth_day or "",
         "birth_month": person.birth_month or "",
@@ -63,48 +64,29 @@ def build_person_form_data(person, current_name):
 
 
 @router.post("/persons/new")
-def create_person_from_form(
-    request: Request,
-    surname: Annotated[str, Form()],
-    name: Annotated[str, Form()],
-    patronymic: Annotated[str | None, Form()] = None,
-    tax_number: Annotated[str | None, Form()] = None,
-    birth_day: Annotated[str | None, Form()] = None,
-    birth_month: Annotated[str | None, Form()] = None,
-    birth_year: Annotated[str | None, Form()] = None,
-    db: Session = Depends(get_db),
-):
-    form_data = {
-        "surname": surname,
-        "name": name,
-        "patronymic": patronymic,
-        "surname_latin": None,
-        "name_latin": None,
-        "patronymic_latin": None,
-        "tax_number": tax_number,
-        "birth_day": birth_day,
-        "birth_month": birth_month,
-        "birth_year": birth_year,
-    }
-
+async def create_person_from_form(request: Request, db: Session = Depends(get_db)):
+    form = await request.form()
+    allowed = {"sex", "tax_number", "birth_day", "birth_month", "birth_year", "rank_id", *NAME_PARTS}
+    for kind in NAME_PARTS:
+        allowed.update(f"{kind}_{case}" for case in CASES if case != "nominative")
+        allowed.update((f"{kind}_verified", f"{kind}_bound_base", f"{kind}_bound_sex"))
+    data = {key: str(form.get(key, "")) for key in allowed}
     try:
-        person = ServicePersonCreate.create_person(form_data, db)
+        person = register_person(db, data)
     except ValueError as error:
-        return templates.TemplateResponse(
-            request=request,
-            name="person_form.html",
-            context={
-                "error": str(error),
-                "form_data": form_data,
-                "form_action": "/persons/new",
-                "page_title": "Додати людину",
-                "submit_label": "Зберегти",
-                "cancel_url": "/persons",
-            },
-            status_code=400,
-        )
+        return render_create(request, db, data, error, 400)
+    except SQLAlchemyError:
+        return render_create(request, db, data, ValueError("Збереження відхилено БД. Перевірте РНОКПП та актуальність схеми; введені значення збережено у формі."), 409)
+    return RedirectResponse(f"/persons/{person.person_id}/created", 303)
 
-    return RedirectResponse(url=f"/persons/{person.person_id}", status_code=303)
+
+@router.get("/persons/{person_id}/created")
+def person_created(request: Request, person_id: int, db: Session = Depends(get_db)):
+    try:
+        details = person_details(db, person_id)
+    except ValueError as error:
+        raise HTTPException(404, str(error)) from error
+    return templates.TemplateResponse(request=request, name="person_created.html", context=details)
 
 
 @router.get("/persons/{person_id}/edit")
@@ -135,6 +117,7 @@ def update_person_from_form(
     birth_day: Annotated[str | None, Form()] = None,
     birth_month: Annotated[str | None, Form()] = None,
     birth_year: Annotated[str | None, Form()] = None,
+    sex: Annotated[str | None, Form()] = None,
     db: Session = Depends(get_db),
 ):
     form_data = {
@@ -150,6 +133,8 @@ def update_person_from_form(
         "birth_year": birth_year,
     }
 
+    if sex is not None:
+        form_data["sex"] = sex
     try:
         person = ServicePersonCreate.update_person(person_id, form_data, db)
     except ValueError as error:

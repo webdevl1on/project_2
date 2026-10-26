@@ -7,6 +7,7 @@ const { spawn, execFileSync } = require("node:child_process");
 const net = require("node:net");
 const path = require("node:path");
 const { chromium } = require("playwright");
+const { randomBytes } = require("node:crypto");
 
 async function main() {
     const root = path.resolve(__dirname, "../..");
@@ -25,8 +26,11 @@ async function main() {
                 `https://cdn.jsdelivr.net/npm/bootstrap@${version}/dist/${file}`]);
         }
     }
+    const adminToken = randomBytes(32).toString("base64url");
     const server = spawn(process.env.PYTHON || "python3",
-        ["-m", "tests.browser.serve_column_visibility", String(port)], { cwd: root });
+        ["-m", "tests.browser.serve_column_visibility", String(port)], {
+            cwd: root, env: { ...process.env, PROJECT2_ADMIN_TOKEN: adminToken, PROJECT2_ADMIN_ALLOW_HTTP: "1" },
+        });
     let serverOutput = "";
     server.stderr.on("data", data => { serverOutput += data; });
     let browser;
@@ -53,10 +57,10 @@ async function main() {
             const version = route.request().url().split("bootstrap@")[1].split("/")[0];
             return route.fulfill({ body: assets[`${version}/${file}`], contentType: file.endsWith(".js") ? "application/javascript" : "text/css" });
         });
-        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "history_forms"];
+        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "history_forms", "name_cases"];
         if (process.env.COLUMN_STAGE) {
             assert.ok(suites.includes(process.env.COLUMN_STAGE));
-            await require(`./${process.env.COLUMN_STAGE}.cjs`)({ context, base });
+            await require(`./${process.env.COLUMN_STAGE}.cjs`)({ context, base, adminToken });
             return;
         }
         const page = await context.newPage();
@@ -236,7 +240,7 @@ async function main() {
             assert.ok(box.x >= 0 && box.x + box.width <= 390);
             assert.deepEqual(errors, []);
         });
-        for (const suite of suites) { await context.request.post(base+"/_column-test/reset"); await require(`./${suite}.cjs`)({ context, base }); }
+        for (const suite of suites) { await context.request.post(base+"/_column-test/reset"); await require(`./${suite}.cjs`)({ context, base, adminToken }); }
     } finally {
         if (browser) await browser.close();
         server.kill();

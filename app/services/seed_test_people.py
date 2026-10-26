@@ -19,11 +19,12 @@ from app.validators.person_validator import PersonValidator
 from app.database.schema_check import require_current_schema
 from app.date_fields import DATE_FIELDS
 from app.utils.date_utils import date_values_from_input
+from app.validators.name_cases import sex
 
 
 REQUIRED_COLUMNS = (
     "surname", "name", "patronymic", "tax_number",
-    "birth_day", "birth_month", "birth_year", "rank",
+    "birth_day", "birth_month", "birth_year", "rank", "sex",
 )
 
 
@@ -120,7 +121,7 @@ def _create_row(db, data: dict) -> bool:
         if not name_data["surname"] or not name_data["name"]:
             raise ValueError("Required name")
     except ValueError as error:
-        raise ValueError("ПІБ: surname і name обов'язкові; непорожні частини — лише літери, 3–25 символів.") from error
+        raise ValueError("ПІБ: surname і name обов'язкові; дозволені літери, апостроф, дефіс і пробіли, 1–100 символів.") from error
 
     rank_key = _rank_key(data["rank"] or "")
     if not rank_key:
@@ -135,6 +136,7 @@ def _create_row(db, data: dict) -> bool:
         raise ValueError("rank: неоднозначне звання в довіднику; вкажіть унікальний code.")
     if PersonRepository.get_by_tax_number(db, tax_number) is not None:
         return False
+    person_data["sex"] = sex(data.get("sex"))
 
     person = PersonRepository.add_person(db, person_data)
     PersonRepository.add_name(db, person.person_id, name_data)

@@ -3,6 +3,7 @@ from app.database.transactions import service_transaction
 from app.models.person_identity import PersonName
 from app.services.service_person_checking import ServicePersonCheck
 from app.services.service_person_group_data_validation import DataGroupValidate
+from app.validators.name_cases import sex
 
 class ServicePersonCreate:
 
@@ -10,6 +11,7 @@ class ServicePersonCreate:
     def create_person(data, db, *, commit=True):
         with service_transaction(db, commit=commit):
             person_data = DataGroupValidate.validate_person_base_data(data)
+            person_data["sex"] = sex(data.get("sex"))
             name_data = DataGroupValidate.validate_name_data(data)
 
             if not name_data["surname"] or not name_data["name"]:
@@ -31,6 +33,8 @@ class ServicePersonCreate:
                 raise ValueError(f"Person with id {person_id} does not exist.")
 
             person_data = DataGroupValidate.validate_person_base_data(data)
+            if "sex" in data:
+                person.sex = sex(data["sex"], required=False)
             name_data = DataGroupValidate.validate_name_data(data)
             if not name_data["surname"] or not name_data["name"]:
                 raise ValueError("Surname and name required!")

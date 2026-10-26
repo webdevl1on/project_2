@@ -4,6 +4,7 @@ from app.services.service_person_name import ServicePersonNameFunc
 
 def test_create_person_without_tax_number_and_birth_date(db):
     data = {
+        "sex": "male",
         "tax_number": None,
         "birth_day": None,
         "birth_month": None,
@@ -31,6 +32,7 @@ def test_create_person_without_tax_number_and_birth_date(db):
 
 def test_create_person_with_tax_number_and_birth_date(db):
     data = {
+        "sex": "male",
         "tax_number": "0123456789",
         "birth_day": "01",
         "birth_month": "12",
@@ -59,6 +61,7 @@ def test_create_person_with_tax_number_and_birth_date(db):
 
 def test_change_person_name_creates_name_history(db):
     person_data = {
+        "sex": "male",
         "tax_number": None,
         "birth_day": None,
         "birth_month": None,
@@ -110,6 +113,7 @@ def test_change_person_name_creates_name_history(db):
 
 def test_update_person_name_updates_old_record_without_new_history(db):
     person_data = {
+        "sex": "male",
         "tax_number": None,
         "birth_day": None,
         "birth_month": None,

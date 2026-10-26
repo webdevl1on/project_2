@@ -74,12 +74,12 @@ def test_validate_names_ok():
     assert result == "Василь"
 def test_validate_names_too_long():
     with pytest.raises(ValueError):
-        PersonValidator.validate_names('a'*26)
-def test_validate_names_too_short():
-    with pytest.raises(ValueError):
-        PersonValidator.validate_names("a"*2)
-def test_validate_names_capitalize():
+        PersonValidator.validate_names('a'*101)
+def test_validate_names_supports_short_real_names():
+    assert PersonValidator.validate_names("Ян") == "Ян"
+def test_validate_names_preserves_original_case():
     result = PersonValidator.validate_names("          ваСИЛЬ         ")
+    assert result == "ваСИЛЬ"
 
 #test person passport
 def test_validate_passport_type_ok_id():

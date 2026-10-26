@@ -5,7 +5,7 @@ from app.database.db import SessionLocal
 
 
 @contextmanager
-def service_transaction(db, *, commit=True):
+def service_transaction(db, *, commit=True, immediate=False):
     """Own a complete operation, or participate in a caller-owned transaction.
 
     With commit=False the caller must commit/rollback the entire unit, including
@@ -14,7 +14,13 @@ def service_transaction(db, *, commit=True):
     """
     if commit and (db.new or db.dirty or db.deleted):
         raise ValueError("Спочатку завершіть поточні незбережені зміни.")
+    if immediate and not commit:
+        raise ValueError("Блокування запису потребує власної транзакції.")
     try:
+        if immediate:
+            db.rollback()
+            if db.get_bind().dialect.name == "sqlite":
+                db.connection().exec_driver_sql("BEGIN IMMEDIATE")
         yield db
         db.flush()
         if commit:

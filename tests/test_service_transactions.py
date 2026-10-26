@@ -31,7 +31,7 @@ def factory(tmp_path):
 
 
 def data(**changes):
-    return {"surname": "Тестовий", "name": "Тарас", "tax_number": "0123456789",
+    return {"sex": "male", "surname": "Тестовий", "name": "Тарас", "tax_number": "0123456789",
             "birth_month": 3, "birth_year": 1993, **changes}
 
 
@@ -153,12 +153,14 @@ def test_existing_person_pages_and_failed_edit_contract(factory):
     app.dependency_overrides[get_db] = override
     try:
         with TestClient(app) as client:
-            response = client.post("/persons/new", data=data(), follow_redirects=False)
-            # Preserve the existing redirect contract, including its known target.
+            with factory() as db:
+                rank_id = db.scalar(select(Rank.rank_id))
+            response = client.post("/persons/new", data=data(rank_id=rank_id), follow_redirects=False)
             assert response.status_code == 303
             with factory() as db:
                 key = db.scalar(select(Person.person_id))
-            assert response.headers["location"] == f"/persons/{key}"
+            assert response.headers["location"] == f"/persons/{key}/created"
+            assert client.get(response.headers["location"]).status_code == 200
             for url in ["/persons", f"/person_detail/{key}", f"/person_full_info/{key}", f"/persons/{key}/edit"]:
                 assert client.get(url).status_code == 200
             bad = client.post(f"/persons/{key}/edit", data=data(birth_day=31, birth_month=2))

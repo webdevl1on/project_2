@@ -16,6 +16,14 @@
     {% endif %}
     <form method="post" action="{{ form_action or '/persons/new' }}" class="row g-3">
         <div class="col-md-6">
+            <label class="form-label" for="sex">Стать</label>
+            <select class="form-select" id="sex" name="sex"><option value="">Не внесено</option>
+                <option value="male" {{ 'selected' if form_data.get('sex')=='male' else '' }}>Чоловіча</option>
+                <option value="female" {{ 'selected' if form_data.get('sex')=='female' else '' }}>Жіноча</option>
+            </select>
+            <p class="form-text">Після зміни статі або ПІБ персональні відмінки потребуватимуть повторної перевірки.</p>
+        </div>
+        <div class="col-md-6">
             <label class="form-label" for="surname">Прізвище *</label>
             <input class="form-control" id="surname" name="surname" required value="{{ form_data.get('surname', '') }}">
         </div>

@@ -5,16 +5,8 @@ class PersonValidator:
 #person name data validation
     @staticmethod
     def validate_names(name):
-        name = name.strip() if name else None
-        if name:
-            name = name.capitalize()
-            if not name.isalpha():
-                raise ValueError("Wrong letters")
-            if len(name) > 25:
-                raise ValueError("Cannot exceed 25 characters.")
-            elif len(name) < 3:
-                raise ValueError("Canot be so short")
-        return name
+        from app.validators.name_cases import word
+        return word(name, required=False)
 #person base data validation
     @staticmethod
     def validate_tax_number(number):

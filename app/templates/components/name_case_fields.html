@@ -1,0 +1,19 @@
+{% macro name_case_fields(data, parts, cases, readonly=false, errors=[]) %}
+{% for kind,label in parts.items() %}
+<section class="col-lg-4" data-name-part="{{ kind }}">
+<label class="form-label" for="{{ kind }}">{{ label }}{{ ' *' if kind!='patronymic' else '' }}</label>
+<input class="form-control {{ 'is-invalid' if kind in errors else '' }}" id="{{ kind }}" name="{{ kind }}" data-base-word
+ maxlength="100" value="{{ data.get(kind) or '' }}" {{ 'required' if kind!='patronymic' else '' }} {{ 'readonly' if readonly else '' }}>
+<input type="hidden" name="{{ kind }}_bound_base" data-bound-base value="{{ data.get(kind ~ '_bound_base', data.get(kind)) or '' }}">
+<input type="hidden" name="{{ kind }}_bound_sex" data-bound-sex value="{{ data.get(kind ~ '_bound_sex', data.get('sex')) or '' }}">
+<p class="form-text" role="status" aria-live="polite" data-case-status>Відмінки ще не перевірено.</p>
+<div data-stale-actions hidden class="alert alert-warning"><p>Форми потребують перевірки після зміни слова або статі.</p>
+<button class="btn btn-sm btn-outline-danger" type="button" data-clear-cases>Очистити старі форми</button>
+<button class="btn btn-sm btn-outline-secondary mt-1" type="button" data-keep-cases>Залишити й перевірити</button></div>
+<button type="button" class="btn btn-sm btn-outline-primary mb-2" data-use-dictionary hidden>Застосувати словник</button>
+<details {{ 'open' if errors else '' }}><summary>Інші відмінки</summary>
+{% for case,case_label in cases.items() if case!='nominative' %}<label class="form-label mt-2" for="{{ kind }}_{{ case }}">{{ case_label }}</label>
+<input class="form-control {{ 'is-invalid' if kind ~ '_' ~ case in errors else '' }}" id="{{ kind }}_{{ case }}" name="{{ kind }}_{{ case }}" data-case="{{ case }}" maxlength="100" value="{{ data.get(kind ~ '_' ~ case) or '' }}">{% endfor %}
+<div class="form-check mt-2"><input class="form-check-input" type="checkbox" name="{{ kind }}_verified" id="{{ kind }}_verified" data-case-verified {{ 'checked' if data.get(kind ~ '_verified') in [true,'on','true','1'] else '' }}><label class="form-check-label" for="{{ kind }}_verified">Форми перевірено для цього ПІБ</label></div>
+</details></section>{% endfor %}
+{% endmacro %}
