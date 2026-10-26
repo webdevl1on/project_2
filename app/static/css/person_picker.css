@@ -5,3 +5,8 @@
 .person-picker [data-person-label] { white-space: normal; }
 .person-assignment-form { flex-wrap: wrap; }
 .person-assignment-form [data-assignment-status] { width: 100%; }
+
+.staff-history-form [aria-invalid="true"] {
+    outline: 2px solid var(--bs-danger, #dc3545);
+    outline-offset: 2px;
+}

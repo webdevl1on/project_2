@@ -312,3 +312,29 @@ def test_raw_partial_dates_are_rejected_even_without_orm(store):
             store.execute(text('INSERT INTO person_events(person_id,event_type_id,date_start,date_end) VALUES (:person,:kind,:start,:end)'),{'person':people[0].person_id,'kind':kind.event_type_id,'start':start,'end':end})
             store.commit()
         store.rollback()
+
+
+def test_history_json_errors_leave_database_unchanged(store):
+    _,versions,positions,people=setup(store)
+    person=people[0].person_id;position=positions[1].position_id
+    key=Service.create_assignment(store,person,position,D(2026,6,1))
+    def isolated():yield store
+    app.dependency_overrides[get_db]=isolated
+    try:
+        with TestClient(app) as client:
+            headers={'Accept':'application/json'}
+            invalid=client.post('/staff/assignments/create',headers=headers,data={'person_id':person,'position_id':position,'assigned_from':'2026-08-01','assigned_to':'2026-07-01'})
+            assert invalid.status_code==409
+            assert invalid.json()['fields']==['assigned_to']
+            assert 'раніше' in invalid.json()['detail']
+            conflict=client.post('/staff/assignments/create',headers=headers,data={'person_id':person,'position_id':position,'assigned_from':'2026-08-01'})
+            assert conflict.status_code==409 and 'перетинаються' in conflict.json()['detail']
+            stale=client.post(f'/staff/assignments/{key}/correct',headers=headers,data={'revision':999,'person_id':person,'position_id':position,'assigned_from':'2026-08-01'})
+            assert stale.status_code==409 and 'змінився' in stale.json()['detail']
+            duplicate=client.post(f'/staff/positions/{position}/correct',headers=headers,data={'revision':store.get(Position,position).revision,'position_number':27})
+            assert duplicate.status_code==409
+            assert duplicate.json()['fields']==['position_number']
+            assert 'таким номером' in duplicate.json()['detail']
+            assert store.query(PersonAssignment).count()==1
+            assert store.get(PersonAssignment,key).assigned_from==D(2026,6,1)
+    finally:app.dependency_overrides.clear()

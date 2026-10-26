@@ -98,6 +98,27 @@ def history(request:Request,version_id:int|None=None,db:Session=Depends(get_db))
 
 
 def form_failure(request,error):
+    if 'application/json' in request.headers.get('accept',''):
+        message=str(error)
+        fields=[]
+        constraint=str(getattr(error.__cause__,'orig',''))
+        if 'UNIQUE constraint failed: positions.staff_version_id, positions.position_number' in constraint:
+            message='Посада з таким номером уже існує у цій версії штату.'
+            fields=['position_number']
+        elif 'UNIQUE constraint failed: staff_versions.staff_structure_id, staff_versions.name' in constraint:
+            message='Версія з такою назвою вже існує у цій структурі.'
+            fields=['name']
+        elif 'UNIQUE constraint failed: staff_structures.code' in constraint:
+            message='Структура з таким кодом уже існує.'
+            fields=['code']
+        elif 'Завершення не може передувати початку' in message:
+            message='Дата завершення не може бути раніше дати початку.'
+            fields=['assigned_to'] if '/assignments/' in request.url.path else ['valid_to']
+        elif 'перетинаються' in message or 'період' in message.lower():
+            fields=['assigned_from','assigned_to','position_id'] if '/assignments/' in request.url.path else ['valid_from','valid_to']
+        elif 'змінився' in message or 'блокування' in message:
+            message+=' Введені значення збережено у формі.'
+        return JSONResponse({'detail':message,'fields':fields},status_code=409)
     return templates.TemplateResponse(request=request,name='staff_error.html',context={'error':str(error)},status_code=409)
 
 
