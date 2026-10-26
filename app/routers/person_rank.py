@@ -5,7 +5,6 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.database.db import get_db
-from app.models.person_military_service import PersonRank
 from app.services.service_person_rank import ServicePersonRankFunc
 
 
@@ -45,7 +44,7 @@ def add_new_rank_to_person(
         ServicePersonRankFunc.add_rank(person_id, form_data, db)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    
+
     return RedirectResponse(
         url=f"/person_full_info/{person_id}",
         status_code=303,
@@ -80,7 +79,7 @@ def update_rank_to_person(
         person_rank = ServicePersonRankFunc.update_person_rank(person_rank_id, form_data, db)
     except ValueError as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
-    
+
     return RedirectResponse(
         url=f"/person_full_info/{person_rank.person_id}",
         status_code=303,
@@ -99,11 +98,7 @@ def delete_person_rank(
             db,
         )
     except ValueError:
-        person_rank = (
-            db.query(PersonRank)
-            .filter(PersonRank.person_rank_id == person_rank_id)
-            .first()
-        )
+        person_rank = ServicePersonRankFunc.get_record(person_rank_id, db)
         if not person_rank:
             raise ValueError ("Person rank record was not found")
         return RedirectResponse(

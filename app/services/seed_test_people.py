@@ -8,13 +8,12 @@ from zipfile import BadZipFile
 
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
-from sqlalchemy import URL, create_engine, select
+from sqlalchemy import URL, create_engine
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
 from app.config import EXCEL_PATH
-from app.models import Person, PersonRank, Rank
-from app.services.service_person_create import ServicePersonCreate
+from app.repositories.person_repository import PersonRepository
 from app.services.service_person_group_data_validation import DataGroupValidate
 from app.validators.person_validator import PersonValidator
 from app.database.schema_check import require_current_schema
@@ -127,23 +126,21 @@ def _create_row(db, data: dict) -> bool:
     if not rank_key:
         raise ValueError("rank: звання відсутнє в довіднику; потрібен code або називний відмінок.")
     matches = [
-        rank for rank in db.scalars(select(Rank))
+        rank for rank in PersonRepository.ranks(db)
         if rank_key in (_rank_key(rank.code), _rank_key(rank.nominative))
     ]
     if not matches:
         raise ValueError("rank: звання відсутнє в довіднику; потрібен code або називний відмінок.")
     if len(matches) != 1:
         raise ValueError("rank: неоднозначне звання в довіднику; вкажіть унікальний code.")
-    if db.scalar(select(Person.person_id).where(Person.tax_number == tax_number)) is not None:
+    if PersonRepository.get_by_tax_number(db, tax_number) is not None:
         return False
 
-    person = Person(**person_data)
-    db.add(person)
-    db.flush()
-    db.add(ServicePersonCreate.add_name(person.person_id, name_data, db))
+    person = PersonRepository.add_person(db, person_data)
+    PersonRepository.add_name(db, person.person_id, name_data)
     # The persons sheet has no order date: keep all of its components unknown.
     rank_date = date_values_from_input(DATE_FIELDS["rank.rank_order_date"], "rank_order", {})
-    db.add(PersonRank(person_id=person.person_id, rank_id=matches[0].rank_id, is_active=True, **rank_date))
+    PersonRepository.add_rank(db, person.person_id, dict(rank_id=matches[0].rank_id, is_active=True, **rank_date))
     db.flush()
     return True
 

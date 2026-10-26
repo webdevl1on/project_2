@@ -2,7 +2,9 @@
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
-from sqlalchemy import and_, or_
+from app.repositories.staff_repository import StaffRepository, active
+from app.repositories.person_repository import PersonRepository
+from app.validators.position_validator import POSITION_ATTRIBUTES, validate_position
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm.exc import StaleDataError
 from app.models.staff import StaffStructure, StaffVersion, PersonAssignment, exact_date
@@ -14,14 +16,9 @@ def today():
     return datetime.now(ZoneInfo("Europe/Kyiv")).date()
 
 
-def active(model, start, end, on):
-    return and_(getattr(model, start) <= on, or_(getattr(model, end).is_(None), getattr(model, end) >= on))
-
-
 def assignments_at(db, on):
-    return (db.query(PersonAssignment).join(Position).join(StaffVersion)
-            .filter(active(PersonAssignment, "assigned_from", "assigned_to", on),
-                    active(StaffVersion, "valid_from", "valid_to", on)))
+    """Compatibility query entry point; SQL construction lives in the repository."""
+    return StaffRepository.assignments_at(db, on)
 
 
 @contextmanager
@@ -57,16 +54,12 @@ def period(start, end):
 
 def version_conflict(db, structure_id, start, end, exclude=None):
     period(start, end)
-    query = db.query(StaffVersion).filter(StaffVersion.staff_structure_id == structure_id,
-        StaffVersion.valid_from <= (end or date.max), or_(StaffVersion.valid_to.is_(None), StaffVersion.valid_to >= start))
-    if exclude is not None:
-        query = query.filter(StaffVersion.id != exclude)
-    if query.first():
+    if StaffRepository.overlapping_version(db, structure_id, start, end or date.max, exclude):
         raise ValueError("Період конфліктує з іншою версією. Явно закрийте попередню версію перед імпортом.")
 
 
 def checked(db, model, key, revision=None):
-    record = db.get(model, key)
+    record = PersonRepository.get_by_id(db, key) if model is Person else StaffRepository.get(db, model, key)
     if record is None:
         raise ValueError("Запис не існує.")
     if revision is not None and record.revision != revision:
@@ -76,12 +69,22 @@ def checked(db, model, key, revision=None):
 
 class StaffService:
     @staticmethod
+    def create_structure(db, code, name):
+        if not code.strip() or not name.strip():
+            raise ValueError('Вкажіть код і назву структури.')
+        with write_unit(db):
+            record = StaffRepository.add(db, StaffStructure(code=code.strip(), name=name.strip()))
+            db.flush()
+            key = record.id
+        return key
+
+    @staticmethod
     def create_assignment(db, person_id, position_id, start, end=None):
         period(start, end)
         with write_unit(db):
             checked(db, Person, person_id); checked(db, Position, position_id)
             record = PersonAssignment(person_id=person_id, staff_position_id=position_id, assigned_from=start, assigned_to=end)
-            db.add(record); db.flush()
+            StaffRepository.add(db, record); db.flush()
             key = record.id
         return key
 
@@ -98,7 +101,6 @@ class StaffService:
 
     @staticmethod
     def correct_position(db, key, revision, values):
-        from app.services.staff_import import validate_position
         with write_unit(db):
             record=checked(db, Position, key, revision)
             current={name: getattr(record,name) for name in POSITION_ATTRIBUTES}
@@ -118,7 +120,7 @@ class StaffService:
             period(version.valid_from,end)
             if version.valid_to is not None and end > version.valid_to:
                 raise ValueError("Закриття не подовжує період; для виправлення використайте редагування версії.")
-            records=(db.query(PersonAssignment).join(Position).filter(Position.staff_version_id==key).all())
+            records=StaffRepository.assignments_for_version(db, key)
             if any(record.assigned_from>end for record in records):
                 raise ValueError("Є призначення після обраного завершення. Спочатку виправте їхні періоди.")
             for record in records:
@@ -145,8 +147,8 @@ class StaffService:
         version=checked(db,StaffVersion,target.staff_version_id)
         if on<version.valid_from or (version.valid_to and on>version.valid_to):
             raise ValueError("Обрана дата не належить періоду цієї версії.")
-        source=assignments_at(db,on).filter(PersonAssignment.person_id==person_id).one_or_none() if person_id else None
-        occupied=assignments_at(db,on).filter(PersonAssignment.staff_position_id==position_id).one_or_none()
+        source=StaffRepository.person_assignment_at(db, person_id, on) if person_id else None
+        occupied=StaffRepository.position_assignment_at(db, position_id, on)
         if person_id: checked(db,Person,person_id)
         if occupied and occupied.person_id!=person_id and person_id is not None:
             raise ValueError("Цільова посада зайнята. Її не буде звільнено автоматично.")
@@ -167,7 +169,7 @@ class StaffService:
             if snapshot["source"] and snapshot["target"]==snapshot["source"]:
                 return "Військовослужбовець уже призначений на цю посаду."
             old_id=(snapshot["source"] or snapshot["target"] or [None])[0]
-            old=db.get(PersonAssignment,old_id) if old_id else None
+            old=StaffRepository.get(db, PersonAssignment, old_id) if old_id else None
             if old:
                 if not confirmed:
                     raise ValueError("Перепризначення потребує підтвердження.")
@@ -178,11 +180,7 @@ class StaffService:
             if person_id is not None:
                 position=checked(db,Position,position_id)
                 version=checked(db,StaffVersion,position.staff_version_id)
-                db.add(PersonAssignment(person_id=person_id,staff_position_id=position_id,
+                StaffRepository.add(db, PersonAssignment(person_id=person_id,staff_position_id=position_id,
                                         assigned_from=on,assigned_to=version.valid_to))
                 db.flush()
         return "Призначення збережено; історію попередньої посади збережено." if person_id else "Призначення завершено."
-
-
-POSITION_ATTRIBUTES=("position_number","code","unit_short","name_short","name_nominative","name_genitive","name_dative",
-                     "name_accusative","name_instrumental","name_locative","name_vocative")

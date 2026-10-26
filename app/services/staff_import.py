@@ -2,18 +2,11 @@
 from datetime import date
 from openpyxl import load_workbook
 from zipfile import ZipFile, BadZipFile
-from app.validators.position_validator import PositionValidator
+from app.validators.position_validator import POSITION_ATTRIBUTES, validate_position
+from app.repositories.staff_repository import StaffRepository
 from app.models.staff import StaffStructure, StaffVersion
 from app.models.reference_book import Position
-from app.services.staff_service import POSITION_ATTRIBUTES, period, version_conflict, write_unit, checked
-
-
-def validate_position(row):
-    result={"position_number":PositionValidator.validate_position_number(row["position_number"])}
-    for key in POSITION_ATTRIBUTES[1:]:
-        result[key]=PositionValidator.validate_required_text(str(row.get(key) or ""))
-    result["code"]=result["code"].upper()
-    return result
+from app.services.staff_service import period, version_conflict, write_unit, checked
 
 
 def read_positions(source):
@@ -74,20 +67,20 @@ def import_version(db, prepared, import_key):
 
 def insert_prepared(db, prepared, import_key):
     start=date.fromisoformat(prepared["start"]);end=date.fromisoformat(prepared["end"]) if prepared["end"] else None
-    if db.query(StaffVersion).filter_by(import_key=import_key).first():
+    if StaffRepository.version_by_import_key(db, import_key):
         raise ValueError("Це завантаження вже підтверджено.")
     structure_id=prepared["structure_id"]
     if structure_id is None:
-        structure=db.query(StaffStructure).filter_by(code="main").one_or_none()
+        structure=StaffRepository.structure_by_code(db, "main")
         if structure is None:
-            structure=StaffStructure(code="main",name="Основний штат");db.add(structure);db.flush()
+            structure=StaffStructure(code="main",name="Основний штат");StaffRepository.add(db, structure);db.flush()
         structure_id=structure.id
     checked(db,StaffStructure,structure_id)
     version_conflict(db,structure_id,start,end)
-    if db.query(StaffVersion).filter_by(staff_structure_id=structure_id,name=prepared["name"]).first():
+    if StaffRepository.version_by_name(db, structure_id, prepared["name"]):
         raise ValueError("Версія з такою назвою вже існує.")
     version=StaffVersion(staff_structure_id=structure_id,name=prepared["name"],valid_from=start,valid_to=end,import_key=import_key)
-    db.add(version);db.flush()
-    for row in prepared["positions"]: db.add(Position(staff_version_id=version.id,**validate_position(row)))
+    StaffRepository.add(db, version);db.flush()
+    for row in prepared["positions"]: StaffRepository.add(db, Position(staff_version_id=version.id,**validate_position(row)))
     db.flush(); key=version.id
     return key

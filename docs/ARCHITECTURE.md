@@ -8,17 +8,17 @@
 
 | Завдання | Основні файли |
 | --- | --- |
-| Список, створення, базове редагування людини | `app/routers/persons.py`, `app/services/service_person_create.py`, `app/templates/persons.html`, `app/templates/person_form.html` |
+| Список, створення, базове редагування людини | `app/routers/persons.py`, `app/services/person_read.py`, `app/services/service_person_create.py`, `app/repositories/person_repository.py`, `app/templates/persons.html`, `app/templates/person_form.html` |
 | Предметні дати, фільтри та системний час | `app/date_fields.py`, `app/utils/date_utils.py`, `app/utils/date_query.py`, `app/templates/components/date_*.html`, `app/static/js/date_*.js`, `docs/DATE_SYSTEM.md`, `tests/test_date_system.py` |
 | Історія ПІБ | `app/routers/person_name.py`, `app/services/service_person_name.py`, `app/models/person_identity.py`, `app/templates/person/components/names_history.html` |
 | Історія звань | `app/routers/person_rank.py`, `app/services/service_person_rank.py`, `app/models/person_military_service.py`, `app/templates/person/components/rank_history.html` |
-| Версії штатів, історія, імпорт Excel | `docs/STAFF_HISTORY.md`, `app/models/staff.py`, `app/services/staff_*.py`, `app/services/person_picker.py`, `app/services/assignment_events.py`, `app/routers/staff.py`, `app/templates/staff_*.html` |
-| Посади, призначення, фільтри | `app/routers/person_positions.py`, `app/services/service_person_positions.py`, `app/models/person_positions.py`, `app/templates/person_positions.html`, `tests/test_person_positions.py` |
+| Версії штатів, історія, імпорт Excel | `docs/STAFF_HISTORY.md`, `app/models/staff.py`, `app/services/staff_*.py`, `app/repositories/staff_repository.py`, `app/services/person_picker.py`, `app/services/assignment_events.py`, `app/routers/staff.py`, `app/templates/staff_*.html` |
+| Посади, призначення, фільтри | `app/routers/person_positions.py`, `app/services/service_person_positions.py`, `app/repositories/position_table_repository.py`, `app/models/person_positions.py`, `app/templates/person_positions.html`, `tests/test_person_positions.py` |
 | Каталог полів, видимість колонок, Checkbox Tree | `app/table_fields.py`, `docs/TABLE_FIELDS.md`, `app/table_columns.py`, `app/templates/components/column_visibility.html`, `app/static/js/column_*.js`, `app/static/js/table_*.js`, `app/static/css/column_visibility.css`, `tests/test_table_columns.py`, `tests/js/`, `tests/browser/` |
-| Події | `app/services/service_for_person_event.py`, `app/services/service_common_event_func.py`, `app/models/person_event.py`, `app/validators/event_validatotor.py` |
+| Події | `app/services/service_for_person_event.py`, `app/services/service_common_event_func.py`, `app/repositories/event_repository.py`, `app/models/person_event.py`, `app/validators/event_validatotor.py` |
 | Довідники та початкові дані | `app/models/reference_book.py`, `app/seeds/seed_structure.py`, `app/seeds/seed_reference.py`, `app/config.py`, `reference_data.xlsx` |
 | Окреме засівання тестових людей | `app/services/seed_test_people.py`, аркуш `persons` у `reference_data.xlsx`, `tests/test_seed_test_people.py` |
-| Підключення застосунку, БД, тестів | `app/main.py`, `app/database/`, `requirements.txt`, `tests/conftest.py` |
+| Підключення застосунку, БД, тестів | `app/main.py`, `app/templating.py`, `app/database/`, `requirements.txt`, `tests/conftest.py` |
 
 ## Компоненти та потік запиту
 
@@ -29,23 +29,47 @@ flowchart LR
     Browser[Браузер: HTML-форми] --> Routers[FastAPI: app/routers]
     Routers --> Services[app/services]
     Services --> Validators[app/validators та app/utils/date_utils]
-    Routers --> ORM[SQLAlchemy-моделі та Session]
-    Services --> ORM
+    Services --> Repositories[app/repositories]
+    Repositories --> ORM[SQLAlchemy-моделі та Session]
     ORM --> SQLite[(SQLite)]
     Routers --> Templates[Jinja2: app/templates]
     Templates --> Browser
 ```
 
-GET-маршрути зазвичай самі виконують ORM-запити й передають об'єкти в шаблони. POST-маршрути приймають `Form`, викликають сервіси та переважно повертають перенаправлення `303`. Це не суворо відокремлена архітектура з обов'язковим шаром репозиторіїв: `PersonRepository` існує, але активні роутери та сервіси його не використовують.
+Маршрути обробляють HTTP-параметри, відповіді й вибір шаблону; предметних ORM-запитів у п’яти активних роутерах немає. Сервіси виконують валідацію та кадрові операції, репозиторії будують SQLAlchemy-запити й додають/видаляють записи. Сервіси читання повертають записи та словники, без HTML. Спільний `app/templating.py` налаштовує Jinja2 та форматування дат; роутери більше не імпортують один одного заради templates. Окремих базових Repository/Service або DTO для кожного простого CRUD не введено.
 
 ## База даних і життєвий цикл сесій
 
 - [app/database/base.py](../app/database/base.py) містить спільний `Base`; [app/models/__init__.py](../app/models/__init__.py) реєструє моделі для `Base.metadata`.
-- [app/database/db.py](../app/database/db.py): SQLite `data/database/project2.db`, `engine`, `SessionLocal`, залежність FastAPI `get_db()`. Вона відкриває сесію на запит і закриває її у `finally`.
+- [app/database/db.py](../app/database/db.py): SQLite `data/database/project2.db`, `engine`, `SessionLocal`, залежність FastAPI `get_db()`. Вона відкриває сесію на запит і закриває її у `finally`, без автоматичного commit.
 - `app/database/db_test.py`: окремі `engine_test`, `SessionLocal_test`, `get_test_db()` для `data/database/project2_test.db`.
 - Обидва шляхи БД відносні до робочого каталогу. Шаблони також шукаються відносно нього: `app/templates`.
-- `app/database/init_db.py` та `init_test_db.py` імпортують реєстр моделей і викликають `create_all`. CLI `init_db` створює лише новий файл; пересоздання вимагає `--recreate` з явним `--database`. `schema_check.py` перед засіванням лише перевіряє поточні таблиці/колонки, SQLite-тригери та відсутність застарілої фізичної person_positions. Механізму версійних міграцій немає: на етапі розробки погоджено ручне пересоздання тестових даних, а не автоматичне оновлення існуючої БД.
-- Активні сервіси персон, ПІБ, звань і посад отримують `db` від виклику та самі виконують `commit`. StaffService використовує write_unit, BEGIN IMMEDIATE та rollback; єдиного транзакційного обгортання всіх сервісів немає. Сервіс подій відкриває власні сесії.
+- `app/database/init_db.py` та `init_test_db.py` імпортують реєстр моделей і викликають `create_all`. CLI `init_db` створює лише новий файл; пересоздання вимагає `--recreate` з явним `--database`. `schema_check.py` перед засіванням лише перевіряє поточні таблиці/колонки, SQLite-тригери та відсутність застарілої фізичної person_positions. Автоматичних міграцій немає.
+
+### Єдині правила транзакцій
+
+Життєвий цикл Session і володіння бізнес-транзакцією — різні відповідальності. Репозиторії не відкривають/закривають сесії й не викликають commit/rollback. `flush()` допускається для отримання ID; у кадрових сервісах він також забезпечує правильну послідовність перевірок тригерів.
+
+| Операція | Власник транзакції |
+| --- | --- |
+| Створення/редагування людини, ПІБ, звання | `service_transaction(db)` у `app/database/transactions.py`: одна сервісна операція, flush + commit, rollback при помилці валідації/збереження. Сесію закриває її постачальник. |
+| Спільна операція осіб/подій | Зовнішній виклик, наприклад `with factory.begin() as db`. Для сервісів особи/ПІБ/звань передати `commit=False`, для подій — `db=db`. Вони можуть flush, але не commit/rollback/close. Після будь-якої помилки зовнішній власник має відкотити всю операцію; помилку не можна приховувати й потім commit частину змін. |
+| Штатні записи, перепризначення, закриття та HTTP-імпорт | Чинний `staff_service.write_unit`: відмова за pending-змін виклику, звільнення старої read-only транзакції, SQLite `BEGIN IMMEDIATE`, повторне читання/перевірка revision, один commit або повний rollback. Його не вкладати у сторонню write-транзакцію. |
+| Окремий виклик сервісу подій | `session_scope` у `app/database/transactions.py`: сумісний виклик без db використовує SessionLocal або явний session_factory, сам завершує транзакцію та закриває сесію. Повернені ORM-поля залишаються завантаженими. Читання не робить commit. |
+| Засівання довідників / тестових людей | Довідники: одна CLI-операція з commit у seed_all_structure і rollback у CLI. Люди: окрема зовнішня `session_factory.begin()` на рядок. insert_prepared не робить commit, бо використовується й усередині seed-транзакції. |
+
+Стандартні операції осіб відмовляють за незбережених `new/dirty/deleted`, щоб не зберегти сторонні pending-зміни. Це не механізм виявлення всіх уже flush-нутих сторонніх записів: для будь-якої спільної write-транзакції обов’язкові `commit=False`/`db=db`. Самостійний режим не слід змішувати зі сторонніми записами в тій самій Session. Старі positional-аргументи сервісів та session_factory подій збережено; при одночасному db і session_factory повертається ValueError.
+
+### Репозиторії й читання
+
+| Модуль у app/repositories | Відповідальність |
+| --- | --- |
+| `person_repository.py` | Person, поточні/історичні ПІБ і звання, довідник Rank, список людей, bulk-запит person picker. `history_selection` спільний із таблицею посад. |
+| `staff_repository.py` | Структури, версії, посади, призначення, вибірки на дату/період і пошук перетинів. Рішення про допустимість/виправлення/закриття залишаються у StaffService; чинні обмеження ORM/SQLite не змінені. |
+| `position_table_repository.py` | Join таблиці посад, allowlist ORM-полів, SQL фільтрів/дат/зайнятості та однорівневе сортування. Не виконує кадрових записів. |
+| `event_repository.py` | Події, типи/підтипи, вибірки/конфлікти та add/delete. Перевірка людини, підтипу й календаря та обчислення тривалості — у сервісах. Чинні строгі межі finite-overlap сервісу подій збережено; їх не прирівняно до включних меж штатних періодів. |
+
+`person_read.py` готує дані списку/карток; `staff_read.py` — версії та дату перегляду, історію й дані підтвердження. `service_person_positions.py` координує читання та обчислює значення/попередження/варіанти фільтрів; SQL виконує PositionTableRepository. ORM-записи залишаються доступними Jinja2, включно з наявними lazy-колекціями картки людини; повне переведення шаблонів на DTO не виконувалося.
 
 ## Моделі та зв'язки
 
@@ -78,11 +102,11 @@ GET-маршрути зазвичай самі виконують ORM-запит
 | `service_person_group_data_validation.py` / `DataGroupValidate` | Нормалізує базові дані та ПІБ через `PersonValidator` і `validate_date_components`. |
 | `service_person_name.py` / `ServicePersonNameFunc` | Додавання нового ПІБ деактивує поточний; редагування працює з конкретним записом, зокрема частковими даними. Є перемикання активного запису та видалення неактивного з підтвердженням `DELETE`. |
 | `service_person_rank.py` / `ServicePersonRankFunc` | Звання обирається з `Rank`. Перше стає активним, наступне додається неактивним; активність перемикається окремо. Додавання перевіряє повтор того самого звання в історії. Є редагування та видалення неактивного запису з `DELETE`. |
-| `service_person_positions.py` / `ServicePersonPositionFunc` | Вибірка за версією/датою, каскадні фільтри, сортування; кадрові записи делеговано StaffService. |
+| `service_person_positions.py` / `ServicePersonPositionFunc` | Координація PositionTableRepository, значення/попередження рядків і варіанти фільтрів; кадрові записи делеговано StaffService. |
 | `service_common_event_func.py` / `CommonEventFunc` | Пошук подій, типів і підтипів; перевірка належності підтипу до типу. Читання подій за person_id, незалежно від посад. |
 | `service_for_person_event.py` / `PersonEventService` | Підготовка, створення, зміна, видалення події, пошук за датами та конфліктами. У вебмаршрутах не використовується; підтримує backdated створення/редагування точних дат; історичні посади читає assignment_events.py. |
-| `service_common_person_func.py` / `CommonPersonFunc` | Застарілий шлях загального оновлення та фабрика `add_pasport`; містить посилання на відсутні API. Активне редагування використовує `ServicePersonCreate`. |
-| `check_events.py`, `check_person_events.py` | Діагностичні скрипти читання БД, які виконують запити при імпорті. |
+| `service_common_person_func.py` / `CommonPersonFunc` | Перевірена фабрика `add_pasport` без запису в БД. Невикористаний зламаний update_person видалено після пошуку викликів. |
+| `check_events.py`, `check_person_events.py` | Явні CLI-діагностики через session_scope/EventRepository; імпорт більше не відкриває БД. |
 
 ### Валідація й дати
 
@@ -108,7 +132,7 @@ GET-маршрути зазвичай самі виконують ORM-запит
 
 Базова вибірка починається з Position конкретної StaffVersion, додає PersonAssignment на вибрану as_of дату й людину та через агреговані підзапити обирає ПІБ, звання, паспорт і службу. Погоджене правило: єдиний запис загалом → він, інакше єдиний активний → він; кілька записів без єдиного активного → порожні поля й попередження. Кожен підзапит повертає максимум один ID на людину; outerjoin не множить посади та зберігає вакансії. Звання з довідника й реквізити наказу належать одному вибраному PersonRank. Список людей для призначення використовує той самий вибір ПІБ/звання та обчислений статус на дату.
 
-`app/table_fields.py` явно прив’язує 54 поля до довірених ORM-джерел, їхніх типів, форматування й SQL-виразів; `app/table_columns.py` вибирає поля поточної таблиці. Сервіс формує allowlist: 40 скалярних фільтрів, шість DateBinding та сортування всіх 54 полів. Вісім точних системних DateTime доступні лише для сортування. ПІБ має узгоджене SQL-вираження; числа й дати не сортуються як відформатований текст. Повний перелік моделей, джерел, nullable, історичності й обмежень — у [TABLE_FIELDS.md](TABLE_FIELDS.md).
+`app/table_fields.py` явно прив’язує 54 поля до довірених ORM-джерел, їхніх типів, форматування й SQL-виразів; `app/table_columns.py` вибирає поля поточної таблиці. PositionTableRepository формує allowlist: 40 скалярних фільтрів, шість DateBinding та сортування всіх 54 полів. Вісім точних системних DateTime доступні лише для сортування. ПІБ має узгоджене SQL-вираження; числа й дати не сортуються як відформатований текст. Повний перелік моделей, джерел, nullable, історичності й обмежень — у [TABLE_FIELDS.md](TABLE_FIELDS.md).
 
 Варіанти фільтра колонки враховують решту фільтрів та зайнятість, виключаючи власний фільтр. Для неактивних колонок вони виводяться з уже отриманих рядків, для кожного активного фільтра потрібен один додатковий SQL-запит. Кількість запитів незалежна від кількості людей/колонок: 1 + число активних колонкових фільтрів для результату/варіантів та один запит для людей. Значення готуються в `row["values"]`; предметного словника чи логіки вибору запису в HTML немає.
 
@@ -201,7 +225,7 @@ ClipboardItem/write використовується для HTML, writeText — 
 | `person_positions.py` | `GET /person-positions` | Сервіс посад + список людей → `person_positions.html`. |
 | `person_positions.py` | `POST /person-positions/assign` | Призначення / звільнення; `return_query` відновлює фільтри й сортування після `303`. |
 
-`app/routers/person_service.py` містить лише імпорти, без `router`; його підключення закоментоване. Роутерів для подій, паспортів, `/search` чи видалення цілої людини немає.
+`app/routers/person_service.py` містить лише імпорти, без `router`; app/main.py його більше не імпортує. Роутерів для подій, паспортів, `/search` чи видалення цілої людини немає.
 
 ## Шаблони та взаємодія
 
@@ -229,7 +253,7 @@ ClipboardItem/write використовується для HTML, writeText — 
 
 `app/services/seed_test_people.py` — незалежний від `seed_all_structure` імпортер аркуша `persons`. `seed_test_people(session_factory, excel_path)` перевіряє заголовки до відкриття сесій, читає через openpyxl всі заповнені рядки починаючи з другого й повертає `SeedReport` з лічильниками та `RowIssue` з номерами помилкових рядків. Назви обов'язкових колонок визначені в `REQUIRED_COLUMNS`; зайві колонки ігноруються. Команда й обмеження даних описані в [CURRENT_STATE.md](CURRENT_STATE.md#засівання-тестових-військовослужбовців).
 
-Імпортер використовує `PersonValidator`, `DataGroupValidate` і фабрику `ServicePersonCreate.add_name`. Повні та неповні дати проходять чинний `validate_date_components` і зберігаються в трьох полях `Person`; окремого запису персональних даних немає. Звання зіставляється тільки з існуючим `Rank.code` або `Rank.nominative` без урахування регістру й зайвих пробілів. Для нового РНОКПП створюються `Person`, активний `PersonName` та активний `PersonRank` в **одній транзакції рядка**. Сервіси `create_person` / `add_rank` із власними `commit` тут не викликаються; інші рядки можуть успішно зберегтися після відкату некоректного. Повторний РНОКПП пропускається без оновлення даних. Команда спершу перевіряє поточну схему й не створює схеми, звань, паспортів, призначень або історії служби. Аркуш persons не має дати наказу; усі її компоненти в новому `PersonRank` залишаються NULL. Повторний імпорт не очищає внесені компоненти існуючих записів.
+Імпортер використовує `PersonValidator`, `DataGroupValidate` та PersonRepository для запису вже перевірених даних. Повні та неповні дати проходять чинний `validate_date_components` і зберігаються в трьох полях `Person`; окремого запису персональних даних немає. Звання зіставляється тільки з існуючим `Rank.code` або `Rank.nominative` без урахування регістру й зайвих пробілів. Для нового РНОКПП створюються `Person`, активний `PersonName` та активний `PersonRank` в **одній транзакції рядка**. Самостійний commit сервісів `create_person` / `add_rank` тут не використовується; інші рядки можуть успішно зберегтися після відкату некоректного. Повторний РНОКПП пропускається без оновлення даних. Команда спершу перевіряє поточну схему й не створює схеми, звань, паспортів, призначень або історії служби. Аркуш persons не має дати наказу; усі її компоненти в новому `PersonRank` залишаються NULL. Повторний імпорт не очищає внесені компоненти існуючих записів.
 
 `reset.py` видаляє робочу БД та створює/заповнює її заново; `reset_test_db.py` аналогічно працює з тестовою. Кореневий `test_seed_positions.py` оновлює **робочу** БД при виконанні/імпорті. `test1.py` і `test2.py` — окремі утиліти звіряння Excel з папками/документами з жорстко заданими Windows-шляхами.
 

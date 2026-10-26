@@ -14,7 +14,7 @@ class PositionValidator:
             raise ValueError("Position number must be greater than 0")
 
         return num
-    
+
     @staticmethod
     def validate_required_text(value):
         value = value.strip().lower() if value else ""
@@ -29,3 +29,16 @@ class PositionValidator:
         value = value.strip().lower() if value else None
 
         return value
+
+POSITION_ATTRIBUTES = ("position_number", "code", "unit_short", "name_short", "name_nominative",
+                       "name_genitive", "name_dative", "name_accusative", "name_instrumental",
+                       "name_locative", "name_vocative")
+
+
+def validate_position(row):
+    """The existing worksheet and historical-position correction share rules."""
+    result = {"position_number": PositionValidator.validate_position_number(row["position_number"])}
+    for key in POSITION_ATTRIBUTES[1:]:
+        result[key] = PositionValidator.validate_required_text(str(row.get(key) or ""))
+    result["code"] = result["code"].upper()
+    return result

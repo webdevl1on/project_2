@@ -1,21 +1,14 @@
 """Read event history independently from current staffing. Does not alter events."""
 from datetime import date
-from sqlalchemy import or_
-from app.models import PersonEvent, PersonAssignment, Position, StaffVersion
-from app.services.staff_service import assignments_at
+from app.repositories.staff_repository import StaffRepository
+from app.repositories.event_repository import EventRepository
 
 
 def event_positions(db,event,window_end=None):
     if window_end is not None and window_end<event.date_start:
         raise ValueError("Кінець перегляду передує події.")
     end=min(event.date_end,window_end) if event.date_end and window_end else (event.date_end or window_end)
-    query=(db.query(PersonAssignment,Position,StaffVersion).select_from(PersonAssignment)
-           .join(Position,Position.position_id==PersonAssignment.staff_position_id)
-           .join(StaffVersion,StaffVersion.id==Position.staff_version_id)
-           .filter(PersonAssignment.person_id==event.person_id,
-                   or_(PersonAssignment.assigned_to.is_(None),PersonAssignment.assigned_to>=event.date_start)))
-    if end: query=query.filter(PersonAssignment.assigned_from<=end)
-    records=query.order_by(PersonAssignment.assigned_from).all()
+    records=StaffRepository.assignment_period_rows(db,event.person_id,event.date_start,end)
     segments=[];gaps=[];cursor=event.date_start
     from datetime import timedelta
     for assignment,position,version in records:
@@ -34,13 +27,9 @@ def event_positions(db,event,window_end=None):
 def events_for_people(db,person_ids,start,end):
     from app.services.staff_service import period
     period(start,end)
-    query=db.query(PersonEvent).filter(PersonEvent.person_id.in_(person_ids),
-               or_(PersonEvent.date_end.is_(None),PersonEvent.date_end>=start))
-    if end:query=query.filter(PersonEvent.date_start<=end)
-    return query.order_by(PersonEvent.date_start,PersonEvent.event_id).all()
+    return EventRepository.for_people(db,person_ids,start,end)
 
 
 def events_for_staff(db,version_id,on,start,end):
-    people=[assignment.person_id for assignment in assignments_at(db,on)
-            .filter(StaffVersion.id==version_id)]
+    people=StaffRepository.person_ids_at_version(db,version_id,on)
     return events_for_people(db,people,start,end)

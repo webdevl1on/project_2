@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -6,7 +5,6 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.database.db import get_db
-from app.models.person_identity import PersonName
 from app.services.service_person_name import ServicePersonNameFunc
 
 router = APIRouter(
@@ -36,7 +34,7 @@ def add_new_name_to_person(
         "patronymic_latin": patronymic_latin,
     }
     ServicePersonNameFunc.add_new_name(person_id, form_data, db)
-    
+
     return RedirectResponse(
         url=f"/person_full_info/{person_id}",
         status_code=303,
@@ -64,7 +62,7 @@ def update_name_to_person(
     }
 
     person_name = ServicePersonNameFunc.update_person_name(person_name_id, form_data, db)
-    
+
     return RedirectResponse(
         url=f"/person_full_info/{person_name.person_id}",
         status_code=303,
@@ -95,11 +93,7 @@ def delete_person_name(
             db,
         )
     except ValueError:
-        person_name = (
-            db.query(PersonName)
-            .filter(PersonName.person_name_id == person_name_id)
-            .first()
-        )
+        person_name = ServicePersonNameFunc.get_record(person_name_id, db)
         if not person_name:
             raise ValueError ("Person name recod was not found")
         return RedirectResponse(

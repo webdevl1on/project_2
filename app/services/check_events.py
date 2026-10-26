@@ -1,17 +1,21 @@
-from app.database.db import SessionLocal
-from app.models.event_type import EventType
+"""Explicit read-only diagnostic command; importing performs no database IO."""
+from app.database.transactions import session_scope
+from app.repositories.event_repository import EventRepository
 
-db = SessionLocal()
 
-rows = db.query(EventType).all()
+def main():
+    with session_scope() as db:
+        rows = EventRepository.types(db)
 
-print("COUNT =", len(rows))
+        print("COUNT =", len(rows))
 
-for row in rows:
-    print(
-        row.event_type_id,
-        row.event_type,
-        row.event_name
-    )
+        for row in rows:
+            print(
+                row.event_type_id,
+                row.event_type,
+                row.event_name
+            )
 
-db.close()
+
+if __name__ == "__main__":
+    main()

@@ -1,25 +1,12 @@
 """Bulk person lookup and display formatting, independent of a particular form."""
 from collections import Counter
-from sqlalchemy import and_
-from app.models import Person, PersonName, PersonRank, Rank, Position, StaffVersion, PersonAssignment
-from app.services.staff_service import active
+from app.repositories.person_repository import PersonRepository
 from app.utils.date_utils import format_partial_date
 
 
 def person_options(db, on):
-    from app.services.service_person_positions import history_selection
-    names=history_selection(PersonName); ranks=history_selection(PersonRank)
-    query=(db.query(Person,PersonName,Rank,PersonAssignment,Position)
-           .outerjoin(names,names.c.person_id==Person.person_id)
-           .outerjoin(PersonName,PersonName.person_name_id==names.c.chosen_id)
-           .outerjoin(ranks,ranks.c.person_id==Person.person_id)
-           .outerjoin(PersonRank,PersonRank.person_rank_id==ranks.c.chosen_id)
-           .outerjoin(Rank,Rank.rank_id==PersonRank.rank_id)
-           .outerjoin(PersonAssignment,and_(PersonAssignment.person_id==Person.person_id,
-                       active(PersonAssignment,"assigned_from","assigned_to",on)))
-           .outerjoin(Position,Position.position_id==PersonAssignment.staff_position_id))
     result=[]
-    for person,name,rank,assignment,position in query.all():
+    for person,name,rank,assignment,position in PersonRepository.picker_rows(db, on):
         label=" ".join(value for value in (name.surname,name.name,name.patronymic) if value) if name else "Без ПІБ"
         birth=format_partial_date(person.birth_day,person.birth_month,person.birth_year)
         result.append({"person":person,"name":name,"id":person.person_id,"label":label,

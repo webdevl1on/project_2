@@ -1,26 +1,14 @@
 from typing import Annotated
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
-from fastapi.templating import Jinja2Templates
-from sqlalchemy import and_
 from sqlalchemy.orm import Session
 from app.database.db import get_db
-from app.models.person import Person
-from app.models.person_identity import PersonName
-from app.models.person_military_service import PersonRank
-from app.models.reference_book import Rank
 from app.services.service_person_create import ServicePersonCreate
-from app.services.service_person_checking import ServicePersonCheck
-from app.utils.date_utils import register_date_globals
-from app.date_fields import BIRTH_DATE, DATE_FIELDS
-from app.utils.date_query import DateBinding
+from app.services.person_read import list_people, person_details
+from app.templating import templates
 
 
 router = APIRouter()
-templates = Jinja2Templates(directory="app/templates")
-register_date_globals(templates.env)
-templates.env.globals["birth_date_field"] = BIRTH_DATE.metadata()
-templates.env.globals["rank_order_date_field"] = DATE_FIELDS["rank.rank_order_date"].metadata()
 
 
 def format_form_date(value):
@@ -30,55 +18,11 @@ def format_form_date(value):
 
 #головна таблиця
 @router.get("/persons")
-def get_persons_page(request: Request, 
+def get_persons_page(request: Request,
                      sort_by: str = "surname",
                      direction: str = "asc",
                      db: Session = Depends(get_db)):
-    sort_columns = {
-            "id": Person.person_id,
-            "surname": PersonName.surname,
-            "name": PersonName.name,
-            "birth_year": Person.birth_year,
-            "tax_number": Person.tax_number,
-            "rank": Rank.nominative,
-        }
-
-    sort_column = sort_columns.get(sort_by, PersonName.surname)
-
-    if direction == "desc":
-        order = sort_column.desc()
-    else:
-        order = sort_column.asc()
-    # Keep the existing URL key while sorting the whole domain date correctly.
-    orders = DateBinding(BIRTH_DATE, Person.birth_day, Person.birth_month, Person.birth_year).order_by(direction=direction) if sort_by == "birth_year" else [order]
-
-    records = (
-        db.query(Person, PersonName, PersonRank)
-        .outerjoin(
-            PersonName,
-            and_(
-                PersonName.person_id == Person.person_id,
-                PersonName.is_active.is_(True),
-            ),
-        )
-        .outerjoin(
-            PersonRank,
-            and_(
-                PersonRank.person_id == Person.person_id,
-                PersonRank.is_active.is_(True),
-            ),
-        )
-        .outerjoin(Rank, PersonRank.rank_id == Rank.rank_id)
-        .order_by(*orders, Person.person_id)
-        .all()
-    )
-    persons = [
-        {"person": person, 
-         "name" : name,
-         "rank" : rank,
-         }
-        for person, name, rank in records
-    ]
+    persons = list_people(db, sort_by, direction)
 
     return templates.TemplateResponse(
         request=request,
@@ -165,15 +109,8 @@ def create_person_from_form(
 
 @router.get("/persons/{person_id}/edit")
 def get_edit_person_page(person_id: int, request: Request, db: Session = Depends(get_db)):
-    person = ServicePersonCheck.get_person_or_raise(person_id, db)
-    current_name = (
-        db.query(PersonName)
-        .filter(
-            PersonName.person_id == person_id,
-            PersonName.is_active.is_(True),
-        )
-        .first()
-    )
+    details = person_details(db, person_id)
+    person, current_name = details["person"], details["current_name"]
     return templates.TemplateResponse(
         request=request,
         name="person_form.html",
@@ -235,77 +172,31 @@ def update_person_from_form(
 #Коротка інформація про людину
 @router.get("/person_detail/{person_id}")
 def get_person_page(person_id: int, request: Request, db: Session = Depends(get_db)):
-    person = db.query(Person).filter(Person.person_id == person_id).first()
-    if not person:
-        raise HTTPException(status_code=404, detail="Person not found")
-
-    current_name = (
-        db.query(PersonName)
-        .filter(
-            PersonName.person_id == person_id,
-            PersonName.is_active.is_(True),
-        )
-        .first()
-    )
-    name_history = (
-        db.query(PersonName)
-        .filter(PersonName.person_id == person_id)
-        .order_by(PersonName.created_at.desc())
-        .all()
-    )
-    current_rank = (
-        db.query(PersonRank)
-        .filter(
-            PersonRank.person_id == person_id,
-            PersonRank.is_active.is_(True),
-        )
-        .first()
-    )
+    try:
+        details = person_details(db, person_id, include_history=True)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail="Person not found") from error
     return templates.TemplateResponse(
         request=request,
         name="person_detail.html",
         context={
-            "person": person,
-            "current_name": current_name,
-            "name_history": name_history,
-            "current_rank": current_rank,
+            **details,
         },
     )
 
 #Повна інформація та редагування
 @router.get("/person_full_info/{person_id}")
 def get_person_full_info(
-    request: Request, 
-    person_id: int, 
+    request: Request,
+    person_id: int,
     db: Session = Depends(get_db),
     ):
-    person = ServicePersonCheck.get_person_or_raise(person_id, db)
-    current_name = (
-            db.query(PersonName)
-            .filter(
-                PersonName.person_id == person_id,
-                PersonName.is_active.is_(True),
-            )
-            .first()
-        )
-    current_rank = (
-            db.query(PersonRank)
-            .filter(
-                PersonRank.person_id == person_id,
-                PersonRank.is_active.is_(True),
-            )
-            .first()
-        )  
-    ranks = db.query(Rank).order_by(Rank.rank_id).all()
+    details = person_details(db, person_id, include_ranks=True)
     return templates.TemplateResponse(
         request=request,
         name = "person_full_info.html",
         context = {
-            "person": person,
-            "current_name": current_name,
-            "current_rank" : current_rank,
-            "person_id" : person_id,
-            "ranks": ranks,
+            **details,
+            "person_id": person_id,
         }
     )
-
