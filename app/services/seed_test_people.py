@@ -20,6 +20,10 @@ from app.database.schema_check import require_current_schema
 from app.date_fields import DATE_FIELDS
 from app.utils.date_utils import date_values_from_input
 from app.validators.name_cases import sex
+from app.geography import GEO_FIELDS, DETAIL_FIELDS
+
+GEO_COLUMNS = tuple("birth_" + key for key in (*GEO_FIELDS, "settlement_type")) + tuple(prefix + key for prefix in ("registration_", "actual_") for key in (*GEO_FIELDS, "settlement_type", *DETAIL_FIELDS))
+PERSON_LABELS = {"surname":"Прізвище", "name":"Ім’я", "patronymic":"По батькові", "sex":"Стать", "tax_number":"РНОКПП", "birth_day":"День народження", "birth_month":"Місяць народження", "birth_year":"Рік народження", "rank":"Звання"}
 
 
 REQUIRED_COLUMNS = (
@@ -87,13 +91,17 @@ def _read_rows(excel_path: Path) -> list[tuple[int, dict]]:
         missing = [key for key in REQUIRED_COLUMNS if key not in headers]
         if missing:
             raise ValueError("Аркуш persons: відсутні колонки: " + ", ".join(missing))
-        duplicates = [key for key in REQUIRED_COLUMNS if headers.count(key) > 1]
+        duplicates = [key for key in (*REQUIRED_COLUMNS, *GEO_COLUMNS) if headers.count(key) > 1]
         if duplicates:
             raise ValueError("Аркуш persons: повторюються колонки: " + ", ".join(duplicates))
-        indexes = {key: headers.index(key) for key in REQUIRED_COLUMNS}
+        indexes = {key: headers.index(key) for key in (*REQUIRED_COLUMNS, *GEO_COLUMNS) if key in headers}
+        # Row 2 is always explanatory; records begin at actual Excel row 3.
+        labels=next(rows, None)
+        if labels is None or not any(not _is_empty(cell.value) for cell in labels) or str(labels[indexes["sex"]].value or "").strip() in ("male", "female"):
+            raise ValueError("Аркуш persons: рядок 2 має містити українські підписи; дані починаються з рядка 3.")
         return [
             (number, {key: row[index] for key, index in indexes.items()})
-            for number, row in enumerate(rows, 2)
+            for number, row in enumerate(rows, 3)
             if any(not _is_empty(cell.value) for cell in row)
         ]
     finally:
@@ -144,7 +152,23 @@ def _create_row(db, data: dict) -> bool:
     rank_date = date_values_from_input(DATE_FIELDS["rank.rank_order_date"], "rank_order", {})
     PersonRepository.add_rank(db, person.person_id, dict(rank_id=matches[0].rank_id, is_active=True, **rank_date))
     db.flush()
+    seed_geographic_data(db, person.person_id, data)
     return True
+
+
+def seed_geographic_data(db, person_id, data):
+    from app.services.geography import save, normalize
+    from app.repositories.geography_repository import GeographyRepository
+    for prefix, block in [('birth_', 'birthplace'), ('registration_', 'registration'), ('actual_', 'actual')]:
+        values={key[len(prefix):]:value for key,value in data.items() if key.startswith(prefix) and key in GEO_COLUMNS}
+        if not any(values.values()): continue
+        parent_id=None
+        for key in (*GEO_FIELDS, *(() if block=='birthplace' else ('street',))):
+            if not values.get(key): continue
+            matches=GeographyRepository.exact(db,key,normalize(values[key]),parent_id)
+            if len(matches)==1:
+                values[key+'_id']=str(matches[0].id); parent_id=matches[0].id
+        save(db, person_id, block, values, commit=False)
 
 
 def seed_test_people(session_factory, excel_path: Path = EXCEL_PATH) -> SeedReport:

@@ -10,3 +10,5 @@ data/photos/
 data/exports/
 desktop.ini
 .env
+
+*.maintenance.lock

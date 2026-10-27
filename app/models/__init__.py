@@ -34,3 +34,5 @@ __all__ += ["NameDictionary", "PersonNameCases", "NameDictionaryImport"]
 
 from app.models.geography import GeoUnit, GeoAlias, PersonBirthplace, PersonAddress
 __all__ += ["GeoUnit", "GeoAlias", "PersonBirthplace", "PersonAddress"]
+from app.models.geography_import import GeoSource, GeoImportLink, GeoCityDistrict
+__all__ += ['GeoSource', 'GeoImportLink', 'GeoCityDistrict']

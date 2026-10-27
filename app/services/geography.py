@@ -1,15 +1,10 @@
 """Soft geographic verification, immutable address history and formatting."""
-import unicodedata
 from datetime import date
-from app.geography import GEO_FIELDS, DETAIL_FIELDS, ADDRESS_TYPES
+from app.geography import GEO_FIELDS, DETAIL_FIELDS, ADDRESS_TYPES, normalize
 from app.models import PersonAddress, PersonBirthplace
 from app.repositories.geography_repository import GeographyRepository as Repo
 from app.services.service_person_checking import ServicePersonCheck
 from app.database.transactions import service_transaction
-
-
-def normalize(value):
-    return ' '.join(unicodedata.normalize('NFC', value or '').casefold().split())
 
 
 def suggestions(db, kind, query, parent_id=None):
@@ -103,11 +98,11 @@ def prepare(db, data, *, birth=False):
     return values, warnings
 
 
-def save(db, person_id, block, data):
+def save(db, person_id, block, data, *, commit=True):
     birth = block == 'birthplace'
     if not birth and block not in ADDRESS_TYPES:
         raise ValueError('Невідомий тип адреси.')
-    with service_transaction(db, immediate=True):
+    with service_transaction(db, commit=commit, immediate=commit):
         ServicePersonCheck.get_person_or_raise(person_id, db)
         values, warnings = prepare(db, data, birth=birth)
         old = Repo.birthplace(db, person_id) if birth else next((r for r in Repo.addresses(db, person_id) if r.kind == block and r.is_active), None)

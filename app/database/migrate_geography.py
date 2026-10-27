@@ -46,6 +46,7 @@ def migrate(database):
         present = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         new_names = {table.name for table in NEW_TABLES}
         for table in Base.metadata.sorted_tables:
+            if table.name in {'geo_sources','geo_import_links','geo_city_districts'}: continue
             if table.name in new_names:
                 continue
             required = {column.name for column in table.columns}

@@ -48,6 +48,7 @@ def workbook(tmp_path, rows, *, headers=REQUIRED_COLUMNS, sheet="persons"):
     page = book.active
     page.title = sheet
     page.append(list(headers))
+    page.append(["Підпис"] * len(headers))
     for row in rows:
         page.append(row)
     path = tmp_path / "people.xlsx"
@@ -133,7 +134,7 @@ def test_excel_tax_representation(isolated_db, tmp_path, value, number_format, e
     path = workbook(tmp_path, [person_row(tax_number=value)])
     from openpyxl import load_workbook
     book = load_workbook(path)
-    book["persons"].cell(2, REQUIRED_COLUMNS.index("tax_number") + 1).number_format = number_format
+    book["persons"].cell(3, REQUIRED_COLUMNS.index("tax_number") + 1).number_format = number_format
     book.save(path)
     book.close()
     assert seed_test_people(factory, path).created == 1
@@ -166,7 +167,7 @@ def test_invalid_row_reports_number_and_continues(isolated_db, tmp_path, changes
     report = seed_test_people(factory, path)
     assert (report.found, report.created, report.existing, report.skipped) == (2, 1, 0, 1)
     assert len(report.issues) == 1
-    assert report.issues[0].row_number == 2
+    assert report.issues[0].row_number == 3
     assert message in report.issues[0].message
     assert "0123456789" not in report.issues[0].message
     assert "Тестенко" not in report.issues[0].message
@@ -210,7 +211,7 @@ def test_error_after_related_insert_rolls_back_entire_person(isolated_db, tmp_pa
     finally:
         event.remove(PersonRank, "after_insert", fail_first_rank)
     assert (report.created, report.skipped) == (1, 1)
-    assert report.issues[0].row_number == 2
+    assert report.issues[0].row_number == 3
     assert "цілісності" in report.issues[0].message
     assert "private" not in report.issues[0].message
     assert "0123456789" not in report.issues[0].message
@@ -250,7 +251,7 @@ def test_invalid_source_for_existing_person_is_reported_without_changes(isolated
     path = workbook(tmp_path, [person_row(rank="Неіснуюче звання")])
     report = seed_test_people(factory, path)
     assert report.created == 0 and report.skipped == 1
-    assert report.issues[0].row_number == 2
+    assert report.issues[0].row_number == 3
     assert counts(factory) == (1, 1, 1)
 
 
@@ -281,7 +282,7 @@ def test_module_cli_repeat_and_exit_codes(isolated_db, tmp_path):
     invalid = workbook(tmp_path, [person_row(tax_number="bad")])
     failed_row = run_cli(invalid, path)
     assert failed_row.returncode == 1
-    assert "Рядок 2: tax_number:" in failed_row.stdout
+    assert "Рядок 3: tax_number:" in failed_row.stdout
     assert counts(factory) == (1, 1, 1)
     missing = tmp_path / "must_not_be_created.sqlite3"
     failed_file = run_cli(excel, missing)

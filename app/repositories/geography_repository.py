@@ -36,3 +36,14 @@ class GeographyRepository:
     def add(db, record):
         db.add(record)
         return record
+
+    @staticmethod
+    def exact(db, kind, normalized, parent_id=None):
+        stmt = select(GeoUnit).where(GeoUnit.kind == kind, or_(
+            GeoUnit.normalized_name == normalized,
+            exists().where(GeoAlias.unit_id == GeoUnit.id, GeoAlias.normalized_name == normalized)))
+        if parent_id:
+            descendants = select(GeoUnit.id).where(GeoUnit.id == parent_id).cte(recursive=True)
+            descendants = descendants.union(select(GeoUnit.id).where(GeoUnit.parent_id == descendants.c.id))
+            stmt = stmt.where(GeoUnit.parent_id.in_(select(descendants.c.id)))
+        return list(db.scalars(stmt.limit(2)))  # Two suffice to prove ambiguity.

@@ -9,7 +9,8 @@ from app.routers import person_rank
 from app.routers import person_positions
 
 
-app = FastAPI()
+from app.database.maintenance import application_lifespan
+app = FastAPI(lifespan=application_lifespan)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 app.include_router(persons.router)

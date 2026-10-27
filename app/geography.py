@@ -2,3 +2,8 @@
 GEO_FIELDS = {"country": "Країна", "region": "Область / регіон", "district": "Район", "community": "Територіальна громада", "settlement": "Населений пункт"}
 DETAIL_FIELDS = {"street": "Назва вулиці", "street_type": "Тип вулиці", "house": "Будинок", "corps": "Корпус", "building": "Будівля / споруда", "apartment": "Квартира", "room": "Кімната", "postal_code": "Поштовий індекс", "note": "Уточнення"}
 ADDRESS_TYPES = {"registration": "Місце реєстрації", "actual": "Фактичне проживання", "correspondence": "Адреса листування"}
+
+
+def normalize(value):
+    import unicodedata
+    return ' '.join(unicodedata.normalize('NFC', value or '').casefold().split())
