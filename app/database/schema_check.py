@@ -35,6 +35,8 @@ def require_current_schema(engine):
             installed=set(connection.execute(text("SELECT name FROM sqlite_master WHERE type='trigger'")).scalars())
         missing.extend("trigger:"+name for name in sorted(required-installed))
     if missing:
+        if set(missing) <= {"geo_units", "geo_aliases", "person_birthplaces", "person_addresses"}:
+            raise ValueError("Потрібна безпечна міграція: python -m app.database.migrate_geography --database PATH. Автоматично БД не змінено.")
         name_changes = {"persons.sex", "name_dictionaries", "person_name_cases", "name_dictionary_imports"}
         if set(missing) <= name_changes:
             raise ValueError("Потрібна безпечна міграція зі збереженням даних: python -m app.database.migrate_name_cases --database PATH. Автоматично БД не змінено.")

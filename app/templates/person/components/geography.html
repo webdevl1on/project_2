@@ -1,0 +1,43 @@
+{% for block, record in geo_blocks.items() %}
+{% if block != 'correspondence' %}
+<section class="card mb-3" data-geo-block="{{ block }}">
+<div class="card-body"><h2 class="h5">{{ 'Місце народження' if block == 'birthplace' else address_types[block] }}</h2>
+<p data-geo-summary>{{ format_address(record) if record else '—' }}</p>
+{% if geo_edit_block == block %}
+{% if geo_error %}<div class="alert alert-danger" role="alert" tabindex="-1">{{ geo_error }}</div>{% endif %}
+{% if geo_message %}<div class="alert alert-success" role="status">{{ geo_message }}</div>{% endif %}
+{% for warning in geo_warnings or [] %}<div class="alert alert-warning">{{ warning }}</div>{% endfor %}
+{% endif %}
+{% if record %}<p>Перевірка: {{ {'matched':'Підтверджено довідником','mismatch':'Є невідповідність','unknown':'Не підтверджено'}[record.validation_status] }}</p>{% endif %}
+<details {% if geo_edit_block == block %}open{% endif %}><summary>Редагувати</summary>
+{% set draft = geo_draft if geo_edit_block == block and geo_draft else record %}
+<form data-geo-form data-block="{{ block }}" method="post" action="/persons/{{ person_id }}/geography/{{ block }}">
+<input type="hidden" name="record_id" value="{{ draft.record_id if geo_draft and geo_edit_block == block else record.id if record else '' }}">
+<input type="hidden" name="revision" value="{{ draft.revision if draft else '' }}">
+<div class="row g-2">
+{% for key,label in geo_fields.items() %}
+<div class="col-md-6 position-relative"><label class="form-label" for="{{ block }}-{{ key }}">{{ label }}</label>
+<input class="form-control" id="{{ block }}-{{ key }}" name="{{ key }}" maxlength="250" autocomplete="off" data-geo-kind="{{ key }}" value="{{ draft[key] or '' if draft else '' }}">
+<input type="hidden" name="{{ key }}_id" value="{{ draft[key ~ '_id'] or '' if draft else '' }}"><div data-geo-results="{{ key }}" class="list-group" role="listbox"></div></div>
+{% endfor %}
+<div class="col-md-6"><label class="form-label">Тип населеного пункту<input name="settlement_type" class="form-control" maxlength="60" value="{{ draft.settlement_type or '' if draft else '' }}"></label></div>
+{% if block != 'birthplace' %}
+{% for key,label in detail_fields.items() %}
+<div class="col-md-6"><label class="form-label" for="{{ block }}-{{ key }}">{{ label }}</label>
+<input class="form-control" id="{{ block }}-{{ key }}" name="{{ key }}" maxlength="{{ 1000 if key == 'note' else 250 }}" value="{{ draft[key] or '' if draft else '' }}" {% if key == 'street' %}data-geo-kind="street" autocomplete="off"{% endif %}>
+{% if key == 'street' %}<input type="hidden" name="street_id" value="{{ draft.street_id or '' if draft else '' }}"><div data-geo-results="street" class="list-group" role="listbox"></div>{% endif %}
+{% if key == 'postal_code' %}<a href="https://index.ukrposhta.ua/" target="_blank" rel="noopener noreferrer">Знайти індекс на Укрпошті</a>{% endif %}</div>
+{% endfor %}
+{% for key,label in [('date_start','Дата початку (якщо відома)'),('date_end','Дата завершення (якщо відома)')] %}
+<div class="col-md-6"><label class="form-label">{{ label }}<input class="form-control" type="date" name="{{ key }}" value="{{ draft[key] or '' if draft else '' }}"></label></div>
+{% endfor %}
+{% endif %}
+</div>
+<p class="form-text" data-geo-warning>Ручний текст і історичні назви можна зберігати без довідника.</p>
+{% if block == 'actual' %}<button type="button" class="btn btn-outline-secondary my-2" data-copy-registration>Скопіювати адресу реєстрації</button>{% endif %}
+<button class="btn btn-primary my-2" type="submit">Зберегти</button>
+</form></details>
+</div></section>
+{% endif %}{% endfor %}
+<div data-geo-history><h2 class="h5">Історія адрес</h2>
+{% for record in geo_history %}<p>{{ address_types[record.kind] }}: {{ format_address(record) or '—' }} ({{ record.date_start or 'початок невідомий' }} — {{ record.date_end or 'завершення невідоме' }})</p>{% else %}<p>Історичних адрес немає.</p>{% endfor %}</div>

@@ -23,3 +23,6 @@ app.include_router(staff.router)
 from app.routers import name_cases, admin
 app.include_router(name_cases.router)
 app.include_router(admin.router)
+
+from app.routers import geography
+app.include_router(geography.router)

@@ -18,6 +18,7 @@
 
     {% include "person/components/modal_windows.html" %}
     <ul class="nav nav-pills mb-3" id="personTabs">
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#general">Загальна інформація</button></li>
         <li class="nav-item">
             <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#names">
                 ПІБ
@@ -55,6 +56,7 @@
         </li>
     </ul>
     <div class="tab-content">
+        <div class="tab-pane fade" id="general"><div id="person-geography" data-person-id="{{ person_id }}">{% include "person/components/geography.html" %}</div></div>
 
         <div class="tab-pane fade show active" id="names">
             {% include "person/components/names_history.html" %}
@@ -120,6 +122,7 @@
         </script>
 
     <script src="/static/js/date_input.js"></script>
+    <script src="/static/js/geography.js"></script>
 </body>
 
 </html>

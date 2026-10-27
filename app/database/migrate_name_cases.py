@@ -46,7 +46,7 @@ def migrate(database):
         present = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         new_names = {table.name for table in NEW_TABLES}
         for table in Base.metadata.sorted_tables:
-            if table.name in new_names:
+            if table.name in new_names or table.name in {"geo_units", "geo_aliases", "person_birthplaces", "person_addresses"}:
                 continue
             required = {column.name for column in table.columns} - ({"sex"} if table.name == "persons" else set())
             if table.name not in present or not required <= columns(connection, table.name):

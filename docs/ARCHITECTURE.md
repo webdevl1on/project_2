@@ -292,3 +292,7 @@ ClipboardItem/write використовується для HTML, writeText — 
 Повна схема, транзакції, маршрути /staff, компонент вибору, захист імпорту, точність PersonEvent та команди БД — у [STAFF_HISTORY.md](STAFF_HISTORY.md). Старий POST /person-positions/assign із довільним person_id замінено prepare → підписане підтвердження; це навмисна зміна серверного контракту.
 
 На /staff/history POST-форми обробляє `app/static/js/staff_history_forms.js`: клієнтські перевірки + fetch/FormData, JSON-помилка `detail/fields` із `form_failure` у роутері staff або FastAPI 422. Помилка лишає вихідний DOM/введені значення та details відкритими, показує alert, підсвічує поле й фокусує його. Успіх переходить на серверний redirect із новими даними/повідомленням. Моделі та StaffService не змінені. Регресії — `tests/browser/history_forms.cjs`, JSON-контракт — `tests/test_staff_history.py`. Деталі — [STAFF_HISTORY.md](STAFF_HISTORY.md#помилки-форм-історії).
+
+## Географія та адреси
+
+[GEOGRAPHY.md](GEOGRAPHY.md) описує чотири нові таблиці, м’яку перевірку, точкове оновлення форм і безпечну міграцію. app/geography.py — метадані полів; routers/geography.py → services/geography.py → repositories/geography_repository.py. PersonBirthplace обмежено населеним пунктом; PersonAddress зберігає текстові знімки, необов’язкові GeoUnit ID та незалежну історію registration/actual/correspondence. GeoAlias підтримує альтернативні назви. Вкладка «Загальна інформація» включає спільний geography.html і geography.js; старі кадрові правила та каталоги колонок не змінені.
