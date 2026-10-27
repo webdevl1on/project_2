@@ -12,7 +12,7 @@
 {% if record %}<p>Перевірка: {{ {'matched':'Підтверджено довідником','mismatch':'Є невідповідність','unknown':'Не підтверджено'}[record.validation_status] }}</p>{% endif %}
 <details {% if geo_edit_block == block %}open{% endif %}><summary>Редагувати</summary>
 {% set draft = geo_draft if geo_edit_block == block and geo_draft else record %}
-<form data-geo-form data-block="{{ block }}" method="post" action="/persons/{{ person_id }}/geography/{{ block }}">
+<form data-geo-form data-geo-meaningful="{{ (birth_components if block == 'birthplace' else address_components)|join(',') }}" data-geo-empty-message="{{ empty_geo_messages['birthplace' if block == 'birthplace' else 'address'] }}" data-block="{{ block }}" method="post" action="/persons/{{ person_id }}/geography/{{ block }}">
 <input type="hidden" name="record_id" value="{{ draft.record_id if geo_draft and geo_edit_block == block else record.id if record else '' }}">
 <input type="hidden" name="revision" value="{{ draft.revision if draft else '' }}">
 <div class="row g-2">
@@ -39,6 +39,7 @@
 </div>
 <p class="form-text" data-geo-warning>Ручний текст і історичні назви можна зберігати без довідника.</p>
 {% if block == 'actual' %}<button type="button" class="btn btn-outline-secondary my-2" data-copy-registration>Скопіювати адресу реєстрації</button>{% endif %}
+<button class="btn btn-outline-secondary my-2" type="button" data-geo-clear-form>Очистити форму</button>
 <button class="btn btn-primary my-2" type="submit">Зберегти</button>
 </form></details>
 </div></section>

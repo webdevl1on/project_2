@@ -2,6 +2,7 @@
 from datetime import date
 from app.geography import GEO_FIELDS, DETAIL_FIELDS, ADDRESS_TYPES, SETTLEMENT_TYPES, STREET_TYPES, SETTLEMENT_TYPE_ALIASES, normalize
 from app.utils.address_format import format_address
+from app.geography import BIRTH_COMPONENTS, ADDRESS_COMPONENTS, EMPTY_GEO_MESSAGES
 from app.models import PersonAddress, PersonBirthplace
 from app.repositories.geography_repository import GeographyRepository as Repo
 from app.services.service_person_checking import ServicePersonCheck
@@ -49,6 +50,9 @@ def prepare(db, data, *, birth=False):
         if not isinstance(raw, str) or len(raw) > limit:
             raise ValueError(f'{key}: допускається до {limit} символів.')
         values[key] = raw.strip() or None
+    meaningful = BIRTH_COMPONENTS if birth else ADDRESS_COMPONENTS
+    if not any(values[key] for key in meaningful):
+        raise ValueError(EMPTY_GEO_MESSAGES['birthplace' if birth else 'address'])
     for key in list(GEO_FIELDS) + ([] if birth else ['street']):
         raw = data.get(key + '_id')
         unit = None
@@ -137,6 +141,6 @@ def page(db, person_id):
     records = Repo.addresses(db, person_id)
     blocks = {'birthplace': Repo.birthplace(db, person_id)}
     blocks.update({kind: next((r for r in records if r.kind == kind and r.is_active), None) for kind in ADDRESS_TYPES})
-    return {'person_id': person_id, 'geo_blocks': blocks, 'geo_history': [r for r in records if not r.is_active],
+    return {'birth_components': BIRTH_COMPONENTS, 'address_components': ADDRESS_COMPONENTS, 'empty_geo_messages': EMPTY_GEO_MESSAGES, 'person_id': person_id, 'geo_blocks': blocks, 'geo_history': [r for r in records if not r.is_active],
             'geo_fields': GEO_FIELDS, 'detail_fields': DETAIL_FIELDS,
             'settlement_types': SETTLEMENT_TYPES, 'street_types': STREET_TYPES, 'address_types': ADDRESS_TYPES, 'format_address': format_address}

@@ -12,3 +12,10 @@ def normalize(value):
 SETTLEMENT_TYPES = {'місто':'м.', 'село':'с.', 'селище':'с-ще', 'селище міського типу':'смт', 'хутір':'х.'}
 STREET_TYPES = {'вулиця':'вул.', 'проспект':'просп.', 'провулок':'пров.', 'бульвар':'бульв.', 'площа':'пл.', 'проїзд':'пр-д', 'узвіз':'узвіз', 'набережна':'наб.', 'шосе':'шосе', 'алея':'алея', 'тупик':'туп.'}
 SETTLEMENT_TYPE_ALIASES = {'city':'місто', 'special_city':'місто', 'village':'село', 'settlement':'селище'}
+
+BIRTH_COMPONENTS = tuple(GEO_FIELDS)
+ADDRESS_COMPONENTS = (*BIRTH_COMPONENTS, 'street', 'house', 'corps', 'building', 'apartment', 'room', 'postal_code')
+EMPTY_GEO_MESSAGES = {
+    'birthplace': 'Неможливо зберегти порожнє місце народження. Заповніть хоча б один компонент місця народження',
+    'address': 'Неможливо зберегти порожню адресу. Заповніть хоча б один компонент адреси',
+}

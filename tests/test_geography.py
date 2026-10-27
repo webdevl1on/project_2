@@ -166,9 +166,46 @@ def test_complete_birthplace_and_exact_optional_address_period(factory):
         data.update({key+'_id':str(unit.id) for key,unit in [('country',country),('region',region),('district',district),('community',community),('settlement',cities[0])]})
         service.save(db,pid,'birthplace',data)
         assert service.Repo.birthplace(db,pid).validation_status=='matched'
-        service.save(db,pid,'registration',{'date_start':'2025-01-01','date_end':'2025-05-31'})
+        service.save(db,pid,'registration',{'country':'Україна','date_start':'2025-01-01','date_end':'2025-05-31'})
         assert current(db,pid).date_end==date(2025,5,31)
         with pytest.raises(ValueError,match='повної дати'):
-            service.prepare(db,{'date_start':'2025-03'})
+            service.prepare(db,{'country':'Україна','date_start':'2025-03'})
         with pytest.raises(ValueError,match='раніше'):
-            service.prepare(db,{'date_start':'2025-05-01','date_end':'2025-04-30'})
+            service.prepare(db,{'country':'Україна','date_start':'2025-05-01','date_end':'2025-04-30'})
+
+
+@pytest.mark.parametrize('block',['birthplace','registration','actual','correspondence'])
+@pytest.mark.parametrize('data',[{}, {'note':'Лише примітка','date_start':'2026-01-01','date_end':'2026-02-01','settlement_type':'місто','street_type':'вулиця','country_id':'999'}])
+def test_empty_blocks_never_create_records(factory,block,data):
+    with factory() as db:
+        pid=person(db)
+        with pytest.raises(ValueError,match='порожн'):service.save(db,pid,block,data)
+        assert service.Repo.birthplace(db,pid) is None
+        assert service.Repo.addresses(db,pid)==[]
+
+
+def test_empty_replacement_preserves_revision_and_history(factory):
+    with factory() as db:
+        pid=person(db)
+        service.save(db,pid,'birthplace',{'country':'Україна'})
+        service.save(db,pid,'registration',{'house':'01А/2'})
+        birth=service.Repo.birthplace(db,pid); row=current(db,pid)
+        birth_rev=birth.revision; row_rev=row.revision
+        for block,record in [('birthplace',birth),('registration',row)]:
+            with pytest.raises(ValueError,match='порожн'):
+                service.save(db,pid,block,{'record_id':str(record.id),'revision':str(record.revision),'note':'Примітка'})
+        db.expire_all()
+        assert service.Repo.birthplace(db,pid).revision==birth_rev
+        assert current(db,pid).revision==row_rev
+        assert current(db,pid).house=='01А/2' and len(service.Repo.addresses(db,pid))==1
+
+
+def test_direct_http_empty_save_is_rejected_without_archiving(client,factory):
+    browser,_=client
+    with factory() as db:
+        pid=person(db);service.save(db,pid,'registration',{'house':'01А/2'});row=current(db,pid)
+        values={'record_id':str(row.id),'revision':str(row.revision),'note':'Лише примітка'}
+    response=browser.post(f'/persons/{pid}/geography/registration',data=values)
+    assert response.status_code==400 and 'порожню адресу' in response.text
+    assert 'Лише примітка' in response.text and '<details open>' in response.text
+    with factory() as db:assert len(service.Repo.addresses(db,pid))==1 and current(db,pid).house=='01А/2'
