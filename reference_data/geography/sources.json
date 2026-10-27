@@ -1,0 +1,38 @@
+[
+  {
+    "id": "katottg_20260707",
+    "version_date": "2026-07-07",
+    "url": "https://mindev.gov.ua/storage/app/sites/1/uploaded-files/kodifikator-07-07.xlsx",
+    "license": "CC BY 4.0",
+    "local_file": "katottg.xlsx",
+    "retrieved_date": "2026-10-27",
+    "sha256": "5c5317759b2b90208e9b00338bc3db3c5e694272a166acf73f1543b3e18ecbea"
+  },
+  {
+    "id": "katottg_20260622",
+    "version_date": "2026-06-22",
+    "url": "https://mindev.gov.ua/storage/app/sites/1/uploaded-files/kodifikator-22-06-2026.xlsx",
+    "license": "CC BY 4.0",
+    "local_file": "katottg_previous.xlsx",
+    "retrieved_date": "2026-10-27",
+    "sha256": "ebea021ed20e65666a2fae25497cd8e083e145949ac5c2a5568b3e5c451e08d1"
+  },
+  {
+    "id": "nais_20261026",
+    "version_date": "2026-10-26",
+    "url": "https://nais.gov.ua/files/general/2026/10/27/20261027095330-17.zip",
+    "license": "CC BY; attribution required (data.gov.ua dataset)",
+    "local_file": "nais.zip",
+    "retrieved_date": "2026-10-27",
+    "sha256": "613cfe684c9c77a5838ce0484b7588147196933d5aa9a3316e26bc4e6798d66e"
+  },
+  {
+    "id": "pkks_20221223",
+    "version_date": "2022-12-23",
+    "url": "https://stat.gov.ua/sites/default/files/2023-08/PKKS_0.pdf",
+    "license": "Official published classifier; retain attribution; PDF has no explicit standalone license",
+    "local_file": "countries.pdf",
+    "retrieved_date": "2026-10-27",
+    "sha256": "735ad1985fec6a0061771e23836444fc63d4d20f9497d66900d18f4db6f37603"
+  }
+]

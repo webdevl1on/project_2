@@ -1,0 +1,50 @@
+[
+  {
+    "file": "project_2_dictionary_01.xlsx",
+    "records": 10000,
+    "sheets": {
+      "surname_male": 2753,
+      "names_male": 2636,
+      "patronimic_male": 150,
+      "surname_female": 2788,
+      "names_female": 1528,
+      "patronimic_female": 145
+    }
+  },
+  {
+    "file": "project_2_dictionary_02.xlsx",
+    "records": 10000,
+    "sheets": {
+      "surname_male": 4981,
+      "names_male": 0,
+      "patronimic_male": 0,
+      "surname_female": 5019,
+      "names_female": 0,
+      "patronimic_female": 0
+    }
+  },
+  {
+    "file": "project_2_dictionary_03.xlsx",
+    "records": 10000,
+    "sheets": {
+      "surname_male": 5001,
+      "names_male": 0,
+      "patronimic_male": 0,
+      "surname_female": 4999,
+      "names_female": 0,
+      "patronimic_female": 0
+    }
+  },
+  {
+    "file": "project_2_dictionary_04.xlsx",
+    "records": 6880,
+    "sheets": {
+      "surname_male": 3457,
+      "names_male": 0,
+      "patronimic_male": 0,
+      "surname_female": 3423,
+      "names_female": 0,
+      "patronimic_female": 0
+    }
+  }
+]

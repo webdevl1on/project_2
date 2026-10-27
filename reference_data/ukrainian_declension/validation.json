@@ -1,0 +1,210 @@
+{
+  "status": "passed",
+  "records": 36880,
+  "checks": [
+    "six exact worksheet names",
+    "two exact header rows",
+    "all seven forms present",
+    "base_form equals nominative",
+    "no duplicate keys within or across import files",
+    "all values stored as text with number format @",
+    "two rows frozen",
+    "table filters present",
+    "maximum 10000 records per import workbook",
+    "no formulas"
+  ],
+  "sheets": [
+    {
+      "file": "project_2_dictionary_01.xlsx",
+      "sheet": "surname_male",
+      "records": 2753,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_01.xlsx",
+      "sheet": "names_male",
+      "records": 2636,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_01.xlsx",
+      "sheet": "patronimic_male",
+      "records": 150,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_01.xlsx",
+      "sheet": "surname_female",
+      "records": 2788,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_01.xlsx",
+      "sheet": "names_female",
+      "records": 1528,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_01.xlsx",
+      "sheet": "patronimic_female",
+      "records": 145,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_02.xlsx",
+      "sheet": "surname_male",
+      "records": 4981,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_02.xlsx",
+      "sheet": "names_male",
+      "records": 0,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_02.xlsx",
+      "sheet": "patronimic_male",
+      "records": 0,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_02.xlsx",
+      "sheet": "surname_female",
+      "records": 5019,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_02.xlsx",
+      "sheet": "names_female",
+      "records": 0,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_02.xlsx",
+      "sheet": "patronimic_female",
+      "records": 0,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_03.xlsx",
+      "sheet": "surname_male",
+      "records": 5001,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_03.xlsx",
+      "sheet": "names_male",
+      "records": 0,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_03.xlsx",
+      "sheet": "patronimic_male",
+      "records": 0,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_03.xlsx",
+      "sheet": "surname_female",
+      "records": 4999,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_03.xlsx",
+      "sheet": "names_female",
+      "records": 0,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_03.xlsx",
+      "sheet": "patronimic_female",
+      "records": 0,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_04.xlsx",
+      "sheet": "surname_male",
+      "records": 3457,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_04.xlsx",
+      "sheet": "names_male",
+      "records": 0,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_04.xlsx",
+      "sheet": "patronimic_male",
+      "records": 0,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_04.xlsx",
+      "sheet": "surname_female",
+      "records": 3423,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_04.xlsx",
+      "sheet": "names_female",
+      "records": 0,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    },
+    {
+      "file": "project_2_dictionary_04.xlsx",
+      "sheet": "patronimic_female",
+      "records": 0,
+      "freeze_rows": 2,
+      "header_rows": 2,
+      "text_format": true
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+ВЕСУМ / dict_uk. Андрій Рисін, Василь Старко, команда БрУК.
+Дані: CC BY-NC-SA 4.0. https://creativecommons.org/licenses/by-nc-sa/4.0/
+Source: https://github.com/brown-uk/dict_uk
+Snapshot: 4df36e0bfc3fb2cb421a3c45ba20e557803b8ae1
+shevchenko.js: MIT. https://github.com/tooleks/shevchenko-js
+Snapshot: e99c64c4e3771d7477116fc3fec7d2f099cc0cb3

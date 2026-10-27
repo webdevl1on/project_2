@@ -1,0 +1,64 @@
+{
+  "status": "passed",
+  "excel_native_checks": [
+    {
+      "file": "geography_admin.xlsx",
+      "table": "countries",
+      "rows": 249,
+      "frozen_rows": 2
+    },
+    {
+      "file": "geography_admin.xlsx",
+      "table": "regions",
+      "rows": 27,
+      "frozen_rows": 2
+    },
+    {
+      "file": "geography_admin.xlsx",
+      "table": "districts",
+      "rows": 136,
+      "frozen_rows": 2
+    },
+    {
+      "file": "geography_admin.xlsx",
+      "table": "communities",
+      "rows": 1772,
+      "frozen_rows": 2
+    },
+    {
+      "file": "geography_admin.xlsx",
+      "table": "city_districts",
+      "rows": 108,
+      "frozen_rows": 2
+    },
+    {
+      "file": "geography_admin.xlsx",
+      "table": "aliases",
+      "rows": 0,
+      "frozen_rows": 2
+    },
+    {
+      "file": "settlements_01.xlsx",
+      "table": "settlements",
+      "rows": 10000,
+      "frozen_rows": 2
+    },
+    {
+      "file": "settlements_02.xlsx",
+      "table": "settlements",
+      "rows": 10000,
+      "frozen_rows": 2
+    },
+    {
+      "file": "settlements_03.xlsx",
+      "table": "settlements",
+      "rows": 9703,
+      "frozen_rows": 2
+    }
+  ],
+  "all_excel_values_equal_csv_source": true,
+  "text_and_leading_zeros_preserved": true,
+  "streets_unique_ids": 327985,
+  "street_foreign_keys_resolve": true,
+  "visual_previews_reviewed": 9
+}

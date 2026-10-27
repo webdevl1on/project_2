@@ -1,0 +1,52 @@
+{
+  "status": "passed",
+  "checks": [
+    "unique KATOTTG codes in source",
+    "all non-null foreign keys resolve",
+    "settlement/community/district region consistency",
+    "no name-only ambiguous links",
+    "street references resolve",
+    "same-code aliases only"
+  ],
+  "counts": {
+    "countries": 249,
+    "regions": 27,
+    "districts": 136,
+    "communities": 1772,
+    "settlements": 29703,
+    "city_districts": 108,
+    "streets": 327985,
+    "aliases": 0
+  },
+  "nais_records": 501312,
+  "nais_no_street": 75276,
+  "street_duplicates_removed": 11363,
+  "street_link_status": {
+    "matched": 327985,
+    "unresolved": 86638,
+    "ambiguous": 50
+  },
+  "unresolved_streets": 86688,
+  "settlements_with_streets": 24458,
+  "hierarchy_gaps": 8,
+  "excluded_country_records": [
+    {
+      "id": "2b77f5b0-1ca7-5967-9a46-adff2a798a3a",
+      "name_uk": "Сарк",
+      "iso_alpha2": "-",
+      "iso_alpha3": "-",
+      "iso_numeric": "680",
+      "source_id": "pkks_20221223",
+      "source_row": "6"
+    },
+    {
+      "id": "89c23b38-c583-5d48-b4f9-c72a193a5918",
+      "name_uk": "Вільна економічна зона \"Крим\"",
+      "iso_alpha2": "ZK",
+      "iso_alpha3": "ZKR",
+      "iso_numeric": "900",
+      "source_id": "pkks_20221223",
+      "source_row": "7"
+    }
+  ]
+}
