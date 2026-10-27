@@ -12,7 +12,7 @@ from app.database.db import get_db
 from app.models import (Person, PersonName, PersonRank, PersonNameCases, NameDictionary,
                         NameDictionaryImport, Rank, EventType, PersonEvent)
 from app.models.reference_data.ranks import ReferenceRanks
-from app.name_cases import CASES, SHEETS, IMPORT_HEADERS
+from app.name_cases import CASES, SHEETS, EXCEL_HEADERS, EXCEL_LABELS
 from app.services import name_cases, name_dictionary_import as excel, dictionary_previews
 from app.services.person_registration import register_person
 from app.services.service_person_create import ServicePersonCreate
@@ -44,7 +44,7 @@ def dictionary_data(kind="name", sex="male", base="Тестослав", **change
 def workbook(rows=(), *, change=None):
     book = load_workbook(BytesIO(excel.empty_template()))
     for sheet, row in rows:
-        book[sheet].append([row.get(key) for key in IMPORT_HEADERS])
+        book[sheet].append([row.get(key) for key in EXCEL_HEADERS])
     if change:
         change(book)
     target = BytesIO(); book.save(target); book.close()
@@ -148,22 +148,61 @@ def test_template_is_empty_and_documents_exact_headers():
     book = load_workbook(BytesIO(excel.empty_template()))
     assert book.sheetnames == list(SHEETS)
     for sheet in book:
-        assert sheet.max_row == 1
-        assert tuple(cell.value for cell in sheet[1]) == IMPORT_HEADERS
+        assert sheet.max_row == 2
+        assert tuple(cell.value for cell in sheet[1]) == EXCEL_HEADERS
+        assert tuple(cell.value for cell in sheet[2]) == EXCEL_LABELS
+        assert sheet.freeze_panes == "A3"
+    book.close()
+
+
+def test_all_six_sheets_derive_kind_and_sex_and_skip_labels(factory):
+    content = workbook([(sheet, dictionary_data(sex="ignored", kind="ignored")) for sheet in SHEETS])
+    with factory() as db:
+        prepared = excel.preview(db, content, "add")
+        assert prepared["errors"] == [] and prepared["counts"]["new"] == 6
+        assert [(row["sheet"], row["row"], row["values"]["kind"], row["values"]["sex"])
+                for row in prepared["rows"]] == [(sheet, 3, kind, sex) for sheet, (kind, sex) in SHEETS.items()]
+        excel.confirm(db, prepared, "six-sheets", reviewed=True)
+        assert count(db, NameDictionary) == 6
+        assert excel.preview(db, content, "add")["counts"]["unchanged"] == 6
+
+
+def test_second_row_is_not_data_and_errors_use_excel_row_numbers():
+    def change(book):
+        sheet = book["names_male"]
+        sheet["A2"] = "=not_dictionary_data"
+        sheet.append([None] * len(EXCEL_HEADERS))
+        sheet.append(["Помилка", "Інше", *(["Помилка"] * 6)])
+    rows, errors = excel.read_workbook(workbook([("names_male", dictionary_data())], change=change))
+    assert len(rows) == 1 and rows[0]["row"] == 3
+    assert len(errors) == 1 and "names_male, рядок 5" in errors[0]
+
+
+def test_excel_rejects_old_sex_column_and_template_artifact_matches_contract():
+    from pathlib import Path
+    rows, errors = excel.read_workbook(workbook(change=lambda book: book["names_male"].insert_cols(2)))
+    assert not rows and any("рядок 1" in error for error in errors)
+    artifact = Path(__file__).resolve().parents[1] / "docs/templates/name_dictionaries_empty.xlsx"
+    book = load_workbook(artifact)
+    assert book.sheetnames == list(SHEETS)
+    for sheet in book:
+        assert sheet.max_row == 2
+        assert tuple(cell.value for cell in sheet[1]) == EXCEL_HEADERS
+        assert tuple(cell.value for cell in sheet[2]) == EXCEL_LABELS
     book.close()
 
 
 @pytest.mark.parametrize("change,message", [
-    (lambda book: book.remove(book["names"]), "Відсутні аркуші"),
-    (lambda book: setattr(book["names"]["A1"], "value", "wrong"), "заголовки"),
-    (lambda book: setattr(book["names"]["B2"], "value", "unknown"), "стать"),
-    (lambda book: setattr(book["names"]["D2"], "value", None), "Родовий"),
-    (lambda book: setattr(book["names"]["D2"], "value", '=A2'), "Формули"),
-    (lambda book: setattr(book["names"]["C2"], "value", "Інше"), "повинні збігатися"),
+    (lambda book: book.remove(book["names_male"]), "Відсутні аркуші"),
+    (lambda book: setattr(book["names_male"]["A1"], "value", "wrong"), "заголовки"),
+    (lambda book: setattr(book["names_male"]["I3"], "value", "unexpected"), "межами"),
+    (lambda book: setattr(book["names_male"]["C3"], "value", None), "Родовий"),
+    (lambda book: setattr(book["names_male"]["C3"], "value", '=A3'), "Формули"),
+    (lambda book: setattr(book["names_male"]["B3"], "value", "Інше"), "повинні збігатися"),
 ])
 def test_import_errors_never_write(factory, change, message):
     with factory() as db:
-        content = workbook([("names", dictionary_data())], change=change)
+        content = workbook([("names_male", dictionary_data())], change=change)
         try:
             prepared = excel.preview(db, content, "add")
         except ValueError as error:
@@ -177,10 +216,10 @@ def test_import_errors_never_write(factory, change, message):
 
 def test_duplicate_excel_keys_are_errors_even_with_different_case(factory):
     with factory() as db:
-        content = workbook([("names", dictionary_data()), ("names", dictionary_data(base="ТЕСТОСЛАВ"))])
+        content = workbook([("names_male", dictionary_data()), ("names_male", dictionary_data(base="ТЕСТОСЛАВ"))])
         prepared = excel.preview(db, content, "add")
         assert prepared["counts"]["errors"] == 1
-        assert "names, рядок 3" in prepared["errors"][0]
+        assert "names_male, рядок 4" in prepared["errors"][0]
         with pytest.raises(ValueError):
             excel.confirm(db, prepared, "duplicate", reviewed=True)
         assert count(db, NameDictionary) == 0
@@ -188,7 +227,7 @@ def test_duplicate_excel_keys_are_errors_even_with_different_case(factory):
 
 def test_import_modes_confirmation_replay_and_personal_forms_are_independent(factory):
     with factory() as db:
-        initial = workbook([("names", dictionary_data(genitive="Першого"))])
+        initial = workbook([("names_male", dictionary_data(genitive="Першого"))])
         prepared = excel.preview(db, initial, "add")
         assert prepared["counts"]["new"] == 1 and count(db, NameDictionary) == 0
         commits = []; event.listen(db, "after_commit", lambda db: commits.append(True))
@@ -199,7 +238,7 @@ def test_import_modes_confirmation_replay_and_personal_forms_are_independent(fac
         person = register_person(db, person_data(name_genitive="Персонального"))
         personal = db.scalar(select(PersonNameCases).where(PersonNameCases.kind == "name"))
         snapshot_revision = personal.revision
-        changed = workbook([("names", dictionary_data(genitive="Другого"))])
+        changed = workbook([("names_male", dictionary_data(genitive="Другого"))])
         only_new = excel.preview(db, changed, "add")
         assert only_new["counts"]["updated"] == 0 and only_new["counts"]["skipped"] == 1
         update = excel.preview(db, changed, "update")
@@ -221,7 +260,7 @@ def test_import_failure_rolls_back_all_rows_and_receipt(factory):
     event.listen(NameDictionary, "before_insert", refuse)
     try:
         with factory() as db:
-            content = workbook([("names", dictionary_data()), ("surnames", dictionary_data(kind="surname", base="Тестенко"))])
+            content = workbook([("names_male", dictionary_data()), ("surname_male", dictionary_data(kind="surname", base="Тестенко"))])
             # Sheet iteration order puts surnames first; force failure on the second write.
             def fail_second(mapper, connection, target):
                 if target.kind == "name": raise RuntimeError("second write")
@@ -240,7 +279,7 @@ def test_import_failure_rolls_back_all_rows_and_receipt(factory):
 
 def test_preview_rejects_changes_since_review_and_owner_mismatch(factory):
     with factory() as db:
-        prepared = excel.preview(db, workbook([("names", dictionary_data())]), "add")
+        prepared = excel.preview(db, workbook([("names_male", dictionary_data())]), "add")
         token = dictionary_previews.store(prepared, "first-session")
         with pytest.raises(ValueError, match="іншій"):
             dictionary_previews.load(token, "second-session")
@@ -309,7 +348,7 @@ def test_admin_cookie_transport_and_manual_editor(client):
 def test_admin_excel_preview_confirm_and_replay(client, factory):
     client, token = client; csrf = login(client, token)
     assert client.get("/admin/dictionaries/template.xlsx").content[:2] == b"PK"
-    content = workbook([("names", dictionary_data())])
+    content = workbook([("names_male", dictionary_data())])
     preview = client.post("/admin/dictionaries/import/preview", files={"file": ("names.xlsx", content)}, data={"mode": "add", "csrf": csrf})
     assert preview.status_code == 200 and 'data-count="new">1' in preview.text
     preview_token = html.fromstring(preview.text).xpath('//input[@name="token"]/@value')[0]
@@ -394,7 +433,7 @@ def test_dev_admin_local_all_operations_without_credentials(client, factory, mon
         edit_url = html.fromstring(created.text).xpath('//a[contains(@href,"/edit")]/@href')[0]
         revision = html.fromstring(local.get(edit_url).text).xpath('//input[@name="revision"]/@value')[0]
         assert local.post(edit_url, data={**dictionary_data(), "revision": revision}).status_code == 200
-        content = workbook([("names", dictionary_data(base="Іншослав"))])
+        content = workbook([("names_male", dictionary_data(base="Іншослав"))])
         preview = local.post("/admin/dictionaries/import/preview", files={"file": ("names.xlsx", content)})
         assert preview.status_code == 200
         preview_token = html.fromstring(preview.text).xpath('//input[@name="token"]/@value')[0]

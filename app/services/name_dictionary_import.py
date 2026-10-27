@@ -1,4 +1,4 @@
-"""Three explicit Excel sheets, reviewed preview, one atomic confirmation."""
+"""Six explicit Excel sheets, reviewed preview, one atomic confirmation."""
 import hashlib
 import json
 from io import BytesIO
@@ -7,12 +7,11 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 from xml.etree.ElementTree import ParseError
 from openpyxl.comments import Comment
-from openpyxl.worksheet.datavalidation import DataValidation
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import StaleDataError
 from app.database.transactions import service_transaction
 from app.models.name_cases import NameDictionary, NameDictionaryImport
-from app.name_cases import SHEETS, IMPORT_HEADERS
+from app.name_cases import SHEETS, EXCEL_HEADERS, EXCEL_LABELS
 from app.repositories.name_case_repository import NameCaseRepository as Repository
 from app.services.name_cases import dictionary_values
 
@@ -22,17 +21,12 @@ def empty_template():
     book.remove(book.active)
     for title in SHEETS:
         sheet = book.create_sheet(title)
-        sheet.append(IMPORT_HEADERS)
-        sheet.freeze_panes = "A2"
+        sheet.append(EXCEL_HEADERS)
+        sheet.append(EXCEL_LABELS)
+        sheet.freeze_panes = "A3"
         for cell in sheet[1]:
-            cell.comment = Comment("Обов'язкове текстове поле. sex: male або female. base_form дорівнює nominative.", "project_2")
+            cell.comment = Comment("Обов'язкове текстове поле. Стать і категорія визначені аркушем. base_form дорівнює nominative.", "project_2")
             sheet.column_dimensions[cell.column_letter].width = 24
-        validation = DataValidation(type="list", formula1='"male,female"', allow_blank=False)
-        validation.errorTitle = "Стать не визначається автоматично"
-        validation.error = "Вкажіть male або female."
-        validation.showErrorMessage = True
-        sheet.add_data_validation(validation)
-        validation.add("B2:B10001")
     target = BytesIO()
     book.save(target)
     book.close()
@@ -54,17 +48,17 @@ def read_workbook(content):
         missing = set(SHEETS) - set(book.sheetnames)
         if missing:
             raise ValueError("Відсутні аркуші: " + ", ".join(sorted(missing)))
-        for sheet_name, kind in SHEETS.items():
+        for sheet_name, (kind, sex) in SHEETS.items():
             sheet = book[sheet_name]
-            if sheet.max_row and sheet.max_row > 10001:
+            if sheet.max_row and sheet.max_row > 10002:
                 raise ValueError(f"{sheet_name}: за один імпорт допускається до 10000 рядків даних.")
             header = [str(cell.value or "").strip() for cell in next(sheet.iter_rows(), ())]
             while header and not header[-1]:
                 header.pop()
-            if tuple(header) != IMPORT_HEADERS:
-                errors.append(f"{sheet_name}, рядок 1: потрібні заголовки у порядку: {', '.join(IMPORT_HEADERS)}.")
+            if tuple(header) != EXCEL_HEADERS:
+                errors.append(f"{sheet_name}, рядок 1: потрібні заголовки у порядку: {', '.join(EXCEL_HEADERS)}.")
                 continue
-            for number, cells in enumerate(sheet.iter_rows(min_row=2), 2):
+            for number, cells in enumerate(sheet.iter_rows(min_row=3), 3):
                 if not any(cell.value is not None and str(cell.value).strip() for cell in cells):
                     continue
                 if len(rows) + len(errors) >= 10000:
@@ -72,9 +66,9 @@ def read_workbook(content):
                 try:
                     if any(cell.data_type == "f" for cell in cells):
                         raise ValueError("Формули не підтримуються; потрібні явні текстові значення.")
-                    if any(cell.value is not None and str(cell.value).strip() for cell in cells[len(IMPORT_HEADERS):]):
+                    if any(cell.value is not None and str(cell.value).strip() for cell in cells[len(EXCEL_HEADERS):]):
                         raise ValueError("Є дані за межами визначених колонок.")
-                    values = dictionary_values({"kind": kind, **dict(zip(IMPORT_HEADERS, (cell.value for cell in cells)))}, verified=True)
+                    values = dictionary_values({**dict(zip(EXCEL_HEADERS, (cell.value for cell in cells))), "kind": kind, "sex": sex}, verified=True)
                     key = (kind, values["sex"], values["normalized_key"])
                     if key in seen:
                         raise ValueError("Повтор слова з тією самою статтю в одному словнику.")

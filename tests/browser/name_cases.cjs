@@ -17,7 +17,7 @@ module.exports = async ({context, base, adminToken}) => {
         await page.waitForFunction(() => !document.querySelector('[data-name-part="name"] [data-case-status]').textContent.includes('ще не перевірено'));
     }
     function excel(duplicate=false) {
-        const script = `from tests.test_name_cases import workbook,dictionary_data\nimport sys\nrows=[('names',dictionary_data(genitive='Імпортованого')),('names',dictionary_data(base='Іншеімя'))]\n${duplicate ? "rows.append(('names',dictionary_data(base='ТЕСТОСЛАВ')))" : ''}\nsys.stdout.buffer.write(workbook(rows))`;
+        const script = `from tests.test_name_cases import workbook,dictionary_data\nimport sys\nrows=[('names_male',dictionary_data(genitive='Імпортованого')),('names_male',dictionary_data(base='Іншеімя'))]\n${duplicate ? "rows.append(('names_male',dictionary_data(base='ТЕСТОСЛАВ')))" : ''}\nsys.stdout.buffer.write(workbook(rows))`;
         return execFileSync(process.env.PYTHON || 'python3', ['-c', script]);
     }
     let personUrl, personalUrl;
@@ -144,7 +144,7 @@ module.exports = async ({context, base, adminToken}) => {
             await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Перевірити файл'}).click()]);
             assert.equal(await page.locator('[data-count="errors"]').innerText(),'1');
             assert.equal(await page.getByRole('button',{name:'Підтвердити імпорт'}).count(),0);
-            assert.match(await page.locator('body').innerText(),/names, рядок 4/);
+            assert.match(await page.locator('body').innerText(),/names_male, рядок 5/);
             await page.goto(base+'/admin');
             await Promise.all([page.waitForURL(base+'/admin/login'),page.getByRole('button',{name:'Вийти з адміністрування'}).click()]);
             assert.equal((await context.request.post(base+'/admin/dictionaries/new',{form:{}})).status(),401);
