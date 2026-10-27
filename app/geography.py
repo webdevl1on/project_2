@@ -7,3 +7,8 @@ ADDRESS_TYPES = {"registration": "Місце реєстрації", "actual": "�
 def normalize(value):
     import unicodedata
     return ' '.join(unicodedata.normalize('NFC', value or '').casefold().split())
+
+# Full text is stored; abbreviations are display metadata only.
+SETTLEMENT_TYPES = {'місто':'м.', 'село':'с.', 'селище':'с-ще', 'селище міського типу':'смт', 'хутір':'х.'}
+STREET_TYPES = {'вулиця':'вул.', 'проспект':'просп.', 'провулок':'пров.', 'бульвар':'бульв.', 'площа':'пл.', 'проїзд':'пр-д', 'узвіз':'узвіз', 'набережна':'наб.', 'шосе':'шосе', 'алея':'алея', 'тупик':'туп.'}
+SETTLEMENT_TYPE_ALIASES = {'city':'місто', 'special_city':'місто', 'village':'село', 'settlement':'селище'}

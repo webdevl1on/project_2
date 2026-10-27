@@ -16,6 +16,8 @@ module.exports = async ({context, base}) => {
     }
     await open('birthplace');
     assert.equal(await section('birthplace').locator('[name="street"]').count(),0);
+    assert.ok(await field('birthplace','settlement_type').getAttribute('list'));
+    await field('birthplace','settlement_type').fill('Особливе поселення');
     await field('birthplace','settlement').fill('Історичне');
     await save('birthplace');
     await section('birthplace').getByRole('status').waitFor();
@@ -23,11 +25,15 @@ module.exports = async ({context, base}) => {
     console.log('PASS geography: partial birthplace without street');
     await open('registration');
     await field('registration','country').fill('Україна');
+    await field('registration','settlement_type').fill('Особливе поселення');
+    await field('registration','street_type').fill('Давній шлях');
+    assert.equal(await section('registration').locator('datalist[id$="street_type-options"] option').count(),11);
     await field('registration','house').fill('01А/2');
     await field('registration','postal_code').fill('123');
     assert.equal((await save('registration')).status(),400);
     await section('registration').getByRole('alert').waitFor();
     assert.equal(await field('registration','house').inputValue(),'01А/2');
+    assert.equal(await field('registration','street_type').inputValue(),'Давній шлях');
     assert.equal(await section('registration').locator('details').getAttribute('open'),'');
     await field('registration','postal_code').fill('01234');
     await save('registration'); await section('registration').getByRole('status').waitFor();
@@ -35,8 +41,11 @@ module.exports = async ({context, base}) => {
     await open('actual');
     await section('actual').getByRole('button',{name:'Скопіювати адресу реєстрації'}).click();
     assert.equal(await field('actual','postal_code').inputValue(),'01234');
+    assert.equal(await field('actual','settlement_type').inputValue(),'Особливе поселення');
+    assert.equal(await field('actual','street_type').inputValue(),'Давній шлях');
     await field('actual','house').fill('99Б');
     assert.equal(await field('registration','house').inputValue(),'01А/2');
+    assert.equal(await field('registration','street_type').inputValue(),'Давній шлях');
     await save('actual'); await section('actual').getByRole('status').waitFor();
     console.log('PASS geography: copied address edits independently');
     await field('registration','house').fill('03В');
@@ -48,10 +57,13 @@ module.exports = async ({context, base}) => {
     assert.match(await section('actual').locator('[data-geo-summary]').innerText(),/99Б/);
     console.log('PASS geography: address history and reload persistence');
     await open('registration');
+    assert.equal(await field('registration','street_type').inputValue(),'Давній шлях');
+    assert.equal(await field('registration','settlement_type').inputValue(),'Особливе поселення');
+    console.log('PASS geography: editable type lists retain custom values through errors, copying and reload');
     await page.route('**/geography/search?*', async route => {
         const q = new URL(route.request().url()).searchParams.get('q');
         if (q === 'Стара') await new Promise(resolve=>setTimeout(resolve,500));
-        await route.fulfill({json:[{id:q==='Стара'?501:502,name:q,context:'Тестова область'}]});
+        await route.fulfill({json:[{id:q==='Стара'?501:502,name:q,context:'Тестова область',type:q==='Типове'?'село':null}]});
     });
     const oldRequest=page.waitForRequest(r=>r.url().includes('q=') && new URL(r.url()).searchParams.get('q')==='Стара');
     await field('registration','settlement').fill('Стара'); await oldRequest;
@@ -65,5 +77,21 @@ module.exports = async ({context, base}) => {
     assert.equal(await field('registration','settlement').inputValue(),'Нова');
     assert.equal(await field('registration','settlement_id').inputValue(),'');
     console.log('PASS geography: autocomplete ignores stale responses; parent change retains dependent text');
+    async function chooseType(accept) {
+        await field('registration','settlement').fill('Типове');
+        const button=section('registration').getByRole('button',{name:'Типове — Тестова область'});
+        await button.waitFor();
+        page.once('dialog',dialog=>accept?dialog.accept():dialog.dismiss());
+        await button.click();
+    }
+    await chooseType(false);
+    assert.equal(await field('registration','settlement_type').inputValue(),'Особливе поселення');
+    await chooseType(true);
+    assert.equal(await field('registration','settlement_type').inputValue(),'село');
+    await field('registration','settlement_type').fill('');
+    await field('registration','settlement').fill('Типове');
+    await section('registration').getByRole('button',{name:'Типове — Тестова область'}).click();
+    assert.equal(await field('registration','settlement_type').inputValue(),'село');
+    console.log('PASS geography: dictionary type respects manual text and replacement confirmation');
     assert.deepEqual(errors,[]); await page.close();
 };

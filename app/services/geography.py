@@ -1,6 +1,7 @@
 """Soft geographic verification, immutable address history and formatting."""
 from datetime import date
-from app.geography import GEO_FIELDS, DETAIL_FIELDS, ADDRESS_TYPES, normalize
+from app.geography import GEO_FIELDS, DETAIL_FIELDS, ADDRESS_TYPES, SETTLEMENT_TYPES, STREET_TYPES, SETTLEMENT_TYPE_ALIASES, normalize
+from app.utils.address_format import format_address
 from app.models import PersonAddress, PersonBirthplace
 from app.repositories.geography_repository import GeographyRepository as Repo
 from app.services.service_person_checking import ServicePersonCheck
@@ -15,8 +16,18 @@ def suggestions(db, kind, query, parent_id=None):
         return []
     if len(query) > 250:
         raise ValueError('Пошуковий запит надто довгий.')
+    rows = Repo.search(db, kind, query, parent_id)
+    types = {}
+    if rows and kind in ('settlement', 'street'):
+        for unit_id, details in Repo.type_details(db, [r.id for r in rows]):
+            raw = (details or {}).get(kind + '_type')
+            if not isinstance(raw, str) or not raw.strip():
+                continue
+            raw = SETTLEMENT_TYPE_ALIASES.get(raw, raw) if kind == 'settlement' else raw
+            types.setdefault(unit_id, set()).add(raw)
     return [{'id': r.id, 'name': r.name, 'parent_id': r.parent_id,
-             'context': context(db, r)} for r in Repo.search(db, kind, query, parent_id)]
+             'context': context(db, r),
+             'type': next(iter(types[r.id])) if len(types.get(r.id, ())) == 1 else None} for r in rows]
 
 
 def context(db, unit):
@@ -121,18 +132,6 @@ def save(db, person_id, block, data, *, commit=True):
     return warnings
 
 
-def format_address(record):
-    def value(key):
-        return (record.get(key) if isinstance(record, dict) else getattr(record, key, None)) or ''
-    settlement = ' '.join(filter(None, [value('settlement_type'), value('settlement')]))
-    street = ' '.join(filter(None, [value('street_type'), value('street')]))
-    parts = [value(k) for k in ('country','region','district','community')] + [settlement, street]
-    for key, label in [('house','буд.'),('corps','корп.'),('building','будівля'),('apartment','кв.'),('room','кімн.')]:
-        if value(key): parts.append(f'{label} {value(key)}')
-    parts.extend([value('postal_code'), value('note')])
-    return ', '.join(filter(None, parts))
-
-
 def page(db, person_id):
     ServicePersonCheck.get_person_or_raise(person_id, db)
     records = Repo.addresses(db, person_id)
@@ -140,4 +139,4 @@ def page(db, person_id):
     blocks.update({kind: next((r for r in records if r.kind == kind and r.is_active), None) for kind in ADDRESS_TYPES})
     return {'person_id': person_id, 'geo_blocks': blocks, 'geo_history': [r for r in records if not r.is_active],
             'geo_fields': GEO_FIELDS, 'detail_fields': DETAIL_FIELDS,
-            'address_types': ADDRESS_TYPES, 'format_address': format_address}
+            'settlement_types': SETTLEMENT_TYPES, 'street_types': STREET_TYPES, 'address_types': ADDRESS_TYPES, 'format_address': format_address}

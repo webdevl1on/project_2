@@ -45,6 +45,12 @@
                     button.addEventListener('click', () => {
                         invalidate(form, kind);
                         input.value = unit.name; form.elements[kind + '_id'].value = unit.id;
+                        const typeInput = form.elements[kind + '_type'];
+                        if (typeInput && unit.type && typeInput.value !== unit.type) {
+                            if (!typeInput.value.trim() || window.confirm(`Замінити введений тип «${typeInput.value}» на довідниковий «${unit.type}»?`)) {
+                                typeInput.value = unit.type;
+                            }
+                        }
                         list.replaceChildren();
                     });
                     list.append(button);

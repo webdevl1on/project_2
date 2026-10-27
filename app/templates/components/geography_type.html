@@ -1,0 +1,8 @@
+{% macro type_input(block, key, label, value, options, maxlength=250) %}
+<label class="form-label" for="{{ block }}-{{ key }}">{{ label }}</label>
+<input id="{{ block }}-{{ key }}" name="{{ key }}" class="form-control" maxlength="{{ maxlength }}" list="{{ block }}-{{ key }}-options" value="{{ value or '' }}" aria-describedby="{{ block }}-{{ key }}-hint">
+<datalist id="{{ block }}-{{ key }}-options">
+{% for option in options %}<option value="{{ option }}">{{ 'Історичне позначення' if option == 'селище міського типу' else option }}</option>{% endfor %}
+</datalist>
+<div class="form-text" id="{{ block }}-{{ key }}-hint">Виберіть зі списку або введіть інший тип вручну. Можна залишити порожнім.</div>
+{% endmacro %}

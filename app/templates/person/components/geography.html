@@ -1,3 +1,4 @@
+{% from "components/geography_type.html" import type_input %}
 {% for block, record in geo_blocks.items() %}
 {% if block != 'correspondence' %}
 <section class="card mb-3" data-geo-block="{{ block }}">
@@ -20,11 +21,14 @@
 <input class="form-control" id="{{ block }}-{{ key }}" name="{{ key }}" maxlength="250" autocomplete="off" data-geo-kind="{{ key }}" value="{{ draft[key] or '' if draft else '' }}">
 <input type="hidden" name="{{ key }}_id" value="{{ draft[key ~ '_id'] or '' if draft else '' }}"><div data-geo-results="{{ key }}" class="list-group" role="listbox"></div></div>
 {% endfor %}
-<div class="col-md-6"><label class="form-label">Тип населеного пункту<input name="settlement_type" class="form-control" maxlength="60" value="{{ draft.settlement_type or '' if draft else '' }}"></label></div>
+<div class="col-md-6">{{ type_input(block, "settlement_type", "Тип населеного пункту", draft.settlement_type if draft else "", settlement_types, 60) }}</div>
 {% if block != 'birthplace' %}
 {% for key,label in detail_fields.items() %}
-<div class="col-md-6"><label class="form-label" for="{{ block }}-{{ key }}">{{ label }}</label>
+<div class="col-md-6">
+{% if key == "street_type" %}{{ type_input(block, key, label, draft[key] if draft else "", street_types) }}{% else %}
+<label class="form-label" for="{{ block }}-{{ key }}">{{ label }}</label>
 <input class="form-control" id="{{ block }}-{{ key }}" name="{{ key }}" maxlength="{{ 1000 if key == 'note' else 250 }}" value="{{ draft[key] or '' if draft else '' }}" {% if key == 'street' %}data-geo-kind="street" autocomplete="off"{% endif %}>
+{% endif %}
 {% if key == 'street' %}<input type="hidden" name="street_id" value="{{ draft.street_id or '' if draft else '' }}"><div data-geo-results="street" class="list-group" role="listbox"></div>{% endif %}
 {% if key == 'postal_code' %}<a href="https://index.ukrposhta.ua/" target="_blank" rel="noopener noreferrer">Знайти індекс на Укрпошті</a>{% endif %}</div>
 {% endfor %}

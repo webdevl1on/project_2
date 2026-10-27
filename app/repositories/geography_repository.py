@@ -4,6 +4,11 @@ from app.models import GeoUnit, GeoAlias, PersonAddress, PersonBirthplace
 
 class GeographyRepository:
     @staticmethod
+    def type_details(db, ids):
+        from app.models import GeoImportLink
+        return list(db.execute(select(GeoImportLink.unit_id, GeoImportLink.details).where(GeoImportLink.unit_id.in_(ids))))
+
+    @staticmethod
     def unit(db, key):
         return db.get(GeoUnit, key)
 
