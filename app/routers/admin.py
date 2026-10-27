@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.database.db import get_db
 from app.name_cases import CASES, NAME_PARTS, SEXES, IMPORT_HEADERS
 from app.security.admin import (require_admin, configured_token, check_transport, new_session,
-                                csrf_token, check_csrf, COOKIE, TTL)
+                                csrf_token, check_csrf, dev_admin_open, COOKIE, TTL)
 from app.services import name_cases, name_dictionary_import, dictionary_previews
 from app.templating import templates
 
@@ -22,6 +22,8 @@ def render(request, name, owner=None, status=200, **context):
 
 @router.get("/login")
 def login_page(request: Request):
+    if dev_admin_open(request):
+        return RedirectResponse("/admin", 303)
     if configured_token():
         check_transport(request)
     return render(request, "admin/login.html", enabled=bool(configured_token()))
@@ -29,6 +31,8 @@ def login_page(request: Request):
 
 @router.post("/login")
 def login(request: Request, token: str = Form("")):
+    if dev_admin_open(request):
+        return RedirectResponse("/admin", 303)
     expected = configured_token()
     if expected is None:
         raise HTTPException(503, "Адміністрування вимкнено.")
