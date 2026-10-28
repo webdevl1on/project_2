@@ -48,6 +48,8 @@ def _migrate(database):
         from app.database.service_schema import ADDED_COLUMNS
         from app.models.service_basis import NEW_TABLE_NAMES
         for table in Base.metadata.sorted_tables:
+            from app.models.documents import NEW_TABLE_NAMES as DOCUMENT_TABLES
+            if table.name in DOCUMENT_TABLES: continue
             if table.name in NEW_TABLE_NAMES: continue
             if table.name == 'person_position_mirages': continue
             if table.name in new_names:

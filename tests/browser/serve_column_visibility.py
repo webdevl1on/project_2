@@ -112,5 +112,15 @@ def two_tables():
     ''').render(configs=[first, second])
 
 
+@app.post('/_column-test/documents/setup')
+def document_accounts():
+    # Test-only application module: never registered by app.main in production.
+    import os
+    from app.services.accounts import create_user
+    with Session() as db:
+        key=create_user(db,'doc-admin','Тестовий адміністратор',os.environ['PROJECT2_ADMIN_TOKEN'],'admin')
+    return {'user_id':key,'person_id':3}
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=int(sys.argv[1]), log_level="warning")

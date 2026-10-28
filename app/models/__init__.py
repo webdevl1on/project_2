@@ -42,3 +42,6 @@ from app.models.mirage import PersonPositionMirage
 __all__ += ['PersonPositionMirage']
 from app.models.service_basis import PersonServiceBasis, TccOffice, TccImport
 __all__ += ['PersonServiceBasis', 'TccOffice', 'TccImport']
+from app.models.accounts import User, UserSession
+from app.models.documents import DocumentType, PersonDocumentState, PersonDocument, DocumentDetails, DrivingCategory, DocumentFile, DocumentAudit
+__all__ += ['User', 'UserSession', 'DocumentType', 'PersonDocumentState', 'PersonDocument', 'DocumentDetails', 'DrivingCategory', 'DocumentFile', 'DocumentAudit']

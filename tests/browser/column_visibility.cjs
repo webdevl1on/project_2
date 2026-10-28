@@ -8,6 +8,8 @@ const net = require("node:net");
 const path = require("node:path");
 const { chromium } = require("playwright");
 const { randomBytes } = require("node:crypto");
+const fs = require('node:fs');
+const os = require('node:os');
 
 async function main() {
     const root = path.resolve(__dirname, "../..");
@@ -27,9 +29,10 @@ async function main() {
         }
     }
     const adminToken = randomBytes(32).toString("base64url");
+    const privateStorage = fs.mkdtempSync(path.join(os.tmpdir(),'project2-document-browser-'));
     const server = spawn(process.env.PYTHON || "python3",
         ["-m", "tests.browser.serve_column_visibility", String(port)], {
-            cwd: root, env: { ...process.env, PROJECT2_ADMIN_TOKEN: adminToken, PROJECT2_ADMIN_ALLOW_HTTP: "1" },
+            cwd: root, env: { ...process.env, PROJECT2_ADMIN_TOKEN: adminToken, PROJECT2_ADMIN_ALLOW_HTTP: "1", PROJECT2_AUTH_ALLOW_LOCAL_HTTP: '1', PROJECT2_DOCUMENT_STORAGE: privateStorage },
         });
     let serverOutput = "";
     server.stderr.on("data", data => { serverOutput += data; });
@@ -57,7 +60,7 @@ async function main() {
             const version = route.request().url().split("bootstrap@")[1].split("/")[0];
             return route.fulfill({ body: assets[`${version}/${file}`], contentType: file.endsWith(".js") ? "application/javascript" : "text/css" });
         });
-        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "history_forms", "name_cases", "geography", "contacts", "personnel", "service_bases"];
+        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "history_forms", "name_cases", "geography", "contacts", "personnel", "service_bases", "documents"];
         if (process.env.COLUMN_STAGE) {
             assert.ok(suites.includes(process.env.COLUMN_STAGE));
             await require(`./${process.env.COLUMN_STAGE}.cjs`)({ context, base, adminToken });
@@ -244,6 +247,7 @@ async function main() {
     } finally {
         if (browser) await browser.close();
         server.kill();
+        fs.rmSync(privateStorage,{recursive:true,force:true});
     }
 }
 

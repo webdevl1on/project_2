@@ -34,3 +34,6 @@ app.include_router(service_chronology.router)
 from app.routers import service_bases, admin_tcc
 app.include_router(service_bases.router)
 app.include_router(admin_tcc.router)
+from app.routers import accounts, documents
+app.include_router(accounts.router)
+app.include_router(documents.router)
