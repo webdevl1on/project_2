@@ -1,0 +1,32 @@
+{% macro basis_form(record=none) %}
+{% set prefix='basis-' ~ (record.id if record else 'new') %}
+<form data-personnel-form data-service-basis-form method="post" action="/persons/{{ person_id }}/service-bases{{ '/' ~ record.id if record else '' }}">
+{% if record %}<input type="hidden" name="revision" value="{{ record.revision }}">{% endif %}
+<label class="form-label" for="{{ prefix }}-type">Вид служби</label>
+<select id="{{ prefix }}-type" name="service_type" class="form-select" required><option value="">Оберіть вид служби</option>{% for key,label in service_basis_types.items() %}<option value="{{ key }}" {{ 'selected' if record and record.service_type==key else '' }}>{{ label }}</option>{% endfor %}</select>
+<fieldset data-basis-fields="mobilization" class="row g-2 my-2" hidden disabled>
+<legend class="h6">Мобілізація</legend>
+<div class="col-md-4"><label for="{{ prefix }}-mobilization">Дата мобілізації</label><input id="{{ prefix }}-mobilization" class="form-control" type="date" name="mobilization_date" value="{{ record.mobilization_date or '' if record else '' }}"></div>
+<div class="col-md-4"><label for="{{ prefix }}-region">Область</label><input id="{{ prefix }}-region" class="form-control" name="region" maxlength="250" list="tcc-regions" value="{{ record.region or '' if record else '' }}"></div>
+<div class="col-md-4"><label for="{{ prefix }}-settlement">Населений пункт</label><input id="{{ prefix }}-settlement" class="form-control" name="settlement" maxlength="250" list="tcc-settlements" value="{{ record.settlement or '' if record else '' }}"></div>
+<div class="col-12"><label for="{{ prefix }}-search">ТЦК та СП — пошук у довіднику</label><div class="input-group"><input id="{{ prefix }}-search" class="form-control" data-tcc-query maxlength="250" placeholder="Частина офіційної назви"><button type="button" class="btn btn-outline-secondary" data-tcc-search>Знайти ТЦК</button></div>
+<select class="form-select mt-1" aria-label="Установа довідника ТЦК" name="tcc_office_id"><option value="">Без довідникового посилання</option>{% if record and record.tcc_office_id %}{% set linked=basis_tcc_offices[record.tcc_office_id] %}<option selected value="{{ record.tcc_office_id }}">{{ linked.official_name }} · #{{ linked.id }}{{ ' · Неактивний' if not linked.is_active else '' }}</option>{% endif %}</select><p class="form-text" data-tcc-hint role="status">Довідник лише підказує. Відсутність установи не заважає збереженню.</p></div>
+<div class="col-12"><label for="{{ prefix }}-document">Фактичне формулювання ТЦК та СП з документа</label><input id="{{ prefix }}-document" class="form-control" name="document_tcc_name" maxlength="500" value="{{ record.document_tcc_name or '' if record else '' }}"></div>
+{% if record and record.service_type=='mobilization' %}<p class="small">Зіставлення на момент збереження: {{ {'matched':'Збіг із довідником','mismatch':'Розбіжність із довідником','unknown':'Без довідникового збігу'}[record.match_status] }}. Подальші оновлення довідника не змінюють цей документ.</p>{% endif %}
+</fieldset>
+<fieldset data-basis-fields="contract" class="row g-2 my-2" hidden disabled><legend class="h6">Контракт</legend>
+{% for field,label in [('contract_signed_date','Дата підписання'),('contract_start_date','Дата початку служби за контрактом'),('enlistment_order_date','Дата наказу про зарахування')] %}<div class="col-md-4"><label for="{{ prefix }}-{{ field }}">{{ label }}</label><input id="{{ prefix }}-{{ field }}" class="form-control" type="date" name="{{ field }}" value="{{ record[field] or '' if record else '' }}"></div>{% endfor %}
+<div class="col-md-4"><label for="{{ prefix }}-number">Номер наказу</label><input id="{{ prefix }}-number" class="form-control" name="enlistment_order_number" maxlength="100" value="{{ record.enlistment_order_number or '' if record else '' }}"></div>
+<div class="col-md-8"><label for="{{ prefix }}-unit">Військова частина, у якій укладено контракт</label><input id="{{ prefix }}-unit" class="form-control" name="contract_unit" maxlength="250" value="{{ record.contract_unit or '' if record else '' }}"></div>
+</fieldset>
+<p class="form-text">Невідома дата залишається порожньою. Якщо зазначена — потрібні день, місяць і рік. Дати не прирівнюються одна до одної.</p>
+<label class="d-block"><input type="checkbox" name="document_verified" {{ 'checked' if record and record.document_verified else '' }}> Вручну перевірено за документом</label>
+<label class="d-block"><input type="checkbox" name="is_current" {{ 'checked' if (record and record.is_current) or (not record and not current_service_basis) else '' }}> Поточна підстава служби (попередня залишиться в історії)</label>
+<button class="btn btn-primary my-2">Зберегти підставу</button>
+</form>
+{% endmacro %}
+<h2 class="h4">Підстава проходження військової служби</h2>
+<p>Окремі відомості з документів. Збереження не створює призначень або записів незалежної історії служби.</p>
+<details class="border rounded p-3 mb-3" data-new-basis><summary>Додати підставу служби</summary>{{ basis_form() }}</details>
+{% for record in service_bases %}<details class="border rounded p-3 mb-2" data-service-basis="{{ record.id }}"><summary>{{ service_basis_types[record.service_type] }} · {{ 'Поточна' if record.is_current else 'Історична' }} · {{ record.mobilization_date or record.contract_start_date or 'Дата не зазначена' }}</summary>{{ basis_form(record) }}</details>{% else %}<p>Підстави служби не внесено.</p>{% endfor %}
+<datalist id="tcc-regions"></datalist><datalist id="tcc-settlements"></datalist>

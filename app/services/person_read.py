@@ -25,11 +25,10 @@ def person_details(db, person_id, *, include_history=False, include_ranks=False)
 
 def full_profile(db,person_id):
     from app.repositories.person_repository import ProfileRepository
-    from app.models import PersonName,PersonRank,PersonServiceHistory
+    from app.models import PersonName,PersonRank
     from app.services.staff_service import today
     from app.services import geography,contacts
     from app.utils.date_utils import format_partial_date
-    from app.geography import normalize
     result={"person":ServicePersonCheck.get_person_or_raise(person_id,db),"ranks":PersonRepository.ranks(db)}
     warnings=[]
     for key,model in [('current_name',PersonName),('current_rank',PersonRank)]:
@@ -39,11 +38,8 @@ def full_profile(db,person_id):
     assignments=ProfileRepository.assignments(db,person_id,today())
     result['profile_assignment']=assignments[0] if len(assignments)==1 else None
     if len(assignments)>1:warnings.append('Кілька чинних призначень: поточну посаду не визначено.')
-    from app.services.service_chronology import service_record_applies
-    services=[record for record in ProfileRepository.active_records(db,PersonServiceHistory,person_id) if service_record_applies(record,today())]
-    wording={'contract':'за контрактом','контракт':'за контрактом','за контрактом':'за контрактом',
-             'mobilization':'за мобілізацією','мобілізація':'за мобілізацією','за мобілізацією':'за мобілізацією'}
-    result['service_wording']=wording.get(normalize(services[0].service_type)) if len(services)==1 else None
+    from app.services import service_bases
+    result.update(service_bases.page(db,person_id))
     result['profile_warnings']=warnings
     result['assignment_history']=ProfileRepository.assignments(db,person_id)
     person=result['person'];result['profile_birth']=format_partial_date(person.birth_day,person.birth_month,person.birth_year) if any([person.birth_day,person.birth_month,person.birth_year]) else None

@@ -14,6 +14,7 @@
 <select class="form-select" id="mode" name="mode"><option value="add">Додавати тільки нові записи</option><option value="update">Додавати нові й оновлювати існуючі</option></select>
 <p class="form-text">Аркуші surname_male, names_male, patronimic_male, surname_female, names_female, patronimic_female визначають категорію та стать. Рядок 1 — системні заголовки, рядок 2 — українські назви, дані — з рядка 3. Усі сім відмінків обов'язкові; невідомі форми не підставляйте.</p>
 <button class="btn btn-primary">Перевірити файл</button></form></div></section>
+<section class="card my-3"><div class="card-body"><h2 class="h4">Довідник ТЦК та СП</h2><p>Незалежний довідник установ: пошук, редагування, деактивація та контрольований Excel-імпорт.</p><a href="/admin/tcc" class="btn btn-outline-primary">Відкрити довідник ТЦК та СП</a></div></section>
 <p>Наступні розділи адміністрування додаватимуться за потреби.</p>
 <form method="post" action="/admin/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-outline-secondary">Вийти з адміністрування</button> <a href="/persons" class="btn btn-link">До списку людей</a></form>
 </body></html>

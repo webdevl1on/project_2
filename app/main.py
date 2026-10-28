@@ -31,3 +31,6 @@ from app.routers import contacts
 app.include_router(contacts.router)
 from app.routers import service_chronology
 app.include_router(service_chronology.router)
+from app.routers import service_bases, admin_tcc
+app.include_router(service_bases.router)
+app.include_router(admin_tcc.router)

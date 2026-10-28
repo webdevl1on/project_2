@@ -12,7 +12,7 @@ DIRECTORY = Path(tempfile.gettempdir()) / "project2-name-dictionary-previews"
 PURPOSE = "name-dictionary-import"
 
 
-def store(prepared, owner):
+def store(prepared, owner, *, resource='name-dictionary'):
     DIRECTORY.mkdir(mode=0o700, exist_ok=True)
     for path in DIRECTORY.glob("*.json"):
         if path.stat().st_mtime < time.time() - TTL:
@@ -22,12 +22,14 @@ def store(prepared, owner):
     descriptor = os.open(DIRECTORY / (key + ".json"), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "wb") as target:
         target.write(content)
-    return sign({"key": key, "digest": hashlib.sha256(content).hexdigest(), "owner": owner}, PURPOSE)
+    return sign({"key": key, "digest": hashlib.sha256(content).hexdigest(), "owner": owner, 'resource': resource}, PURPOSE)
 
 
-def load(token, owner):
+def load(token, owner, *, resource='name-dictionary'):
     payload = verify(token, PURPOSE)
     key = payload.get("key", "")
+    if payload.get('resource', 'name-dictionary') != resource:
+        raise ValueError('Попередній перегляд належить іншому довіднику.')
     if payload.get("owner") != owner or len(key) != 64 or any(char not in "0123456789abcdef" for char in key):
         raise ValueError("Попередній перегляд належить іншій адміністративній сесії.")
     try:

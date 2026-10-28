@@ -40,3 +40,5 @@ from app.models.person_contact import PersonContact
 __all__ += ['PersonContact']
 from app.models.mirage import PersonPositionMirage
 __all__ += ['PersonPositionMirage']
+from app.models.service_basis import PersonServiceBasis, TccOffice, TccImport
+__all__ += ['PersonServiceBasis', 'TccOffice', 'TccImport']

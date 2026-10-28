@@ -161,7 +161,8 @@ def test_profile_reads_effective_assignments_and_explicit_service_only(factory):
         assert full_profile(db,pid)['profile_assignment'][1].position_id==positions[-1].position_id
         assert full_profile(db,pid)['service_wording'] is None
         db.add(PersonServiceHistory(person_id=pid,service_type='mobilization',is_active=True));db.commit()
-        assert full_profile(db,pid)['service_wording']=='за мобілізацією'
+        # Legacy service text must not infer an explicit document-owned basis.
+        assert full_profile(db,pid)['service_wording'] is None
 
 
 def test_database_failure_is_sanitized_and_rolls_back_primary(factory,monkeypatch):

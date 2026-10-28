@@ -21,7 +21,9 @@ def migrate(database):
         try:
             connection.execute('PRAGMA foreign_keys=ON');integrity(connection)
             tables={r[0] for r in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            from app.models.service_basis import NEW_TABLE_NAMES
             for table in Base.metadata.sorted_tables:
+                if table.name in NEW_TABLE_NAMES: continue
                 if table.name=='person_position_mirages':continue
                 required={c.name for c in table.columns}-ADDED_COLUMNS.get(table.name,set())
                 if table.name not in tables or not required<=columns(connection,table.name):raise ValueError(f'Попередня схема {table.name} неповна; спочатку виконайте попередні міграції.')
