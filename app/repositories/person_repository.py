@@ -128,3 +128,17 @@ def history_selection(model):
         model.person_id.label("person_id"), chosen.label("chosen_id"),
         func.count().label("total"), active_count.label("active_count"),
     ).group_by(model.person_id).subquery())
+
+
+class ProfileRepository:
+    """Unambiguous current data and effective-dated assignment reads."""
+    @staticmethod
+    def active_records(db,model,person_id):
+        return db.query(model).filter(model.person_id==person_id,model.is_active.is_(True)).all()
+
+    @staticmethod
+    def assignments(db,person_id,on=None):
+        from app.models.staff import StaffVersion
+        query=db.query(PersonAssignment,Position,StaffVersion).select_from(PersonAssignment).join(Position,Position.position_id==PersonAssignment.position_id).join(StaffVersion,StaffVersion.id==Position.staff_version_id).filter(PersonAssignment.person_id==person_id)
+        if on is not None: query=query.filter(active(PersonAssignment,'assigned_from','assigned_to',on),active(StaffVersion,'valid_from','valid_to',on))
+        return query.order_by(PersonAssignment.assigned_from.desc(),PersonAssignment.id.desc()).all()

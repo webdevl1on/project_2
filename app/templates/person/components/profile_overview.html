@@ -1,0 +1,17 @@
+<div class="row g-3">
+<section class="col-md-6"><div class="card h-100"><div class="card-body"><h2 class="h5">Особисті дані</h2>
+<p>{{ current_name.surname if current_name else 'Не зазначено' }} {{ current_name.name if current_name else '' }} {{ current_name.patronymic or '' if current_name else '' }}</p>
+<p>Звання: {{ current_rank.rank.nominative if current_rank else 'Не зазначено' }}</p><p>Дата народження: {{ profile_birth or 'Не зазначено' }}</p><p>Стать: {{ {'male':'Чоловіча','female':'Жіноча'}.get(person.sex,'Не зазначено') }}</p>
+<a href="#names" data-profile-tab="names">Редагувати ПІБ</a> · <a href="#ranks" data-profile-tab="ranks">Редагувати звання</a>
+</div></div></section>
+<section class="col-md-6"><div class="card h-100"><div class="card-body"><h2 class="h5">Службова інформація</h2>
+<p>{{ profile_assignment[1].name_nominative if profile_assignment else 'Посада не зазначена' }}</p><p>Підрозділ: {{ profile_assignment[1].unit_short if profile_assignment else 'Не зазначено' }}</p><p>Вид служби: {{ service_wording or 'Не зазначено' }}</p><a href="#positions" data-profile-tab="positions">Відкрити посаду та історію</a>
+</div></div></section>
+<section class="col-md-6"><div class="card h-100"><div class="card-body"><h2 class="h5">Контактна інформація</h2>
+{% for kind,label in [('phone','Телефон'),('email','Email')] %}{% set info=contact_summary[kind] %}
+<p>{{ label }}: {% if info.record %}<a class="text-break" href="#contacts" data-profile-tab="contacts">{{ info.record.value }}</a> · {{ 'Основний' if info.primary else 'Додатковий' }}{% else %}Не зазначено{% endif %}<br>Додаткових активних: {{ info.additional }}</p>{% endfor %}
+<a href="#contacts" data-profile-tab="contacts">Редагувати контакти</a></div></div></section>
+<section class="col-md-6"><div class="card h-100"><div class="card-body"><h2 class="h5">Адреси</h2>
+{% for block,label in [('birthplace','Місце народження'),('registration','Реєстрація'),('actual','Фактичне проживання')] %}<p>{{ label }}: {{ format_address(geo_blocks[block]) or 'Не зазначено' }}</p><a href="#addresses-{{ block }}" data-profile-tab="addresses" data-profile-block="{{ block }}">Редагувати {{ label|lower }}</a>{% endfor %}
+</div></div></section>
+</div>

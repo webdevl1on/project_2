@@ -1,7 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="uk">
 
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="/static/css/person_profile.css" rel="stylesheet">
     <title>{{ current_name.surname }} {{ current_name.name }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
         integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
@@ -11,118 +13,30 @@
 
     {% include "person/components/full_info_top_navigation.html" %}
 
-    <h1>Картка військовослужбовця</h1>
-    <p>{{ current_rank.rank.nominative if current_rank else "" }} {{ current_name.surname if current_name else "" }} {{ current_name.name if current_name else "" }} {{ current_name.patronymic if current_name and current_name.patronymic else "" }}</p>
-
-
-
+    {% include "person/components/profile_header.html" %}
     {% include "person/components/modal_windows.html" %}
-    <ul class="nav nav-pills mb-3" id="personTabs">
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#general">Загальна інформація</button></li>
-        <li class="nav-item">
-            <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#names">
-                ПІБ
-            </button>
-        </li>
-
-        <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="pill" data-bs-target="#ranks">
-                Звання
-            </button>
-        </li>
-
-        <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="pill" data-bs-target="#positions">
-                Посада
-            </button>
-        </li>
-
-        <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="pill" data-bs-target="#documents">
-                Документи
-            </button>
-        </li>
-
-        <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="pill" data-bs-target="#family">
-                Сім'я
-            </button>
-        </li>
-
-        <li class="nav-item">
-            <button class="nav-link" data-bs-toggle="pill" data-bs-target="#events">
-                Події
-            </button>
-        </li>
-    </ul>
+    <ul class="nav nav-pills mb-3" id="personTabs" role="tablist">
+    {% for key,label in [('general','Загальна інформація'),('names','ПІБ'),('ranks','Звання'),('positions','Посада'),('addresses','Адреси'),('contacts','Контакти'),('documents','Документи'),('family',"Сім'я"),('events','Події')] %}
+    <li class="nav-item" role="presentation"><button id="tab-{{ key }}" type="button" role="tab" aria-controls="{{ key }}" aria-selected="{{ 'true' if key == 'general' else 'false' }}" class="nav-link {{ 'active' if key == 'general' else '' }}" data-bs-toggle="pill" data-bs-target="#{{ key }}">{{ label }}</button></li>
+    {% endfor %}</ul>
     <div class="tab-content">
-        <div class="tab-pane fade" id="general"><div id="person-geography" data-person-id="{{ person_id }}">{% include "person/components/geography.html" %}</div></div>
-
-        <div class="tab-pane fade show active" id="names">
-            {% include "person/components/names_history.html" %}
-        </div>
-
-        <div class="tab-pane fade" id="ranks">
-            {% include "person/components/rank_history.html" %}
-        </div>
-
-        <div class="tab-pane fade" id="positions">
-            <!-- тут person.positions -->
-        </div>
-
-        <div class="tab-pane fade" id="documents">
-            <!-- тут person.documents -->
-        </div>
-
-        <div class="tab-pane fade" id="family">
-            <!-- тут person.family -->
-        </div>
-
-        <div class="tab-pane fade" id="events">
-            <!-- тут person.events -->
-        </div>
-
+    <div class="tab-pane fade show active" id="general" role="tabpanel" aria-labelledby="tab-general"><div id="profile-overview" data-url="/persons/{{ person_id }}/overview">{% include 'person/components/profile_overview.html' %}</div></div>
+    <div class="tab-pane fade" id="names" role="tabpanel" aria-labelledby="tab-names">{% include 'person/components/names_history.html' %}</div>
+    <div class="tab-pane fade" id="ranks" role="tabpanel" aria-labelledby="tab-ranks">{% include 'person/components/rank_history.html' %}</div>
+    <div class="tab-pane fade" id="positions" role="tabpanel" aria-labelledby="tab-positions"><p>{{ profile_assignment[1].name_nominative if profile_assignment else 'Посада не зазначена' }}</p><a href="/staff/history">Відкрити версії та історію призначень</a>
+    {% for assignment,position,version in assignment_history %}<p>{{ version.name }} · {{ position.name_nominative }} · {{ position.unit_short }} · {{ assignment.assigned_from }} — {{ assignment.assigned_to or 'Відкрите' }}</p>{% endfor %}</div>
+    <div class="tab-pane fade" id="addresses" role="tabpanel" aria-labelledby="tab-addresses"><div id="person-geography" data-person-id="{{ person_id }}">{% include 'person/components/geography.html' %}</div></div>
+    <div class="tab-pane fade" id="contacts" role="tabpanel" aria-labelledby="tab-contacts"><div id="person-contacts" data-url="/persons/{{ person_id }}/contacts">{% include 'person/components/contacts.html' %}</div></div>
+    {% for key in ['documents','family','events'] %}<div class="tab-pane fade" id="{{ key }}" role="tabpanel" aria-labelledby="tab-{{ key }}">Розділ у розробці.</div>{% endfor %}
     </div>
-
-
-
-    <!-- Modal for tax_number-->
-    <div class="modal fade" id="change_tax_number" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-body">
-                    <form method="post" class="row g-3" action="/person_full_info_name_add/{{ person.person_id }}">
-                        <div class="col-md-6">
-                            <label for="tax_number">ІПН </label>
-                            <input id="tax_number" name="tax_number">
-                        </div>
-
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                            <button type="submit" class="btn btn-primary">Save </button>
-                        </div>
-                    </form>
-                </div>
-
-            </div>
-        </div>
-    </div>
-    <div style="border: solid red 1px; margin-top: 45px;">
-        {% for names in person.names %}
-        <p>TESTING</p>
-        <p>{{loop.index}}<span> {{names.surname}}</span> </p>
-
-        {% endfor %}
-        <p>{{person.ranks}}</p>
-    </div>
-
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous">
         </script>
 
     <script src="/static/js/date_input.js"></script>
     <script src="/static/js/geography.js"></script>
+    <script src="/static/js/person_profile.js"></script>
+    <script src="/static/js/contacts.js"></script>
 </body>
 
 </html>

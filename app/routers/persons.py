@@ -176,9 +176,8 @@ def get_person_full_info(
     person_id: int,
     db: Session = Depends(get_db),
     ):
-    from app.services.geography import page as geography_page
-    details = person_details(db, person_id, include_ranks=True)
-    details.update(geography_page(db, person_id))
+    from app.services.person_read import full_profile
+    details = full_profile(db, person_id)
     return templates.TemplateResponse(
         request=request,
         name = "person_full_info.html",

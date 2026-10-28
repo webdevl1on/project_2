@@ -1,0 +1,7 @@
+<header class="d-flex gap-3 align-items-start mb-3">
+{% include 'person/components/profile_photo.html' %}
+<div class="profile-heading flex-grow-1"><div class="small text-secondary">Картка військовослужбовця</div>
+<h1 class="h3 text-break">{% if current_rank %}{{ current_rank.rank.nominative|lower }} {% endif %}{% if service_wording %}{{ service_wording }} {% endif %}{% if current_name %}<span>{{ current_name.surname|upper }} {{ current_name.name }} {{ current_name.patronymic or '' }}</span>{% else %}ПІБ не зазначено{% endif %}</h1>
+<p>{{ profile_assignment[1].name_nominative if profile_assignment else 'Посада не зазначена' }}{% if profile_assignment %} · {{ profile_assignment[1].unit_short }}{% endif %}</p>
+</div></header>
+{% for warning in profile_warnings %}<p class="alert alert-warning">{{ warning }}</p>{% endfor %}

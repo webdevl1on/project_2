@@ -6,7 +6,7 @@ module.exports = async ({context, base}) => {
     const page = await context.newPage(), errors=[];
     page.on('pageerror', error=>errors.push(error.message));
     await page.goto(base+link[1]);
-    await page.locator('[data-bs-target="#general"]').click();
+    await page.locator('[data-bs-target="#addresses"]').click();
     const section = kind=>page.locator(`[data-geo-block="${kind}"]`);
     const field = (kind,name)=>section(kind).locator(`[name="${name}"]`);
     async function open(kind) { await section(kind).locator('summary').click(); }
@@ -52,7 +52,7 @@ module.exports = async ({context, base}) => {
     await save('registration'); await section('registration').getByRole('status').waitFor();
     assert.match(await page.locator('[data-geo-history]').innerText(),/01А\/2/);
     await page.reload();
-    await page.locator('[data-bs-target="#general"]').click();
+    await page.locator('[data-bs-target="#addresses"]').click();
     assert.match(await section('registration').locator('[data-geo-summary]').innerText(),/03В/);
     assert.match(await section('actual').locator('[data-geo-summary]').innerText(),/99Б/);
     console.log('PASS geography: address history and reload persistence');
@@ -134,7 +134,7 @@ module.exports = async ({context, base}) => {
     await section('birthplace').getByRole('button',{name:'Очистити форму',exact:true}).click();
     await section('birthplace').getByRole('button',{name:'Зберегти',exact:true}).click();
     assert.match(await section('birthplace').locator('[data-geo-client-error]').innerText(),/місце народження/);
-    await page.reload(); await page.locator('[data-bs-target="#general"]').click();
+    await page.reload(); await page.locator('[data-bs-target="#addresses"]').click();
     assert.match(await section('registration').locator('[data-geo-summary]').innerText(),/03В/);
     console.log('PASS geography: confirmed form clear is local, retains technical fields and prevents empty submission');
     await open('registration');

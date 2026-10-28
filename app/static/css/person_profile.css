@@ -1,0 +1,10 @@
+.profile-photo { width:90px; aspect-ratio:3/4; }
+.profile-heading { min-width:0; overflow-wrap:anywhere; }
+#personTabs { flex-wrap:nowrap; overflow-x:auto; }
+#personTabs .nav-link { white-space:nowrap; min-height:44px; }
+#person-contacts button, #person-contacts summary { min-height:44px; }
+#person-contacts, #profile-overview { overflow-wrap:anywhere; }
+@media(max-width:576px) { .profile-photo { width:80px; } .profile-heading h1 { font-size:1.25rem; } }
+
+#names, #ranks { overflow-x:auto; }
+.tab-content { min-width:0; overflow-wrap:anywhere; }

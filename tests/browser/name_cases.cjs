@@ -101,6 +101,7 @@ module.exports = async ({context, base, adminToken}) => {
         await scenario('created person has a rank and personal cases can be corrected by name history record', async () => {
             await page.goto(base+personUrl);
             assert.match(await page.locator('body').innerText(),/Солдат|солдат/);
+            await page.locator('[data-bs-target="#names"]').click();
             personalUrl=await page.getByRole('link',{name:'Відмінки',exact:true}).getAttribute('href');
             await page.goto(base+personalUrl);
             await group().locator('summary').click();

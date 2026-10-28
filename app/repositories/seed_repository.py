@@ -78,9 +78,9 @@ def city_batch(connection, rows, settlements, sources, digest):
 
 def database_snapshot(connection):
     from app.models import (Rank,EventType,EventSubtype,Position,Person,PersonName,PersonRank,
-                            PersonBirthplace,PersonAddress,PersonAssignment)
+                            PersonBirthplace,PersonAddress,PersonAssignment,PersonContact)
     count=lambda model:connection.scalar(select(func.count()).select_from(model))
-    counts={m.__tablename__:count(m) for m in (Rank,EventType,EventSubtype,NameDictionary,Position,Person,PersonBirthplace,PersonAddress,PersonAssignment,GeoCityDistrict)}
+    counts={m.__tablename__:count(m) for m in (Rank,EventType,EventSubtype,NameDictionary,Position,Person,PersonBirthplace,PersonAddress,PersonAssignment,GeoCityDistrict,PersonContact)}
     for kind,table in [('country','countries'),('region','regions'),('district','districts'),('community','communities'),('settlement','settlements'),('street','streets')]:
         counts[table]=connection.scalar(select(func.count()).select_from(GeoUnit).where(GeoUnit.kind==kind))
     names_and_ranks=[]

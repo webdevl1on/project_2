@@ -235,7 +235,7 @@ ClipboardItem/write використовується для HTML, writeText — 
 | `admin.py` | `GET /admin/dictionaries/template.xlsx`, `POST /admin/dictionaries/import/preview`, `/confirm` | Порожній шаблон, перевірка та окреме атомарне підтвердження Excel. |
 | `persons.py` | `GET /persons/{person_id}/edit`, `POST /persons/{person_id}/edit` | Спільна форма → `ServicePersonCreate.update_person`; успіх → `/person_detail/{id}`. |
 | `persons.py` | `GET /person_detail/{person_id}` | Коротка картка, активні ПІБ/звання, історія ПІБ → `person_detail.html`. |
-| `persons.py` | `GET /person_full_info/{person_id}` | Людина, активні ПІБ/звання, довідник звань → `person_full_info.html`. |
+| `persons.py` | `GET /person_full_info/{person_id}` | full_profile: однозначні чинні ПІБ/звання/призначення, контакти й огляд → `person_full_info.html`. |
 | `person_name.py` | `POST /person_name/add_new/{person_id}` | `ServicePersonNameFunc.add_new_name`. |
 | `person_name.py` | `POST /person_name/{person_name_id}/update`, `/make_active`, `/delete` | Операції з конкретним записом ПІБ; перенаправлення до повної картки. |
 | `person_rank.py` | `POST /person_ranks/add_rank/{person_id}` | `ServicePersonRankFunc.add_rank`. |
@@ -254,7 +254,7 @@ ClipboardItem/write використовується для HTML, writeText — 
 | `person_create.html`, `person_created.html`, `person_name_cases.html` | Поетапне створення, повідомлення успіху та редагування форм конкретного історичного ПІБ; спільний макрос name_case_fields.html. |
 | `admin/*.html` | Вхід, централізований розділ, словники, редактор, preview/підтвердження Excel. Словникові мутації потребують admin-сесії та CSRF, крім явно ввімкненого локального режиму розробки. |
 | `person_detail.html` | Коротка картка й історія ПІБ; системні часи створення/оновлення показуються точно в UTC, стан — через `is_active`. |
-| `person_full_info.html` | Повна картка; включає навігацію, модальні форми, історію ПІБ і звань. Інші вкладки — заглушки. |
+| `person_full_info.html` | Шапка/огляд, історія ПІБ і звань, поточна/історична посада, адреси та контакти. Документи/сім’я/події — незавершені. |
 | `person/components/full_info_top_navigation.html` | Посилання на коротку картку та список. |
 | `person/components/modal_windows.html` | Форми додавання ПІБ і звання. |
 | `person/components/names_history.html`, `rank_history.html` | Цикли по ORM-колекціях `person.names` / `person.ranks`, форми редагування, активації та видалення. |
@@ -295,7 +295,7 @@ ClipboardItem/write використовується для HTML, writeText — 
 
 ## Географія та адреси
 
-[GEOGRAPHY.md](GEOGRAPHY.md) описує чотири нові таблиці, м’яку перевірку, точкове оновлення форм і безпечну міграцію. app/geography.py — метадані полів; routers/geography.py → services/geography.py → repositories/geography_repository.py. PersonBirthplace обмежено населеним пунктом; PersonAddress зберігає текстові знімки, необов’язкові GeoUnit ID та незалежну історію registration/actual/correspondence. GeoAlias підтримує альтернативні назви. Вкладка «Загальна інформація» включає спільний geography.html і geography.js; старі кадрові правила та каталоги колонок не змінені.
+[GEOGRAPHY.md](GEOGRAPHY.md) описує чотири нові таблиці, м’яку перевірку, точкове оновлення форм і безпечну міграцію. app/geography.py — метадані полів; routers/geography.py → services/geography.py → repositories/geography_repository.py. PersonBirthplace обмежено населеним пунктом; PersonAddress зберігає текстові знімки, необов’язкові GeoUnit ID та незалежну історію registration/actual/correspondence. GeoAlias підтримує альтернативні назви. Вкладка «Адреси» включає спільний geography.html і geography.js; «Загальна інформація» тепер лише читає адреси; старі кадрові правила та каталоги колонок не змінені.
 
 ## Повне тестове засівання
 
@@ -304,3 +304,7 @@ reset.py — CLI, services/seed_bootstrap.py — порядок/preflight/пер
 Форматування географії: services/geography.py зберігає публічний format_address, реалізація — чистий utils/address_format.py (короткий та extended формат). app/geography.py містить централізовані типи/скорочення; components/geography_type.html — спільний editable datalist для settlement_type/street_type. Repository читає метадані типів вибраних GeoUnit обмеженим пакетним запитом; geography.js підтверджує заміну введеного типу. Збережені повні компоненти/ORM і кадрові правила не змінюються.
 
 Очищення географічної чернетки: один JS-обробник для полів і блоків, інвалідація debounce/поколінь відповідей, без очищення службових record_id/revision. Спільні метадані змістовних компонентів в app/geography.py визначають однакову фронтенд/серверну заборону порожніх записів; geography.prepare перевіряє її до архівування чи іншої зміни ORM.
+
+## Контакти та огляд анкети
+
+[CONTACTS_PROFILE.md](CONTACTS_PROFILE.md) — модель, нормалізація, маршрути, міграція й UI. PersonContact з active partial unique індексами розташовано окремо від Person. routers/contacts.py → services/contacts.py → repositories/contact_repository.py. person_read.full_profile + ProfileRepository формують однозначну чинну шапку/огляд; summary-полів у БД немає. profile_photo/header/overview.html та contacts.html — повторно використовувані компоненти. person_profile.js керує hash/query вкладками й читанням огляду, contacts.js — inline-формами, копіюванням і підтвердженим архівуванням; person_profile.css — компактна адаптивна верстка. Географічні форми переміщено в addresses без зміни endpoint-ів. Міграція migrate_contacts створює лише нову таблицю з backup/rollback, без create_all; reset створює її через актуальний registry й рахує порожні контакти у звіті.

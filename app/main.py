@@ -27,3 +27,5 @@ app.include_router(admin.router)
 
 from app.routers import geography
 app.include_router(geography.router)
+from app.routers import contacts
+app.include_router(contacts.router)

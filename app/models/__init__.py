@@ -36,3 +36,5 @@ from app.models.geography import GeoUnit, GeoAlias, PersonBirthplace, PersonAddr
 __all__ += ["GeoUnit", "GeoAlias", "PersonBirthplace", "PersonAddress"]
 from app.models.geography_import import GeoSource, GeoImportLink, GeoCityDistrict
 __all__ += ['GeoSource', 'GeoImportLink', 'GeoCityDistrict']
+from app.models.person_contact import PersonContact
+__all__ += ['PersonContact']
