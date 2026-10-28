@@ -56,6 +56,17 @@ class PersonAssignment(SystemTimestamps, Base):
     staff_position_id: Mapped[int] = mapped_column(ForeignKey("positions.position_id"), index=True)
     assigned_from: Mapped[date] = mapped_column(Date)
     assigned_to: Mapped[date | None] = mapped_column(Date)
+    assignment_order_number: Mapped[str | None] = mapped_column(String(100))
+    assignment_order_date: Mapped[date | None] = mapped_column(Date)
+    release_order_number: Mapped[str | None] = mapped_column(String(100))
+    release_order_date: Mapped[date | None] = mapped_column(Date)
+    completion_reason: Mapped[str | None] = mapped_column(String(30))
+    completion_note: Mapped[str | None] = mapped_column(String(1000))
+
+    @validates("assignment_order_date", "release_order_date")
+    def validate_order_date(self, key, value):
+        return exact_date(value, False)
+
     person: Mapped["Person"] = relationship(back_populates="positions")
     position: Mapped["Position"] = relationship(back_populates="persons")
     # Read/constructor compatibility only; these are aliases of the SAME history row.
@@ -122,3 +133,9 @@ def install_staff_guards(metadata, connection, **kwargs):
         guard=' OR '.join(checks)
         for action in ('INSERT','UPDATE'):
             connection.exec_driver_sql(f"CREATE TRIGGER IF NOT EXISTS exact_{table}_{action.lower()} BEFORE {action} ON {table} WHEN {guard} BEGIN SELECT RAISE(ABORT,'exact calendar dates and ordered periods required'); END")
+
+@event.listens_for(Base.metadata, 'after_create')
+def assignment_order_guards(metadata, connection, **kwargs):
+    if connection.dialect.name=='sqlite':
+        from app.database.service_schema import install_order_guards
+        install_order_guards(connection)

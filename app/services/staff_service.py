@@ -67,6 +67,15 @@ def checked(db, model, key, revision=None):
     return record
 
 
+def order_values(number=None, issued=None, prefix='assignment'):
+    number=(number or '').strip()
+    if len(number)>100: raise ValueError('Номер наказу: максимум 100 символів.')
+    exact_date(issued,False)
+    return {prefix+'_order_number':number or None,prefix+'_order_date':issued}
+
+
+_ORDER_UNSET = object()
+
 class StaffService:
     @staticmethod
     def create_structure(db, code, name):
@@ -79,11 +88,11 @@ class StaffService:
         return key
 
     @staticmethod
-    def create_assignment(db, person_id, position_id, start, end=None):
+    def create_assignment(db, person_id, position_id, start, end=None, *, order_number=None, order_date=None):
         period(start, end)
         with write_unit(db):
             checked(db, Person, person_id); checked(db, Position, position_id)
-            record = PersonAssignment(person_id=person_id, staff_position_id=position_id, assigned_from=start, assigned_to=end)
+            record = PersonAssignment(person_id=person_id, staff_position_id=position_id, assigned_from=start, assigned_to=end, **order_values(order_number,order_date))
             StaffRepository.add(db, record); db.flush()
             key = record.id
         return key
@@ -126,6 +135,7 @@ class StaffService:
             for record in records:
                 if record.assigned_to is None or record.assigned_to>end:
                     record.assigned_to=end
+                    record.completion_reason="version_closed"
             db.flush()  # version guard must see already-closed assignment periods
             version.valid_to=end
             db.flush()
@@ -141,7 +151,7 @@ class StaffService:
             db.flush()  # refuses periods invalidating any assignment
 
     @staticmethod
-    def assignment_snapshot(db, position_id, person_id, on):
+    def assignment_snapshot(db, position_id, person_id, on, orders=None):
         exact_date(on)
         target=checked(db,Position,position_id)
         version=checked(db,StaffVersion,target.staff_version_id)
@@ -156,31 +166,77 @@ class StaffService:
         if closing is not None and closing.assigned_from >= on:
             raise ValueError("Призначення починається обраного дня. Для помилки скористайтеся виправленням історії.")
         def stamp(record): return [record.id,record.revision,record.assigned_from.isoformat(),record.assigned_to.isoformat() if record.assigned_to else None,record.person_id,record.staff_position_id] if record else None
-        return {"position_id":position_id,"person_id":person_id,"on":on.isoformat(),
+        result = {"position_id":position_id,"person_id":person_id,"on":on.isoformat(),
                 "source":stamp(source),"target":stamp(occupied),"version":[version.id,version.revision,version.valid_from.isoformat(),version.valid_to.isoformat() if version.valid_to else None],
                 "position_revision":target.revision}
+        if orders: result["orders"] = orders
+        return result
 
     @staticmethod
     def assign(db, position_id, person_id, on, expected, confirmed=False):
         with write_unit(db):
-            snapshot=StaffService.assignment_snapshot(db,position_id,person_id,on)
-            if snapshot!=expected:
-                raise ValueError("Призначення змінилося. Оновіть форму та повторіть підтвердження.")
-            if snapshot["source"] and snapshot["target"]==snapshot["source"]:
-                return "Військовослужбовець уже призначений на цю посаду."
-            old_id=(snapshot["source"] or snapshot["target"] or [None])[0]
-            old=StaffRepository.get(db, PersonAssignment, old_id) if old_id else None
-            if old:
-                if not confirmed:
-                    raise ValueError("Перепризначення потребує підтвердження.")
-                if old.assigned_from>=on:
-                    raise ValueError("Призначення починається цього дня. Виправте помилковий запис через редагування історії.")
-                old.assigned_to=on-timedelta(days=1)
-                db.flush()
-            if person_id is not None:
-                position=checked(db,Position,position_id)
-                version=checked(db,StaffVersion,position.staff_version_id)
-                StaffRepository.add(db, PersonAssignment(person_id=person_id,staff_position_id=position_id,
-                                        assigned_from=on,assigned_to=version.valid_to))
-                db.flush()
+            return StaffService._assign_locked(db,position_id,person_id,on,expected,confirmed)
+
+    @staticmethod
+    def _assign_locked(db, position_id, person_id, on, expected, confirmed=False):
+        snapshot=StaffService.assignment_snapshot(db,position_id,person_id,on,expected.get("orders"))
+        if snapshot!=expected:
+            raise ValueError("Призначення змінилося. Оновіть форму та повторіть підтвердження.")
+        if snapshot["source"] and snapshot["target"]==snapshot["source"]:
+            return "Військовослужбовець уже призначений на цю посаду."
+        old_id=(snapshot["source"] or snapshot["target"] or [None])[0]
+        old=StaffRepository.get(db, PersonAssignment, old_id) if old_id else None
+        if old:
+            if not confirmed:
+                raise ValueError("Перепризначення потребує підтвердження.")
+            if old.assigned_from>=on:
+                raise ValueError("Призначення починається цього дня. Виправте помилковий запис через редагування історії.")
+            old.assigned_to=on-timedelta(days=1)
+            old.completion_reason="transfer" if person_id else "release"
+            orders=expected.get('orders') or {}
+            for key,value in order_values(orders.get('release_number'),date.fromisoformat(orders['release_date']) if orders.get('release_date') else None,'release').items():
+                setattr(old,key,value)
+            db.flush()
+        if person_id is not None:
+            position=checked(db,Position,position_id)
+            version=checked(db,StaffVersion,position.staff_version_id)
+            StaffRepository.add(db, PersonAssignment(person_id=person_id,staff_position_id=position_id,
+                                    assigned_from=on,assigned_to=version.valid_to, **order_values((expected.get("orders") or {}).get("number"),date.fromisoformat(expected["orders"]["date"]) if (expected.get("orders") or {}).get("date") else None)))
+            db.flush()
         return "Призначення збережено; історію попередньої посади збережено." if person_id else "Призначення завершено."
+
+    @staticmethod
+    def correct_orders(db, key, revision, assignment_number=_ORDER_UNSET, assignment_date=_ORDER_UNSET, release_number=_ORDER_UNSET, release_date=_ORDER_UNSET):
+        values={}
+        for prefix,number,issued in [('assignment',assignment_number,assignment_date),('release',release_number,release_date)]:
+            if number is not _ORDER_UNSET:values[prefix+'_order_number']=order_values(number,None,prefix)[prefix+'_order_number']
+            if issued is not _ORDER_UNSET:
+                exact_date(issued,False);values[prefix+'_order_date']=issued
+        with write_unit(db):
+            record=checked(db,PersonAssignment,key,revision)
+            for field,value in values.items():setattr(record,field,value)
+            db.flush()
+        return key
+
+    @staticmethod
+    def release_assignment(db,key,revision,effective,number=None,issued=None,note=None,confirmed=False):
+        exact_date(effective)
+        if not confirmed:raise ValueError('Підтвердьте звільнення саме з посади.')
+        values=order_values(number,issued,'release')
+        if len(note or '')>1000:raise ValueError('Примітка: максимум 1000 символів.')
+        with write_unit(db):
+            record=checked(db,PersonAssignment,key,revision)
+            if effective<=record.assigned_from:raise ValueError('Дата звільнення має бути пізніше першого дня призначення.')
+            end=effective-timedelta(days=1)
+            if (record.completion_reason and record.assigned_to!=end) or (record.assigned_to is not None and end>record.assigned_to):
+                raise ValueError('Призначення вже завершене або дата виходить за його межі. Використайте виправлення історичних дат.')
+            record.assigned_to=end;record.completion_reason='release';record.completion_note=(note or '').strip() or None
+            for field,value in values.items():setattr(record,field,value)
+            db.flush()
+        return key
+
+
+def domain_date(raw, required=True):
+    if not raw and not required:return None
+    try:return date.fromisoformat(raw)
+    except (ValueError,TypeError):raise ValueError('Потрібна точна дата у форматі РРРР-ММ-ДД.') from None

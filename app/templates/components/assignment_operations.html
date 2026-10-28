@@ -1,0 +1,34 @@
+{% macro orders(record) %}
+<details class="my-2"><summary>Накази призначення / звільнення</summary>
+<form data-personnel-form method="post" action="/personnel/assignments/{{ record.id }}/orders">
+<input type="hidden" name="revision" value="{{ record.revision }}">
+{% for prefix,title in [('assignment','Призначення'),('release','Звільнення')] %}
+<label>{{ title }} — номер наказу<input class="form-control" name="{{ prefix }}_order_number" maxlength="100" value="{{ record[prefix ~ '_order_number'] or '' }}"></label>
+<label>{{ title }} — дата наказу<input class="form-control" type="date" name="{{ prefix }}_order_date" value="{{ record[prefix ~ '_order_date'] or '' }}"></label>{% endfor %}
+<button class="btn btn-outline-primary">Зберегти лише накази</button></form></details>
+{% endmacro %}
+{% macro release(record) %}
+<details data-assignment-release class="my-2"><summary>Звільнити з посади</summary><form data-personnel-form method="post" action="/personnel/assignments/{{ record.id }}/release">
+<input type="hidden" name="revision" value="{{ record.revision }}">
+<label>Звільнено з посади з (перший день поза посадою)<input type="date" class="form-control" name="release_effective" required></label>
+<p class="small">Останній день перебування = обрана дата мінус 1 день. Це не звільнення з військової служби.</p>
+<label>Номер наказу<input class="form-control" name="release_order_number" maxlength="100"></label><label>Дата наказу<input type="date" class="form-control" name="release_order_date"></label>
+<label>Примітка<input class="form-control" name="note" maxlength="1000"></label><label><input type="checkbox" name="confirmed" required> Підтверджую звільнення з посади</label><button class="btn btn-outline-warning">Звільнити з посади</button></form></details>
+{% endmacro %}
+{% macro historical_form(person_id,record=none) %}
+<form data-personnel-form method="post" action="/persons/{{ person_id }}/service-history{{ '/' ~ record.person_service_history_id if record else '' }}">
+<input type="hidden" name="revision" value="{{ record.revision if record else '' }}">
+{% for key,label in [('military_unit','Військова частина'),('position','Історична посада'),('service_type','Вид служби'),('order_number','Номер наказу'),('note','Примітка')] %}<label>{{ label }}<input class="form-control" name="{{ key }}" value="{{ record[key] or '' if record else '' }}" maxlength="{{ 1000 if key == 'note' else 250 }}"></label>{% endfor %}
+{% for prefix,label in [('position','Початок служби'),('end','Завершення служби'),('order','Дата наказу')] %}<fieldset><legend class="h6">{{ label }} (відомі компоненти)</legend><div class="d-flex gap-2">{% for part,text in [('day','День'),('month','Місяць'),('year','Рік')] %}<label>{{ text }}<input class="form-control" inputmode="numeric" name="{{ prefix }}_{{ part }}" value="{{ record[prefix ~ '_' ~ part] or '' if record else '' }}"></label>{% endfor %}</div></fieldset>{% endfor %}
+<label><input type="checkbox" name="is_active" {% if record and record.is_active %}checked{% endif %}> Актуальні відомості незалежної історії (не штатне призначення)</label><button class="btn btn-primary">Зберегти історичний запис</button></form>
+{% endmacro %}
+{% macro mirage_actions(record) %}
+{% if record.status == 'waiting' %}
+<details><summary>Оформити призначення</summary><form data-personnel-form data-mirage-convert method="post" action="/personnel/mirages/{{ record.id }}/prepare">
+<input type="hidden" name="revision" value="{{ record.revision }}"><label>Дата офіційного призначення<input type="date" class="form-control" name="on" required></label>
+<label>Номер наказу<input class="form-control" name="assignment_order_number" maxlength="100"></label><label>Дата наказу<input type="date" class="form-control" name="assignment_order_date"></label>
+<details><summary>Наказ завершення попередньої посади (при переведенні)</summary><input class="form-control" name="transfer_release_order_number" aria-label="Номер наказу завершення попередньої посади" maxlength="100"><input class="form-control" type="date" name="transfer_release_order_date" aria-label="Дата наказу завершення попередньої посади"></details>
+<p>Якщо є інша посада, її завершення потребує підтвердження; чужа зайнята посада не звільняється автоматично.</p><button class="btn btn-outline-primary">Перевірити та підтвердити</button></form></details>
+<details><summary>Скасувати Міраж</summary><form data-personnel-form method="post" action="/personnel/mirages/{{ record.id }}/cancel"><input type="hidden" name="revision" value="{{ record.revision }}"><label>Причина<input name="reason" class="form-control" maxlength="1000" required></label><button class="btn btn-outline-secondary">Підтвердити скасування</button></form></details>
+{% endif %}
+{% endmacro %}

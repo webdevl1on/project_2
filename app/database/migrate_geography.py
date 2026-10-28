@@ -45,12 +45,15 @@ def migrate(database):
         integrity(connection)
         present = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         new_names = {table.name for table in NEW_TABLES}
+        from app.database.service_schema import ADDED_COLUMNS
         for table in Base.metadata.sorted_tables:
+            if table.name == 'person_position_mirages': continue
             if table.name == "person_contacts": continue
             if table.name in {'geo_sources','geo_import_links','geo_city_districts'}: continue
             if table.name in new_names:
                 continue
             required = {column.name for column in table.columns}
+            required -= ADDED_COLUMNS.get(table.name,set())
             if table.name not in present or not required <= columns(connection, table.name):
                 raise ValueError(f"Схема {table.name} не відповідає попередній штатній архітектурі. Потрібна окрема міграція цієї БД.")
         if "person_positions" in present:

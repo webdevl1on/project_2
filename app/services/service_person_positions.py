@@ -7,7 +7,8 @@ from app.table_columns import PERSON_POSITIONS_FIELDS
 
 HISTORY_SOURCES = tuple(zip(("name", "person_rank", "passport", "service"),
                            HISTORY_MODELS, ("ПІБ", "звання", "паспорт", "служба")))
-FILTER_KEYS = (*FILTER_COLUMNS, *DATE_FILTER_COLUMNS)
+TEXT_FILTERS = {key+"__contains":key for key,field in PERSON_POSITIONS_FIELDS.items() if field.data_type=="text"}
+FILTER_KEYS = (*FILTER_COLUMNS, *DATE_FILTER_COLUMNS, *TEXT_FILTERS)
 DATE_FILTER_KEYS = tuple(DATE_FILTER_COLUMNS)
 SORT_KEYS = (*SORT_COLUMNS, *DATE_FILTER_COLUMNS)
 
@@ -15,6 +16,7 @@ SORT_KEYS = (*SORT_COLUMNS, *DATE_FILTER_COLUMNS)
 def _row(record):
     keys = ("position", "assignment", "person", "name", "person_rank", "rank", "passport", "service")
     row = dict(zip(keys, record[:8]))
+    row["full_address"] = record[16] if len(record)>16 else None
     row["warnings"] = []
     for index, (source, _, label) in enumerate(HISTORY_SOURCES):
         total, active = record[8 + index * 2:10 + index * 2]
@@ -42,7 +44,7 @@ class ServicePersonPositionFunc:
             if not field.filterable:
                 continue
             candidates = rows
-            if column_filters.get(key):
+            if column_filters.get(key) or column_filters.get(key+"__contains"):
                 records = repository.records(column_filters, occupancy, exclude_key=key)
                 candidates = [_row(record) for record in records]
             if field.data_type == "partial_date":
@@ -61,17 +63,21 @@ class ServicePersonPositionFunc:
 
     @staticmethod
     def get_positions(db, unit_short=None, occupancy="all", sort_by="position_number", direction="asc",
-                      column_filters=None, date_sort_priority=None, version_id=None, on=None):
+                      column_filters=None, date_sort_priority=None, version_id=None, on=None, mirage_filter="all"):
         direction = "desc" if direction == "desc" else "asc"
-        repository = PositionTableRepository(db, version_id, on or today())
+        repository = PositionTableRepository(db, version_id, on or today(),mirage_filter)
         column_filters = dict(column_filters or {})
         if unit_short and not column_filters.get("unit_short"):
             column_filters["unit_short"] = unit_short
         rows = [_row(record) for record in repository.records(
             column_filters, occupancy, sort_by=sort_by, direction=direction,
             date_sort_priority=date_sort_priority)]
+        from app.repositories.service_history_repository import ServiceHistoryRepository
+        mirages={}
+        for record,position in ServiceHistoryRepository.mirages(db,position_ids=[r['position'].position_id for r in rows]):
+            mirages.setdefault(position.position_id,[]).append(record)
         occupied = sum(row["assignment"] is not None for row in rows)
-        return {"rows": rows,
+        return {"rows": rows,"mirages_by_position":mirages,
                 "filter_options": ServicePersonPositionFunc._filter_options(repository, column_filters, occupancy, rows),
                 "total": len(rows), "occupied": occupied, "vacant": len(rows) - occupied,
                 "data_warnings": [{"position_number": row["position"].position_number, "messages": row["warnings"]}

@@ -24,8 +24,13 @@ HISTORY_MODELS = (PersonName, PersonRank, Passport, PersonServiceHistory)
 
 
 class PositionTableRepository:
-    def __init__(self, db, version_id, on):
+    def __init__(self, db, version_id, on, mirage_filter="all"):
+        from app.models import PersonPositionMirage
+        from sqlalchemy import exists
         self._query = self._base_query(db, version_id, on)
+        has=exists().where(PersonPositionMirage.staff_position_id==Position.position_id,PersonPositionMirage.status=='waiting')
+        if mirage_filter=='with':self._query=self._query.filter(has)
+        elif mirage_filter=='without':self._query=self._query.filter(~has)
 
     @staticmethod
     def _base_query(db, version_id=None, on=None):
@@ -39,7 +44,7 @@ class PositionTableRepository:
             query = (query.outerjoin(selection, selection.c.person_id == Person.person_id)
                      .outerjoin(model, model.__mapper__.primary_key[0] == selection.c.chosen_id)
                      .add_columns(selection.c.total, selection.c.active_count))
-        return query.outerjoin(Rank, PersonRank.rank_id == Rank.rank_id)
+        return query.outerjoin(Rank, PersonRank.rank_id == Rank.rank_id).add_columns(PERSON_POSITIONS_FIELDS["full_address"].expression)
 
     @staticmethod
     def _normalise_values(values):
@@ -74,6 +79,13 @@ class PositionTableRepository:
 
     @staticmethod
     def _apply_filters(query, column_filters, occupancy, exclude_key=None):
+        from app.utils.text_search import contains_clause
+        for key,field in PERSON_POSITIONS_FIELDS.items():
+            alias=key+'__contains'
+            if field.data_type=='text' and key!=exclude_key and column_filters.get(alias):
+                values=PositionTableRepository._normalise_values(column_filters[alias])
+                if len(values)!=1:raise ValueError('Містить текст: один запит на колонку.')
+                query=query.filter(contains_clause(field.expression,values[0]))
         for key, column in FILTER_COLUMNS.items():
             if key != exclude_key:
                 query = PositionTableRepository._apply_value_filter(

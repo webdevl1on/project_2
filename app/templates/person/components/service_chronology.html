@@ -1,0 +1,13 @@
+{% from 'components/assignment_operations.html' import orders,release,historical_form,mirage_actions %}
+<h2 class="h5">Історія служби</h2><p>Спільне читання двох джерел; штатні призначення не копіюються в незалежну історію.</p>
+{% for entry in service_chronology %}<article class="card mb-3"><div class="card-body"><h3 class="h6">{{ 'Штатне призначення' if entry.source_type == 'assignment' else 'Історичний запис' }} · {{ entry.position or 'Посада невідома' }}</h3>
+<p>{{ entry.unit or 'Частина / підрозділ невідомі' }}{% if entry.version %} · {{ entry.version }}{% endif %}</p><p>{{ entry.start }} — {{ entry.end or 'Відкрите' }} · {{ entry.state }}</p>
+<p>Наказ призначення: {{ entry.assignment_order[0] or 'Не зазначено' }} · {{ entry.assignment_order[1] or 'Дата невідома' }}</p>
+{% if entry.source_type == 'assignment' %}<p>Наказ звільнення: {{ entry.release_order[0] or 'Не зазначено' }} · {{ entry.release_order[1] or 'Дата невідома' }}</p>{% if entry.release_effective %}<p>{{ 'Переведено з попередньої посади з' if entry.record.completion_reason == 'transfer' else 'Звільнено з' }}: {{ entry.release_effective }}; останній день перебування: {{ entry.end }}</p>{% endif %}
+{{ orders(entry.record) }}{{ release(entry.record) }}
+<details><summary>Виправити історичні дати (з перевіркою конфліктів)</summary><form data-personnel-form method="post" action="/personnel/assignments/{{ entry.source_id }}/period"><input type="hidden" name="revision" value="{{ entry.record.revision }}"><input type="hidden" name="person_id" value="{{ person_id }}"><input type="hidden" name="position_id" value="{{ entry.position_id }}"><label>Початок<input type="date" class="form-control" name="assigned_from" value="{{ entry.record.assigned_from }}" required></label><label>Останній день перебування (включно)<input type="date" class="form-control" name="assigned_to" value="{{ entry.record.assigned_to or '' }}"></label><button class="btn btn-primary">Зберегти виправлення</button></form></details>
+{% else %}<p>{{ entry.record.note or '' }}</p><details><summary>Редагувати історичний запис</summary>{{ historical_form(person_id,entry.record) }}</details>{% endif %}
+</div></article>{% else %}<p>Записів немає.</p>{% endfor %}
+<details><summary>Додати незалежний історичний запис</summary>{{ historical_form(person_id) }}</details>
+<h2 class="h5 mt-3">Попередні закріплення («Міражі»)</h2>
+{% for record,position in profile_mirages %}<article class="card my-2"><div class="card-body"><p>♧ Міраж · № {{ position.position_number }} · {{ position.name_nominative }} · {{ record.status }}</p><p>{{ record.note or '' }} {{ record.cancel_reason or '' }}</p>{{ mirage_actions(record) }}</div></article>{% else %}<p>Попередніх закріплень немає.</p>{% endfor %}

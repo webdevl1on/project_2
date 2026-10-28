@@ -8,6 +8,8 @@ module.exports = async ({context,base}) => {
     const order=()=>table.locator('thead th').evaluateAll(nodes=>nodes.map(n=>n.dataset.columnKey));
     async function scenario(name,fn){await fn();console.log(`PASS layout: ${name}`);}
     async function drag(source,target){
+        // Bootstrap hides the modal before its fading backdrop is detached.
+        await page.locator('.modal-backdrop').waitFor({state:'detached'});
         await header(source).dragTo(header(target),{sourcePosition:{x:12,y:10},targetPosition:{x:12,y:10}});
     }
     try {

@@ -1,3 +1,4 @@
+{% from 'components/assignment_operations.html' import orders,release,mirage_actions %}
 {% from "components/person_picker.html" import person_picker %}
 {% from "components/date_filter.html" import date_filter %}
 {% from "components/column_visibility.html" import column_visibility %}
@@ -141,6 +142,7 @@
                 <option value="vacant" {% if occupancy=="vacant" %}selected{% endif %}>Вільні</option>
             </select>
         </div>
+        <div class="col-md-3"><label class="form-label">Міражі<select name="mirage" class="form-select">{% for key,label in [('all','Усі посади'),('with','Із Міражами'),('without','Без Міражів')] %}<option value="{{ key }}" {% if mirage_filter == key %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label></div>
         <div class="col-md-auto align-self-end">
             <button type="submit" class="btn btn-primary">Застосувати</button>
             <a href="/person-positions" class="btn btn-outline-secondary">Скинути</a>
@@ -209,6 +211,7 @@
                                         <button type="button" class="dropdown-item" data-column-select>Виділити колонку</button>
                                         {% if column.filterable %}
                                         <hr class="dropdown-divider">
+                                        {% if column.data_type == 'text' %}<label class="form-label small">Містить текст<input class="form-control form-control-sm" data-contains-input value="{{ (active_filters.get(key ~ '__contains') or [''])[0] }}" maxlength="250"></label><button type="button" class="btn btn-sm btn-outline-primary mb-2" data-contains-apply>Застосувати текст</button><button type="button" class="btn btn-sm btn-outline-secondary mb-2" data-contains-clear>Прибрати текст</button>{% endif %}
                                         <input type="search" class="form-control form-control-sm mb-2 filter-search"
                                             placeholder="Пошук значень...">
                                         <div class="filter-options" style="max-height: 240px; overflow-y: auto;">
@@ -262,14 +265,21 @@
                         {% for column in columns %}
                         <td data-column-key="{{ column.key }}" {% if not column.default_visible %} hidden{% endif %}>
                             {% if column.key == "assignment" %}
+                            <p>Офіційно: {{ people_labels.get(item.assignment.person_id,'Без ПІБ') if item.assignment else 'Вакантна' }}</p>
+                            {% if item.assignment %}<p>Наказ призначення {{ item.assignment.assignment_order_number or 'Не зазначено' }} · {{ item.assignment.assignment_order_date or 'Дата невідома' }}</p><details data-staff-tools><summary>Накази та звільнення</summary>{{ orders(item.assignment) }}{{ release(item.assignment) }}</details>{% endif %}
+                            {% for mirage in (mirages_by_position|default({})).get(item.position.position_id,[]) %}<div class="text-secondary border-start ps-2 my-2">♧ Міраж: {{ people_labels.get(mirage.person_id,'Без ПІБ') }} — очікує наказу. {{ mirage.note or '' }}{{ mirage_actions(mirage) }}</div>{% endfor %}
+                            <details><summary>Додати Міраж</summary><form data-personnel-form method="post" action="/personnel/mirages"><input type="hidden" name="position_id" value="{{ item.position.position_id }}"><label>Військовослужбовець<select class="form-select" name="person_id" required>{% for candidate in people %}<option value="{{ candidate.id }}">{{ candidate.rank }} {{ candidate.label }} · {{ candidate.birth }}</option>{% endfor %}</select></label><label>Примітка<input class="form-control" name="note" maxlength="1000"></label><button class="btn btn-outline-secondary">Додати попереднє закріплення</button></form></details>
                             <form method="post" action="/person-positions/assign"
-                                class="d-flex gap-2 person-assignment-form">
+                                class="d-flex flex-wrap gap-2 person-assignment-form">
                                 <input type="hidden" name="position_id" value="{{ item.position.position_id }}">
                                 <input type="hidden" name="return_query" value="{{ active_query }}">
                                 <input type="hidden" name="token" value="">
                                 {{ person_picker(people, item.assignment.person_id if item.assignment else none, 'position-'~item.position.position_id) }}
                                 <label class="small">Дата призначення / звільнення<input type="date" name="on" class="form-control form-control-sm" value="{{ as_of }}" required></label>
-                                <p class="small text-danger mb-0" data-assignment-status role="status"></p>
+                                <details><summary>Реквізити наказів (необов’язково)</summary><label class="small">Номер наказу<input name="assignment_order_number" maxlength="100" class="form-control form-control-sm"></label>
+                                <label class="small">Дата наказу<input type="date" name="assignment_order_date" class="form-control form-control-sm"></label>
+                                <details><summary>Наказ завершення попередньої посади (при переведенні)</summary><input name="transfer_release_order_number" class="form-control" aria-label="Номер наказу завершення попередньої посади" maxlength="100"><input type="date" name="transfer_release_order_date" class="form-control" aria-label="Дата наказу завершення попередньої посади"></details>
+                                </details><p class="small text-danger mb-0" data-assignment-status role="status"></p>
                                 <button type="submit" class="btn btn-sm btn-primary align-self-start">Зберегти</button>
                             </form>
                             {% else %}
@@ -300,6 +310,7 @@
     <script src="/static/js/date_filter.js"></script>
     <script src="/static/js/person_picker.js"></script>
     <script src="/static/js/staff_assignments.js"></script>
+    <script src="/static/js/personnel_forms.js"></script>
     <script>
         const filterForm = document.getElementById("position-filters");
         const savedFilters = document.getElementById("active-column-filters");
@@ -325,6 +336,10 @@
 
         document.querySelectorAll(".filter-menu").forEach(menu => {
             const key = menu.dataset.filterKey;
+            menu.querySelector('[data-contains-apply]')?.addEventListener('click',()=>{
+                const text=menu.querySelector('[data-contains-input]').value.trim();applyColumnFilter(key+'__contains',text?[text]:[]);
+            });
+            menu.querySelector('[data-contains-clear]')?.addEventListener('click',()=>applyColumnFilter(key+'__contains',[]));
             const checkboxes = Array.from(menu.querySelectorAll("input[type=checkbox]"));
             const initialValues = Array.from(savedFilters.querySelectorAll("input"))
                 .filter(input => input.name === key).map(input => input.value);

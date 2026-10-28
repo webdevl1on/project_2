@@ -39,7 +39,8 @@ def full_profile(db,person_id):
     assignments=ProfileRepository.assignments(db,person_id,today())
     result['profile_assignment']=assignments[0] if len(assignments)==1 else None
     if len(assignments)>1:warnings.append('Кілька чинних призначень: поточну посаду не визначено.')
-    services=ProfileRepository.active_records(db,PersonServiceHistory,person_id)
+    from app.services.service_chronology import service_record_applies
+    services=[record for record in ProfileRepository.active_records(db,PersonServiceHistory,person_id) if service_record_applies(record,today())]
     wording={'contract':'за контрактом','контракт':'за контрактом','за контрактом':'за контрактом',
              'mobilization':'за мобілізацією','мобілізація':'за мобілізацією','за мобілізацією':'за мобілізацією'}
     result['service_wording']=wording.get(normalize(services[0].service_type)) if len(services)==1 else None
@@ -48,4 +49,8 @@ def full_profile(db,person_id):
     person=result['person'];result['profile_birth']=format_partial_date(person.birth_day,person.birth_month,person.birth_year) if any([person.birth_day,person.birth_month,person.birth_year]) else None
     result.update(geography.page(db,person_id));result.update(contacts.page(db,person_id))
     result['contact_summary']=contacts.summary(result)
+    from app.services.service_chronology import chronology
+    from app.repositories.service_history_repository import ServiceHistoryRepository
+    result['service_chronology']=chronology(db,person_id)
+    result['profile_mirages']=ServiceHistoryRepository.mirages(db,person_id=person_id)
     return result

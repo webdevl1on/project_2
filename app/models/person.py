@@ -29,6 +29,17 @@ class Person(Base):
         from app.validators.name_cases import sex
         return sex(value, required=False)
 
+    personal_number: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    @validates("personal_number")
+    def validate_personal_number(self, key, value):
+        if value is not None and not isinstance(value, str):
+            raise ValueError("Особистий номер має бути текстом.")
+        value = (value or "").strip()
+        if len(value) > 100 or any(ord(char) < 32 for char in value):
+            raise ValueError("Особистий номер: до 100 символів без керівних знаків.")
+        return value or None
+
     tax_number: Mapped[str] = mapped_column(
         String,
         unique=True,

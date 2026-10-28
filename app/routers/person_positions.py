@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database.db import get_db
-from app.services.service_person_positions import FILTER_KEYS, DATE_FILTER_KEYS, SORT_KEYS, ServicePersonPositionFunc
+from app.services.service_person_positions import FILTER_KEYS, DATE_FILTER_KEYS, SORT_KEYS, TEXT_FILTERS, ServicePersonPositionFunc
 from app.table_columns import PERSON_POSITIONS_COLUMNS
 from app.utils.date_query import DateFilter, date_priority
 from app.templating import templates
@@ -56,6 +56,10 @@ def get_person_positions_page(request, occupancy="all", sort_by="position_number
     # Read only fields allowed by this table, not arbitrary model attributes.
     column_filters = {key: field_values.get(key, request.query_params.getlist(key)) for key in FILTER_KEYS}
     try:
+        for alias in TEXT_FILTERS:
+            values=[str(v).strip() for v in column_filters[alias] if str(v).strip()]
+            if len(values)>1 or any(len(v)>250 for v in values):raise ValueError('Містить текст: один запит до 250 символів на колонку.')
+            column_filters[alias]=values
         priorities = {key: date_priority(field_values.get(f"{key}_priority", request.query_params.get(f"{key}_priority", "year,month,day")))
                       for key in DATE_FILTER_KEYS}
         date_filters = {}
@@ -84,12 +88,13 @@ def get_person_positions_page(request, occupancy="all", sort_by="position_number
         sort_by=sort_by,
         direction=direction,
         column_filters=column_filters,
-        date_sort_priority=priorities, version_id=version_id, on=on,
+        date_sort_priority=priorities, version_id=version_id, on=on, mirage_filter=request.query_params.get("mirage","all"),
     )
 
     people = ServicePersonPositionFunc.get_people(db,on)
 
     def contextual(query):
+        query += "&" + urlencode({"mirage":request.query_params.get("mirage","all")})
         return query + "&" + urlencode({"version_id":version_id,"as_of":on.isoformat()}) if chosen else query
 
     active_query = build_query_string(sort_by, direction, occupancy, column_filters, filter_order, priorities)
@@ -126,8 +131,9 @@ def get_person_positions_page(request, occupancy="all", sort_by="position_number
             "sort_urls": sort_urls,
             "active_query": active_query,
             "filter_order": filter_order,
-            "filter_numbers": {key: index + 1 for index, key in enumerate(order)},
+            "filter_numbers": {TEXT_FILTERS.get(key,key): index + 1 for index, key in enumerate(order)},
             "sort_commands": sort_commands,
+            "mirage_filter":request.query_params.get("mirage","all"),"people_labels":{p["id"]:p["rank"]+" "+p["label"] for p in people},
             "people": people, "people_json":picker_json(people),
             "staff_versions":versions,"staff_structures":structures,"structure_names":{item.id:f"{item.name} ({item.code})" for item in structures},"chosen_version":chosen,"as_of":on,
             "staff_message":request.query_params.get("staff_message", ""),
@@ -135,9 +141,9 @@ def get_person_positions_page(request, occupancy="all", sort_by="position_number
             "date_filters": date_filters,
             "date_priorities": {key: list(value) for key, value in priorities.items()},
             "table_column_filters": {
-                "keys": list(FILTER_KEYS),
+                "keys": list(FILTER_KEYS),"column_keys":TEXT_FILTERS,
                 "order_parameter": "filter_order",
-                "extra": {"occupancy": "all"},
+                "extra": {"occupancy": "all", "mirage":"all"},
             },
         },
     )

@@ -52,10 +52,10 @@ def test_catalogue_covers_all_displayable_mapped_attributes():
     # A new model attribute must be deliberately represented or excluded.
     # FK/PK link entities, date projections duplicate the canonical components.
     # Sex belongs to the new person form; adding a staff-table column is separate scope.
-    exclusions = {Person: {"person_id", "sex"}, PersonName: {"person_name_id", "person_id"},
+    exclusions = {Person: {"person_id", "sex", "personal_number"}, PersonName: {"person_name_id", "person_id"},
                   PersonRank: {"person_rank_id", "person_id", "rank_id", "rank_order_date"},
                   Passport: {"passport_id", "person_id", "passport_issued_date", "passport_expire_date"},
-                  PersonServiceHistory: {"person_service_history_id", "person_id", "position_date", "order_date"},
+                  PersonServiceHistory: {"person_service_history_id", "person_id", "position_date", "order_date", "end_date", "end_day", "end_month", "end_year", "note", "revision"},
                   Position: {"position_id", "staff_version_id", "created_at", "updated_at", "revision"}, Rank: {"rank_id"}}
     for model, excluded in exclusions.items():
         covered = {attr for field in FIELDS.values() if field.metadata()["source"]["model"] == model.__name__
@@ -64,7 +64,7 @@ def test_catalogue_covers_all_displayable_mapped_attributes():
         actual = {column.name for column in inspect(model).columns} - excluded
         assert actual <= covered, (model.__name__, actual - covered)
     assert all(field.group not in ("events", "event_types", "event_subtypes") for field in FIELDS.values())
-    assert len(FIELDS) == 54
+    assert len(FIELDS) == 55
     assert set(PERSON_POSITIONS_FIELDS) == set(FIELDS)
 
 
@@ -188,17 +188,17 @@ def test_query_count_is_independent_of_rows_and_field_count(catalog_db):
     event.listen(catalog_db.bind, "before_cursor_execute", record_sql)
     try:
         Service.get_positions(catalog_db)
-        assert len(calls) == 1
+        assert len(calls) == 2
         calls.clear()
         for number in range(2, 8):
             populate(catalog_db, number)
         catalog_db.expire_all(); calls.clear()
         result = Service.get_positions(catalog_db)
         assert len(result["rows"]) == 7
-        assert len(calls) == 1
+        assert len(calls) == 2
         calls.clear()
         Service.get_positions(catalog_db, column_filters={"unit_short": ["Підрозділ"], "passport_number": ["000123"]})
-        assert len(calls) == 3  # result + one query per active facet
+        assert len(calls) == 4  # result + one bulk mirage read + one query per active facet
     finally:
         event.remove(catalog_db.bind, "before_cursor_execute", record_sql)
 

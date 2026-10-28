@@ -1,11 +1,14 @@
 <div class="row g-3">
 <section class="col-md-6"><div class="card h-100"><div class="card-body"><h2 class="h5">Особисті дані</h2>
 <p>{{ current_name.surname if current_name else 'Не зазначено' }} {{ current_name.name if current_name else '' }} {{ current_name.patronymic or '' if current_name else '' }}</p>
+<p>Особистий номер (жетон): {{ person.personal_number or 'Не зазначено' }}</p><a href="#names" data-profile-tab="names">Редагувати облікові дані</a>
 <p>Звання: {{ current_rank.rank.nominative if current_rank else 'Не зазначено' }}</p><p>Дата народження: {{ profile_birth or 'Не зазначено' }}</p><p>Стать: {{ {'male':'Чоловіча','female':'Жіноча'}.get(person.sex,'Не зазначено') }}</p>
 <a href="#names" data-profile-tab="names">Редагувати ПІБ</a> · <a href="#ranks" data-profile-tab="ranks">Редагувати звання</a>
 </div></div></section>
 <section class="col-md-6"><div class="card h-100"><div class="card-body"><h2 class="h5">Службова інформація</h2>
-<p>{{ profile_assignment[1].name_nominative if profile_assignment else 'Посада не зазначена' }}</p><p>Підрозділ: {{ profile_assignment[1].unit_short if profile_assignment else 'Не зазначено' }}</p><p>Вид служби: {{ service_wording or 'Не зазначено' }}</p><a href="#positions" data-profile-tab="positions">Відкрити посаду та історію</a>
+<p>{{ profile_assignment[1].name_nominative if profile_assignment else 'Посада не зазначена' }}</p><p>Підрозділ: {{ profile_assignment[1].unit_short if profile_assignment else 'Не зазначено' }}</p>{% if profile_assignment %}<p>Призначено: {{ profile_assignment[0].assigned_from }} · Наказ {{ profile_assignment[0].assignment_order_number or 'Не зазначено' }} · {{ profile_assignment[0].assignment_order_date or 'Дата невідома' }}</p>{% endif %}
+{% for mirage,position in profile_mirages if mirage.status == 'waiting' %}<p class="text-secondary">Міраж: {{ position.name_nominative }} (не офіційне призначення)</p>{% endfor %}<a href="#service-history" data-profile-tab="service-history">Історія служби та накази</a>
+<p>Вид служби: {{ service_wording or 'Не зазначено' }}</p><a href="#positions" data-profile-tab="positions">Відкрити посаду та історію</a>
 </div></div></section>
 <section class="col-md-6"><div class="card h-100"><div class="card-body"><h2 class="h5">Контактна інформація</h2>
 {% for kind,label in [('phone','Телефон'),('email','Email')] %}{% set info=contact_summary[kind] %}

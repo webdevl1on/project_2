@@ -47,10 +47,10 @@ module.exports=async({context,base})=>{
             await Promise.all([page.waitForNavigation(),confirm.locator('[data-assignment-confirm-yes]').click()]);
             assert.equal(await row(10).locator('[data-person-value]').inputValue(),'');
             assert.equal(await row(30).locator('[data-person-value]').inputValue(),'1');
-            await row(30).locator('form [type=submit]').click();
+            await row(30).locator('.person-assignment-form [type=submit]').click();
             await row(30).locator('[data-assignment-status]').filter({hasText:'уже призначений'}).waitFor();
             await pick(10,'3');
-            await Promise.all([page.waitForNavigation(),row(10).locator('form [type=submit]').click()]);
+            await Promise.all([page.waitForNavigation(),row(10).locator('.person-assignment-form [type=submit]').click()]);
             assert.equal(await row(10).locator('[data-person-value]').inputValue(),'3');
         });
         await scenario('history shows retained source and explicit atomic version closure',async()=>{

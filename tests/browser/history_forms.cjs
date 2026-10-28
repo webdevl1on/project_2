@@ -34,7 +34,7 @@ module.exports=async({context,base})=>{
         });
         await scenario('editing an assignment preserves the draft on date errors and server refusal',async()=>{
             const edit=page.locator('form[action^="/staff/assignments/"][action$="/correct"]').first();
-            await edit.locator('..').locator('summary').click();
+            await edit.locator('..').locator(':scope > summary').click();
             await edit.locator('[name="assigned_from"]').fill('2026-04-01');await edit.locator('[name="assigned_to"]').fill('2026-03-01');
             const before=await values(edit);await edit.locator('button:not([type])').click();
             await edit.locator('[data-history-form-error]').filter({hasText:'раніше'}).waitFor();assert.deepEqual(await values(edit),before);
@@ -46,11 +46,11 @@ module.exports=async({context,base})=>{
         });
         await scenario('position and version refusals retain drafts; successful correction updates data',async()=>{
             const version=page.locator('form[action$="/correct"]').filter({has:page.locator('[name="valid_from"]')});
-            await version.locator('..').locator('summary').click();
+            await version.locator('..').locator(':scope > summary').click();
             await version.locator('[name="name"]').fill('Збережена чернетка');await version.locator('[name="valid_from"]').fill('2027-01-01');
             const before=await values(version);await version.locator('button').click();
             await version.locator('[data-history-form-error]:visible').waitFor();assert.deepEqual(await values(version),before);
-            const position=page.locator('form[action^="/staff/positions/"]').first();await position.locator('..').locator('summary').click();
+            const position=page.locator('form[action^="/staff/positions/"]').first();await position.locator('..').locator(':scope > summary').click();
             await position.locator('[name="name_short"]').fill('Виправлена посада');
             await position.locator('[name="position_number"]').fill('20');
             const draft=await values(position);await position.locator('button').click();

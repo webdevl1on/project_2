@@ -1,3 +1,4 @@
+{% from 'components/assignment_operations.html' import orders,release %}
 {% from 'components/person_picker.html' import person_picker %}
 <!doctype html><html lang="uk"><meta charset="utf-8"><title>Версії та історія призначень</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link href="/static/css/person_picker.css" rel="stylesheet">
@@ -18,14 +19,15 @@
 <input type="hidden" name="revision" value="{{ record.revision }}">{{ person_picker(people,record.person_id,'history-'~record.id) }}
 <label>Посада<select name="position_id" class="form-select">{% for p, version_name in all_positions %}<option value="{{ p.position_id }}" {% if p.position_id==record.staff_position_id %}selected{% endif %}>{{ version_name }} · № {{ p.position_number }} · {{ p.name_short }}</option>{% endfor %}</select></label>
 <label>Початок<input type="date" name="assigned_from" value="{{ record.assigned_from }}" required class="form-control"></label><label>Завершення<input type="date" name="assigned_to" value="{{ record.assigned_to or '' }}" class="form-control"></label><button class="btn btn-primary">Виправити запис</button></form>
+{{ orders(record) }}{{ release(record) }}
 <p class="small">Внесено: {{ format_system_timestamp(record.created_at) }} · Оновлено: {{ format_system_timestamp(record.updated_at) }}</p></details>
 {% endfor %}
 <details class="my-3"><summary>Додати історичне призначення</summary><form method="post" action="/staff/assignments/create" class="d-flex flex-wrap gap-2 align-items-end">
 {{ person_picker(people,none,'history-new') }}<label>Посада<select name="position_id" class="form-select" required>{% for p in positions %}<option value="{{ p.position_id }}">№ {{ p.position_number }} · {{ p.name_short }}</option>{% endfor %}</select></label>
-<label>Початок<input type="date" name="assigned_from" required class="form-control"></label><label>Завершення<input type="date" name="assigned_to" class="form-control"></label><button class="btn btn-primary">Додати</button></form></details>
+<label>Початок<input type="date" name="assigned_from" required class="form-control"></label><label>Завершення<input type="date" name="assigned_to" class="form-control"></label><label>Номер наказу<input name="assignment_order_number" maxlength="100" class="form-control"></label><label>Дата наказу<input type="date" name="assignment_order_date" class="form-control"></label><button class="btn btn-primary">Додати</button></form></details>
 <h2 class="h5">Контрольоване виправлення реквізитів конкретної посади</h2>
 {% for p in positions %}<details class="my-2"><summary>№ {{ p.position_number }} · {{ p.name_short }}</summary><form method="post" action="/staff/positions/{{ p.position_id }}/correct">
 <input type="hidden" name="revision" value="{{ p.revision }}">
 {% for field in position_fields %}<label class="m-1">{{ field.label }}<input name="{{ field.key }}" value="{{ p[field.key] }}" required class="form-control"></label>{% endfor %}<button class="btn btn-primary">Зберегти виправлення цієї посади</button></form></details>{% endfor %}
 {% endif %}
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script><script src="/static/js/person_picker.js"></script><script src="/static/js/staff_history_forms.js"></script></body></html>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script><script src="/static/js/person_picker.js"></script><script src="/static/js/staff_history_forms.js"></script><script src="/static/js/personnel_forms.js"></script></body></html>

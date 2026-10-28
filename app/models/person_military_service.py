@@ -61,6 +61,7 @@ class PersonServiceHistory(PartialDateMixin, HistoryModel):
     __date_fields__ = {
         "position": DATE_FIELDS["service.position_date"],
         "order": DATE_FIELDS["service.order_date"],
+        "end": DATE_FIELDS["service.end_date"],
     }
 
     person_service_history_id: Mapped[int] = mapped_column(
@@ -108,3 +109,12 @@ class PersonServiceHistory(PartialDateMixin, HistoryModel):
     person: Mapped["Person"] = relationship(
     back_populates="service_history"
     )
+
+    end_day: Mapped[int | None] = mapped_column(Integer)
+    end_month: Mapped[int | None] = mapped_column(Integer)
+    end_year: Mapped[int | None] = mapped_column(Integer)
+    _end_date: Mapped[date | None] = mapped_column("end_date", Date)
+    end_date = date_projection("end")
+    note: Mapped[str | None] = mapped_column(String(1000))
+    revision: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    __mapper_args__ = {"version_id_col": revision}

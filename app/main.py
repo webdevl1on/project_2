@@ -29,3 +29,5 @@ from app.routers import geography
 app.include_router(geography.router)
 from app.routers import contacts
 app.include_router(contacts.router)
+from app.routers import service_chronology
+app.include_router(service_chronology.router)

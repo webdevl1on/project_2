@@ -38,3 +38,5 @@ from app.models.geography_import import GeoSource, GeoImportLink, GeoCityDistric
 __all__ += ['GeoSource', 'GeoImportLink', 'GeoCityDistrict']
 from app.models.person_contact import PersonContact
 __all__ += ['PersonContact']
+from app.models.mirage import PersonPositionMirage
+__all__ += ['PersonPositionMirage']

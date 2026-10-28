@@ -13,15 +13,17 @@
 
     {% include "person/components/full_info_top_navigation.html" %}
 
+    {% if request.query_params.get("personnel_message") %}<p class="alert alert-success" role="status">{{ request.query_params.get("personnel_message") }}</p>{% endif %}
     {% include "person/components/profile_header.html" %}
     {% include "person/components/modal_windows.html" %}
     <ul class="nav nav-pills mb-3" id="personTabs" role="tablist">
-    {% for key,label in [('general','Загальна інформація'),('names','ПІБ'),('ranks','Звання'),('positions','Посада'),('addresses','Адреси'),('contacts','Контакти'),('documents','Документи'),('family',"Сім'я"),('events','Події')] %}
+    {% for key,label in [('general','Загальна інформація'),('names','ПІБ'),('ranks','Звання'),('positions','Посада'),('service-history','Історія служби'),('addresses','Адреси'),('contacts','Контакти'),('documents','Документи'),('family',"Сім'я"),('events','Події')] %}
     <li class="nav-item" role="presentation"><button id="tab-{{ key }}" type="button" role="tab" aria-controls="{{ key }}" aria-selected="{{ 'true' if key == 'general' else 'false' }}" class="nav-link {{ 'active' if key == 'general' else '' }}" data-bs-toggle="pill" data-bs-target="#{{ key }}">{{ label }}</button></li>
     {% endfor %}</ul>
     <div class="tab-content">
     <div class="tab-pane fade show active" id="general" role="tabpanel" aria-labelledby="tab-general"><div id="profile-overview" data-url="/persons/{{ person_id }}/overview">{% include 'person/components/profile_overview.html' %}</div></div>
-    <div class="tab-pane fade" id="names" role="tabpanel" aria-labelledby="tab-names">{% include 'person/components/names_history.html' %}</div>
+    <div class="tab-pane fade" id="service-history" role="tabpanel" aria-labelledby="tab-service-history">{% include 'person/components/service_chronology.html' %}</div>
+    <div class="tab-pane fade" id="names" role="tabpanel" aria-labelledby="tab-names"><details class="mb-3"><summary>Особисті / облікові дані</summary><form data-personnel-form method="post" action="/persons/{{ person_id }}/personal-number"><label>Особистий номер (жетон)<input class="form-control" name="personal_number" maxlength="100" value="{{ person.personal_number or '' }}"></label><button class="btn btn-primary">Зберегти особистий номер</button></form></details>{% include 'person/components/names_history.html' %}</div>
     <div class="tab-pane fade" id="ranks" role="tabpanel" aria-labelledby="tab-ranks">{% include 'person/components/rank_history.html' %}</div>
     <div class="tab-pane fade" id="positions" role="tabpanel" aria-labelledby="tab-positions"><p>{{ profile_assignment[1].name_nominative if profile_assignment else 'Посада не зазначена' }}</p><a href="/staff/history">Відкрити версії та історію призначень</a>
     {% for assignment,position,version in assignment_history %}<p>{{ version.name }} · {{ position.name_nominative }} · {{ position.unit_short }} · {{ assignment.assigned_from }} — {{ assignment.assigned_to or 'Відкрите' }}</p>{% endfor %}</div>
@@ -37,6 +39,7 @@
     <script src="/static/js/geography.js"></script>
     <script src="/static/js/person_profile.js"></script>
     <script src="/static/js/contacts.js"></script>
+    <script src="/static/js/personnel_forms.js"></script>
 </body>
 
 </html>

@@ -63,5 +63,5 @@ def test_router_exposes_only_existing_filter_keys_to_url_adapter(db):
     )
     adapter = response.context["table_column_filters"]
     assert adapter["keys"] == list(FILTER_KEYS)
-    assert adapter["extra"] == {"occupancy": "all"}
+    assert adapter["extra"] == {"occupancy": "all", "mirage":"all"}
     assert "data-column-filters" in response.body.decode()

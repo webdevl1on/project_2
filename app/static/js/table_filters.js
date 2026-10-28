@@ -8,6 +8,7 @@
     class QueryFilterAdapter {
         constructor(config = {}, location = globalThis.location) {
             this.keys = config.keys || [];
+            this.columnKeys = config.column_keys || {};
             this.orderParameter = config.order_parameter || "filter_order";
             this.extra = config.extra || {};
             this.location = location;
@@ -30,7 +31,7 @@
             });
         }
         withVisible(visible, filters) {
-            return this.normalise({ ...filters, values: Object.fromEntries(Object.entries(filters.values).filter(([key]) => visible.includes(key))) });
+            return this.normalise({ ...filters, values: Object.fromEntries(Object.entries(filters.values).filter(([key]) => visible.includes(this.columnKeys[key] || key))) });
         }
         equal(left, right) {
             const canonical = value => {

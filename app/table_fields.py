@@ -42,6 +42,12 @@ class TableField:
 
     @property
     def expression(self):
+        if self.key == 'full_address':
+            from sqlalchemy import select
+            from app.models import PersonAddress
+            from app.geography import GEO_FIELDS,DETAIL_FIELDS
+            fields=(*GEO_FIELDS,'settlement_type',*DETAIL_FIELDS)
+            return select(func.formatted_address(*(getattr(PersonAddress,key) for key in fields))).where(PersonAddress.person_id==Person.person_id,PersonAddress.kind=='registration',PersonAddress.is_active.is_(True)).correlate(Person).scalar_subquery()
         if self.key == "full_name":
             value = func.coalesce(PersonName.surname, "")
             for part in (PersonName.name, PersonName.patronymic):
@@ -67,6 +73,7 @@ class TableField:
         return SOURCES[self.source].__mapper__.primary_key[0]
 
     def value(self, row):
+        if self.key == 'full_address':return row.get('full_address')
         record = row.get(self.source)
         if record is None:
             return None
@@ -93,10 +100,10 @@ class TableField:
     def metadata(self):
         model = SOURCES[self.source]
         attributes = [f"{self.prefix}_{part}" for part in ("day", "month", "year")] if self.prefix else [self.attribute]
-        computed = self.key == "full_name"
+        computed = self.key in ("full_name","full_address")
         result = {
             "key": self.key, "label": self.label, "group": self.group,
-            "source": {"model": model.__name__, "attributes": ["surname", "name", "patronymic"] if computed else attributes,
+            "source": {"model": model.__name__, "attributes": ["surname", "name", "patronymic"] if self.key == "full_name" else ["person_id"] if computed else attributes,
                        "computed": computed},
             "data_type": self.data_type, "default_visible": self.default_visible,
             "nullable": True if computed else any(getattr(model, attr).property.columns[0].nullable for attr in attributes),
@@ -161,3 +168,5 @@ for prefix in ("passport_issued", "passport_expire"):
 for source, label in (("name", "ПІБ"), ("person_rank", "Звання"), ("passport", "Паспорт"), ("service", "Служба")):
     for attr, suffix, kind in (("created_at", "створено", "datetime"), ("updated_at", "оновлено", "datetime"), ("is_active", "активний запис", "boolean")):
         _add(f"{source}_{attr}", f"{label}: {suffix}", "system_data", source, attr, data_type=kind)
+
+_add("full_address", "Повна адреса реєстрації", "person", "person", "full_address")

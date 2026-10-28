@@ -39,6 +39,7 @@ DATE_FIELDS = {
         ("rank.rank_order_date", "Дата наказу про звання"),
         ("service.position_date", "Дата посади"),
         ("service.order_date", "Дата наказу про службу"),
+        ("service.end_date", "Завершення історичної служби"),
     )},
     "history.created_at": DateField("created_at", "Створено", required=True, system=True),
     "history.updated_at": DateField("updated_at", "Оновлено", required=True, system=True),

@@ -30,11 +30,15 @@ def require_current_schema(engine):
         missing.append("застаріла фізична person_positions — підготуйте нову БД без другого джерела призначень")
     if engine.dialect.name == "sqlite" and not missing:
         from sqlalchemy import text
-        required = required_sqlite_triggers()
+        required = required_sqlite_triggers() | {"exact_assignment_orders_insert","exact_assignment_orders_update"}
         with engine.connect() as connection:
             installed=set(connection.execute(text("SELECT name FROM sqlite_master WHERE type='trigger'")).scalars())
         missing.extend("trigger:"+name for name in sorted(required-installed))
     if missing:
+        from app.database.service_schema import ADDED_COLUMNS
+        changes={f'{table}.{name}' for table,names in ADDED_COLUMNS.items() for name in names}|{'person_position_mirages','trigger:exact_assignment_orders_insert','trigger:exact_assignment_orders_update'}
+        if set(missing)<=changes:
+            raise ValueError('Потрібна безпечна міграція: python -m app.database.migrate_service_history --database PATH. Автоматично БД не змінено.')
         if set(missing) == {"person_contacts"}:
             raise ValueError("Потрібна безпечна міграція: python -m app.database.migrate_contacts --database PATH. Автоматично БД не змінено.")
         if set(missing) <= {"geo_units", "geo_aliases", "person_birthplaces", "person_addresses"}:

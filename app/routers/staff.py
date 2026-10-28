@@ -14,21 +14,21 @@ from app.templating import templates
 router=APIRouter()
 
 
-def domain_date(raw, required=True):
-    if not raw and not required:return None
-    try:return date.fromisoformat(raw)
-    except (ValueError,TypeError):raise ValueError("Потрібна точна дата у форматі РРРР-ММ-ДД.") from None
-
+from app.services.staff_service import domain_date
 
 def failure(error,status=409):
     return JSONResponse({"detail":str(error)},status_code=status)
 
 
 @router.post('/person-positions/assign/prepare')
-def prepare_assignment(position_id:int=Form(),person_id:str=Form(""),on:str=Form(),db:Session=Depends(get_db)):
+def prepare_assignment(position_id:int=Form(),person_id:str=Form(""),on:str=Form(),assignment_order_number:str=Form(""),assignment_order_date:str=Form(""),transfer_release_order_number:str=Form(""),transfer_release_order_date:str=Form(""),db:Session=Depends(get_db)):
     try:
         person=int(person_id) if person_id else None
         snapshot,options,target,source,previous=assignment_preview(db,position_id,person,domain_date(on))
+        from app.services.staff_service import order_values
+        order=order_values(assignment_order_number,domain_date(assignment_order_date,False))
+        release=order_values(transfer_release_order_number,domain_date(transfer_release_order_date,False),'release')
+        if any([*order.values(),*release.values()]): snapshot['orders']={'number':order['assignment_order_number'],'date':order['assignment_order_date'].isoformat() if order['assignment_order_date'] else None,'release_number':release['release_order_number'],'release_date':release['release_order_date'].isoformat() if release['release_order_date'] else None}
         label=next((item['label'] for item in options if item['id']==person),'Військовослужбовець')
         transfer=bool(source and source.staff_position_id!=position_id)
         noop=bool(source and snapshot['source']==snapshot['target'])
@@ -136,9 +136,9 @@ def correct_version(request:Request,key:int,revision:int=Form(),name:str=Form(),
 
 
 @router.post('/staff/assignments/create')
-def create_assignment(request:Request,person_id:int=Form(),position_id:int=Form(),assigned_from:str=Form(),assigned_to:str=Form(''),db:Session=Depends(get_db)):
+def create_assignment(request:Request,person_id:int=Form(),position_id:int=Form(),assigned_from:str=Form(),assigned_to:str=Form(''),assignment_order_number:str=Form(''),assignment_order_date:str=Form(''),db:Session=Depends(get_db)):
     try:
-        StaffService.create_assignment(db,person_id,position_id,domain_date(assigned_from),domain_date(assigned_to,False))
+        StaffService.create_assignment(db,person_id,position_id,domain_date(assigned_from),domain_date(assigned_to,False),order_number=assignment_order_number,order_date=domain_date(assignment_order_date,False))
         return RedirectResponse('/staff/history?'+urlencode({'version_id':position_version_id(db,position_id),'message':'Призначення збережено.'}),303)
     except ValueError as error:return form_failure(request,error)
 
