@@ -1,3 +1,4 @@
+const {openAssignment,openStaffActions}=require('./table_helpers.cjs');
 /* Run from the repository root:
  * PYTHON=.venv/bin/python CHROMIUM_PATH=/usr/bin/chromium node tests/browser/column_visibility.cjs
  * Requires Playwright for Node; Bootstrap is fetched from the same CDN as the page.
@@ -60,7 +61,7 @@ async function main() {
             const version = route.request().url().split("bootstrap@")[1].split("/")[0];
             return route.fulfill({ body: assets[`${version}/${file}`], contentType: file.endsWith(".js") ? "application/javascript" : "text/css" });
         });
-        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "history_forms", "name_cases", "geography", "contacts", "personnel", "service_bases", "documents"];
+        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "history_forms", "name_cases", "geography", "contacts", "personnel", "service_bases", "documents", "workspace"];
         if (process.env.COLUMN_STAGE) {
             assert.ok(suites.includes(process.env.COLUMN_STAGE));
             await require(`./${process.env.COLUMN_STAGE}.cjs`)({ context, base, adminToken });
@@ -175,14 +176,16 @@ async function main() {
             await choice("rank").uncheck();
             await apply();
             assert.equal(page.url(), url);
-            const form = table.locator("tbody tr").first().locator("form");
+            await openAssignment(table.locator("tbody tr").first());
+            const form = table.locator("tbody tr").first().locator(".person-assignment-form");
             await form.locator('[data-person-label]').click();
             await form.locator('[data-person-option=""]').click();
             await form.locator('[type=submit]').click();
             await page.locator('#staff-assignment-confirm').waitFor({state:'visible'});
             await Promise.all([page.waitForNavigation(),page.locator('[data-assignment-confirm-yes]').click()]);
             assert.equal(await table.locator("tbody tr").first().locator('[data-person-value]').inputValue(), "");
-            const restored=table.locator("tbody tr").first().locator("form");
+            await openAssignment(table.locator("tbody tr").first());
+            const restored=table.locator("tbody tr").first().locator(".person-assignment-form");
             await restored.locator('[data-person-label]').click();
             await restored.locator('[data-person-option="2"]').click();
             await Promise.all([page.waitForNavigation(),restored.locator('[type=submit]').click()]);

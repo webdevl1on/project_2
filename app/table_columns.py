@@ -43,3 +43,11 @@ PERSON_POSITIONS_COLUMNS = table_configuration(
 PERSON_POSITIONS_FIELDS = {column["key"]: FIELDS[column["key"]]
                           for group in PERSON_POSITIONS_COLUMNS["groups"] for column in group["columns"]
                           if column["key"] in FIELDS}
+
+
+PERSONS_COLUMNS = table_configuration('persons', [('person', ['surname','name','tax_number','birth_date']),
+                                                ('rank', ['rank','rank_order_number'])],
+                                      overrides={key:{'default_visible':True} for key in ('tax_number','rank_order_number')})
+PERSONS_COLUMNS['groups'][0]['columns'].insert(0, {
+    **_control('person_id','ID'), 'informational':True, 'resizable':True, 'width':100, 'min_width':64,
+})

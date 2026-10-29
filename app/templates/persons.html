@@ -1,149 +1,27 @@
-<!DOCTYPE html>
-<html lang="uk">
-
-<head>
-    <meta charset="UTF-8">
-    <title>Люди</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js"></script>
-</head>
-
-<body class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1 class="h2 mb-0">Люди</h1>
-        <a class="btn btn-primary" href="/persons/new">Додати людину</a>
-        <a class="btn btn-primary" href="/person-positions">Штатка</a>
-    </div>
-    <form method="get" action="/persons" class="row g-2 mb-3">
-        <div class="col-auto">
-            <select class="form-select" name="sort_by">
-                <option value="surname" {% if sort_by=="surname" %}selected{% endif %}>Прізвище</option>
-                <option value="name" {% if sort_by=="name" %}selected{% endif %}>Ім'я</option>
-                <option value="birth_year" {% if sort_by=="birth_year" %}selected{% endif %}>Дата народження</option>
-                <option value="rank" {% if sort_by=="rank" %}selected{% endif %}>Звання</option>
-
-            </select>
-        </div>
-
-        <div class="col-auto">
-            <select class="form-select" name="direction">
-                <option value="asc" {% if direction=="asc" %}selected{% endif %}>За зростанням</option>
-                <option value="desc" {% if direction=="desc" %}selected{% endif %}>За спаданням</option>
-            </select>
-        </div>
-
-        <div class="col-auto">
-            <button class="btn btn-outline-primary" type="submit">Сортувати</button>
-        </div>
-    </form>
-
-
-    <div class="dropdown mb-3">
-        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
-            ⚙️ Колонки
-        </button>
-
-        <ul class="dropdown-menu p-3">
-
-            <li>
-                <label>
-                    <input type="checkbox" class="column-toggle" data-column="id" checked>
-                    ID
-                </label>
-            </li>
-
-            <li>
-                <label>
-                    <input type="checkbox" class="column-toggle" data-column="surname" checked>
-                    Прізвище
-                </label>
-            </li>
-
-            <li>
-                <label>
-                    <input type="checkbox" class="column-toggle" data-column="rank" checked>
-                    Звання
-                </label>
-            </li>
-            <li>
-                <label>
-                    <input type="checkbox" class="column-toggle" data-column="rank_order_number" checked>
-                    Номер наказу
-                </label>
-            </li>
-
-
-
-        </ul>
-    </div>
-
-
-    {% if persons %}
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th class="col-id">
-                    <a
-                        href="/persons?sort_by=id&direction={% if sort_by == 'id' and direction == 'asc' %}desc{% else %}asc{% endif %}">
-                        ID
-                    </a>
-                </th>
-                <th class="col-surname">
-                    <a
-                        href="/persons?sort_by=surname&direction={% if sort_by == 'surname' and direction == 'asc' %}desc{% else %}asc{% endif %}">
-                        Прізвище
-                    </a>
-                </th>
-                <th>Ім'я</th>
-                <th>ІПН</th>
-                <th>Дата народження</th>
-                <th class="col-rank">Звання</th>
-                <th class="col-rank_order_number">Номер наказу</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in persons %}
-            <tr>
-                <td class="col-id"><a href="/person_detail/{{ item.person.person_id }}">{{ item.person.person_id }}</a>
-                </td>
-                <td class="col-surname">{{ item.name.surname if item.name else "—" }}</td>
-                <td>{{ item.name.name if item.name else "—" }}</td>
-                <td>{{ item.person.tax_number or "—" }}</td>
-                <td>{{ format_partial_date(item.person.birth_day, item.person.birth_month, item.person.birth_year) or
-                    "—" }}</td>
-                <td class="col-rank">{{ item.rank.rank.nominative if item.rank and item.rank.rank else "—" }}</td>
-                <td class="col-rank_order_number">{{ item.rank.rank_order_number if item.rank else "—" }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% else %}
-    <p>Поки що немає жодної людини.</p>
-    {% endif %}
-</body>
-
-</html>
-
-<script>
-    document.querySelectorAll(".column-toggle").forEach(function (checkbox) {
-
-        checkbox.addEventListener("change", function () {
-
-            const column = this.dataset.column;
-
-            document
-                .querySelectorAll(".col-" + column)
-                .forEach(function (cell) {
-
-                    cell.style.display =
-                        checkbox.checked
-                            ? ""
-                            : "none";
-
-                });
-
-        });
-
-    });
-
-</script>
+{% from 'components/column_visibility.html' import column_visibility %}
+{% set columns=table_columns.groups|map(attribute='columns')|sum(start=[]) %}
+<!doctype html><html lang="uk"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Люди</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="/static/css/column_visibility.css" rel="stylesheet"><link href="/static/css/app_layout.css" rel="stylesheet"></head>
+<body class="container-fluid table-page">
+{% include 'components/app_navigation.html' %}
+<div class="page-heading"><h1>Люди</h1><a class="btn btn-sm btn-primary" href="/persons/new">Додати людину</a></div>
+<form method="get" action="/persons" class="d-flex gap-2 flex-wrap mb-2" aria-label="Сортування людей">
+<label class="small">Сортування<select class="form-select form-select-sm" name="sort_by">{% for key,label in [('surname','Прізвище'),('name',"Ім’я"),('birth_year','Дата народження'),('rank','Звання'),('id','ID')] %}<option value="{{ key }}" {{ 'selected' if sort_by==key else '' }}>{{ label }}</option>{% endfor %}</select></label>
+<label class="small">Напрямок<select class="form-select form-select-sm" name="direction"><option value="asc" {{ 'selected' if direction=='asc' else '' }}>За зростанням</option><option value="desc" {{ 'selected' if direction=='desc' else '' }}>За спаданням</option></select></label>
+<button type="submit" class="btn btn-sm btn-outline-primary align-self-end">Сортувати</button></form>
+{{ column_visibility(table_columns) }}
+<div class="table-viewport" tabindex="0" aria-label="Таблиця людей з прокруткою"><table id="persons" data-column-table class="table table-striped table-hover align-middle">
+<thead><tr>{% for column in columns %}{% set sort_key={'person_id':'id','surname':'surname','name':'name','birth_date':'birth_year','rank':'rank'}.get(column.key) %}<th data-column-key="{{ column.key }}" {% if not column.default_visible %}hidden{% endif %}>
+<div class="position-column-heading d-flex align-items-center text-nowrap">
+{% if sort_key %}<a class="text-decoration-none" href="/persons?sort_by={{ sort_key }}&direction={{ 'desc' if sort_by==sort_key and direction=='asc' else 'asc' }}">{{ column.label }}</a>{% else %}<span>{{ column.label }}</span>{% endif %}
+<div class="dropdown"><button type="button" class="btn btn-sm" data-bs-toggle="dropdown" aria-label="Меню: {{ column.label }}">▾</button><div class="dropdown-menu"><button type="button" class="dropdown-item" data-column-select>Виділити колонку</button><button type="button" class="dropdown-item" data-column-hide>Приховати колонку</button></div></div>
+</div></th>{% endfor %}</tr></thead><tbody>
+{% for item in persons %}
+{% set values={'person_id':item.person.person_id,'surname':item.name.surname if item.name else '—','name':item.name.name if item.name else '—','tax_number':item.person.tax_number or '—','birth_date':format_partial_date(item.person.birth_day,item.person.birth_month,item.person.birth_year),'rank':item.rank.rank.nominative if item.rank and item.rank.rank else '—','rank_order_number':(item.rank.rank_order_number or '—') if item.rank else '—'} %}
+<tr data-row-key="person:{{ item.person.person_id }}">{% for column in columns %}<td data-column-key="{{ column.key }}" {% if not column.default_visible %}hidden{% endif %}><span data-column-value title="{{ values[column.key] }}">{% if column.key=='person_id' %}<a href="/person_full_info/{{ item.person.person_id }}">{{ values[column.key] }}</a>{% else %}{{ values[column.key] }}{% endif %}</span></td>{% endfor %}</tr>
+{% else %}<tr><td data-column-empty colspan="{{ columns|length }}">Поки що немає жодної людини.</td></tr>{% endfor %}
+</tbody></table></div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% for script in ['table_state','column_tree','column_presets','column_interactions','table_filters','table_history','table_selection','table_appearance','column_visibility','table_workspace'] %}<script src="/static/js/{{ script }}.js"></script>{% endfor %}
+</body></html>

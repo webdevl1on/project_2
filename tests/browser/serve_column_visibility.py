@@ -122,5 +122,13 @@ def document_accounts():
     return {'user_id':key,'person_id':3}
 
 
+@app.post('/_column-test/many-positions')
+def many_positions():
+    with Session() as db:
+        db.add_all(make_position(number,'Великий підрозділ','Посада','Довга тестова назва посади') for number in range(40,1240,10))
+        db.commit()
+    return {'ok':True}
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=int(sys.argv[1]), log_level="warning")

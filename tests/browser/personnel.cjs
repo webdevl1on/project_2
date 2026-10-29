@@ -1,3 +1,4 @@
+const {openAssignment,openStaffActions}=require('./table_helpers.cjs');
 const assert=require('node:assert/strict');
 module.exports=async({context,base})=>{
  const page=await context.newPage(), errors=[];page.on('pageerror',error=>errors.push(error.message));
@@ -6,12 +7,14 @@ module.exports=async({context,base})=>{
  async function submit(form,label){await Promise.all([page.waitForNavigation(),form.getByRole('button',{name:label,exact:true}).click()]);}
  await page.goto(base+'/person-positions');await page.evaluate(()=>localStorage.clear());await page.reload();
  const date=await page.locator('#position-filters [name="as_of"]').inputValue();
+ await openAssignment(row(30));
  let attach=row(30).locator('details').filter({has:page.locator('summary',{hasText:'Додати Міраж'})});
  await attach.locator('summary').click();await attach.locator('[name="person_id"]').selectOption('3');await submit(attach,'Додати попереднє закріплення');
  await page.goto(base+'/person-positions?mirage=with');
  assert.equal(await page.locator('#person-positions tbody tr').count(),1);
  assert.match(await row(30).innerText(),/Вакантна/);assert.match(await row(30).innerText(),/Міраж/);
  console.log('PASS personnel: mirage on a vacant position preserves vacancy and has its own filter');
+ await openAssignment(row(30));
  const convert=row(30).locator('details').filter({has:page.locator('summary',{hasText:'Оформити призначення'})});
  await convert.locator(':scope > summary').click();await convert.locator('[name="on"]').fill(date);await convert.locator('[name="assignment_order_number"]').fill('00125');await convert.locator('[name="assignment_order_date"]').fill('2026-01-01');
  page.once('dialog',dialog=>dialog.accept());await submit(convert,'Перевірити та підтвердити');
@@ -20,7 +23,7 @@ module.exports=async({context,base})=>{
  assert.match(await page.locator('#service-history').innerText(),/00125/);
  let orders=page.locator('#service-history details').filter({has:page.locator('summary',{hasText:'Накази призначення / звільнення'})});
  await orders.locator('summary').click();await orders.locator('[name="assignment_order_number"]').fill('00126');await submit(orders,'Зберегти лише накази');
- await page.goto(base+'/person-positions');assert.match(await row(30).innerText(),/00126/);
+ await page.goto(base+'/person-positions');await openAssignment(row(30));assert.match(await row(30).innerText(),/00126/);
  console.log('PASS personnel: conversion creates one official assignment and profile order editing updates the staff table');
  await page.goto(base+'/person_full_info/3#names');
  const token=page.locator('details').filter({has:page.locator('summary',{hasText:'Особисті / облікові дані'})});await token.locator('summary').click();await token.locator('[name="personal_number"]').fill('000-А/7');await submit(token,'Зберегти особистий номер');
@@ -34,7 +37,7 @@ module.exports=async({context,base})=>{
  await page.goto(base+'/person-positions?full_address__contains='+encodeURIComponent('МИКОЛАЇ'));
  assert.equal(await page.locator('#person-positions tbody tr').count(),1);assert.equal(await row(30).count(),1);
  await page.goto(base+'/person-positions');
- const menu=row(30);await menu.locator('[data-staff-tools] > summary').click();const release=menu.locator('[data-assignment-release]');await release.locator('summary').click();
+ const menu=row(30);await openAssignment(menu);await menu.locator('[data-staff-tools] > summary').click();const release=menu.locator('[data-assignment-release]');await release.locator('summary').click();
  const next=new Date(date+'T12:00:00Z');next.setUTCDate(next.getUTCDate()+1);const effective=next.toISOString().slice(0,10);
  await release.locator('[name="release_effective"]').fill(effective);await release.locator('[name="confirmed"]').check();await submit(release,'Звільнити з посади');
  await page.goto(base+'/person-positions?as_of='+effective);assert.match(await row(30).innerText(),/Вакантна/);

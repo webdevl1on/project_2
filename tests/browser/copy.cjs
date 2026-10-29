@@ -1,3 +1,4 @@
+const {openAssignment,openStaffActions}=require('./table_helpers.cjs');
 const assert=require('node:assert/strict');
 module.exports=async({context,base})=>{
     const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -74,7 +75,7 @@ module.exports=async({context,base})=>{
             assert.deepEqual(await page.evaluate(()=>shortcuts),[false,false]);
             assert.ok(await page.evaluate(()=>window.getSelection().toString().length>0));
             await page.keyboard.press('Escape');
-            await table.locator('[data-person-label]').first().click();
+            await openAssignment(table.locator('tbody tr').first());await table.locator('[data-person-label]').first().click();
             const input=table.locator('.person-search').first();await input.fill('Тест');await input.press('Control+a');
             assert.equal(await selected(),0);assert.equal(await input.evaluate(n=>n.selectionEnd-n.selectionStart),4);
             await input.fill('');await page.keyboard.press('Escape');

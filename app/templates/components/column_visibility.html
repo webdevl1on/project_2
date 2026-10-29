@@ -52,11 +52,12 @@
             </div>
         </div>
         <button type="button" class="btn btn-outline-primary" data-preset-create>Зберегти пресет</button>
-        <div class="d-flex gap-2 align-items-center flex-wrap" role="group" aria-label="Копіювання таблиці">
-            <span>Формат копіювання:</span>
+        <div class="table-copy-tools d-flex gap-2 align-items-center flex-wrap" role="group" aria-label="Копіювання таблиці">
+            <label>Виділення <select data-selection-mode aria-label="Режим виділення"><option value="cells">Клітинки</option><option value="rows">Рядки</option><option value="columns">Колонки</option></select></label>
             <label><input type="radio" name="{{ config.id }}-copy-format" data-copy-format value="excel" checked> Excel</label>
             <label><input type="radio" name="{{ config.id }}-copy-format" data-copy-format value="word"> Word</label>
             <button type="button" class="btn btn-outline-secondary" data-table-copy disabled>Копіювати</button>
+            <button type="button" class="btn btn-outline-secondary" data-selection-clear>Очистити виділення</button>
             <span class="small" role="status" aria-live="polite" data-copy-status></span>
         </div>
         <div class="btn-group" role="group" aria-label="Історія станів таблиці">
@@ -64,6 +65,20 @@
             <button type="button" class="btn btn-outline-secondary" data-table-forward disabled>Вперед</button>
         </div>
         <div class="d-flex gap-2 flex-wrap" data-preset-list></div>
+        <details class="table-format-panel" data-table-format><summary>Форматування</summary>
+            <div class="table-format-controls">
+                <label>Висота всіх рядків<select data-row-height><option value="28">Компактна — 28 px</option><option value="40" selected>Стандартна — 40 px</option><option value="64">Розширена — 64 px</option><option value="custom">Власна</option></select></label>
+                <label>Власна висота, px<input type="number" data-row-height-custom min="24" max="180" value="40" disabled></label>
+                <label>Базовий шрифт, px<input type="number" data-table-font min="10" max="28" value="14"></label>
+                <label>Масштаб<select data-table-scale>{% for scale in [75,90,100,110,125] %}<option value="{{ scale }}" {{ 'selected' if scale==100 else '' }}>{{ scale }}%</option>{% endfor %}</select></label>
+                <label>Колонка<select data-font-column>{% for group in config.groups %}{% for column in group.columns %}<option value="{{ column.key }}">{{ column.label }}</option>{% endfor %}{% endfor %}</select></label>
+                <label>Шрифт колонки, px<input type="number" data-column-font min="10" max="32" placeholder="Базовий"></label>
+                <button type="button" class="btn btn-outline-secondary" data-column-font-reset>Базовий шрифт колонки</button>
+                <div><span>Заливка виділення</span><div class="table-fill-palette">
+                {% for color,label in [('#fff3cd','Жовта'),('#d1e7dd','Зелена'),('#cfe2ff','Блакитна'),('#f8d7da','Рожева'),('#e2e3e5','Сіра')] %}<button type="button" style="background:{{ color }}" data-cell-fill="{{ color }}" aria-label="{{ label }} заливка" title="{{ label }} заливка"></button>{% endfor %}
+                <button type="button" data-cell-fill="" title="Очистити заливку виділення" aria-label="Очистити заливку виділення">×</button></div></div>
+            </div>
+        </details>
     </div>
     <p class="small text-warning mt-2 mb-0" role="status" aria-live="polite" data-column-storage-error hidden>
         Браузер не дозволив зберегти налаштування після перезавантаження.

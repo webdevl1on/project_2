@@ -1,0 +1,7 @@
+{% set path = request.url.path if request is defined else '' %}
+<nav class="app-navigation" aria-label="Основна навігація">
+<span class="app-brand">project_2</span>
+{% for href,label,active in [('/persons','Люди',path.startswith('/persons') or path.startswith('/person_')),('/person-positions','Штатка',path=='/person-positions'),('/staff/history','Історія штату',path.startswith('/staff')),('/admin','Адміністрування',path.startswith('/admin'))] %}
+<a href="{{ href }}" class="{{ 'active' if active else '' }}" {% if active %}aria-current="page"{% endif %}>{{ label }}</a>
+{% endfor %}
+</nav>

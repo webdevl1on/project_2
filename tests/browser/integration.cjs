@@ -1,3 +1,4 @@
+const {openAssignment,openStaffActions}=require('./table_helpers.cjs');
 const assert=require('node:assert/strict');
 module.exports=async({context,base})=>{
     const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -42,12 +43,12 @@ module.exports=async({context,base})=>{
             const url=page.url();
             const historyBefore=await page.evaluate(()=>localStorage.getItem('project2:table-history:person-positions'));
             // Release the existing historical assignment, then restore it with a real POST.
-            await row(20).locator('[data-person-label]').click();
+            await openAssignment(row(20));await row(20).locator('[data-person-label]').click();
             await row(20).locator('[data-person-option=""]').click();
             await row(20).locator('form [type=submit]').click();
             await page.locator('#staff-assignment-confirm').waitFor({state:'visible'});
             await Promise.all([page.waitForNavigation(),page.locator('[data-assignment-confirm-yes]').click()]);
-            await row(20).locator('[data-person-label]').click();
+            await openAssignment(row(20));await row(20).locator('[data-person-label]').click();
             await row(20).locator('[data-person-option="2"]').click();
             await Promise.all([page.waitForNavigation(),row(20).locator('form [type=submit]').click()]);
             assert.equal(await row(20).locator('[data-person-value]').inputValue(),'2');

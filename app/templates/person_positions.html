@@ -14,6 +14,7 @@
     <link href="/static/css/column_visibility.css" rel="stylesheet">
     <link href="/static/css/date_fields.css" rel="stylesheet">
     <link href="/static/css/person_picker.css" rel="stylesheet">
+<link href="/static/css/app_layout.css" rel="stylesheet">
 </head>
 <style>
     .table-container {
@@ -106,16 +107,14 @@
         text-overflow: ellipsis;
     }
 
-    thead th {
-        padding-top: 16px !important;
-    }
+
 </style>
 
-<body class="container-fluid py-4">
-    <a href="/persons" class="btn btn-outline-secondary mb-3">До списку</a>
-    <h1 class="h3 mb-3">Штатні посади</h1>
+<body class="container-fluid table-page">
+{% include "components/app_navigation.html" %}
+    <div class="page-heading"><h1>Штатні посади</h1>{% include 'components/staff_controls.html' %}</div>
 
-    {% include 'components/staff_controls.html' %}
+    <details class="table-filter-panel" data-table-filters open><summary>Фільтри</summary>
     <form id="position-filters" method="get" action="/person-positions" class="row g-2 mb-3">
         <div class="col-md-4"><label class="form-label">Версія штату<select name="version_id" class="form-select">
         {% if not chosen_version %}<option value="" selected>Немає поточної версії — оберіть версію</option>{% endif %}
@@ -147,9 +146,9 @@
             <button type="submit" class="btn btn-primary">Застосувати</button>
             <a href="/person-positions" class="btn btn-outline-secondary">Скинути</a>
         </div>
-    </form>
+    </form></details>
 
-    <div class="d-flex gap-3 flex-wrap mb-3">
+    <div class="d-flex gap-3 flex-wrap mb-1 small">
         <span>Знайдено: <strong>{{ total }}</strong></span>
         <span>Зайнято: <strong>{{ occupied }}</strong></span>
         <span>Вільно: <strong>{{ vacant }}</strong></span>
@@ -165,7 +164,7 @@
     {% endif %}
     {{ column_visibility(table_columns, table_column_filters) }}
 
-    <div class="table-responsive">
+    <div class="table-responsive table-viewport" tabindex="0" aria-label="Штатна таблиця з прокруткою">
         <div class="table-container">
             <table id="{{ table_columns.id }}" data-column-table class="table table-striped table-hover align-middle">
                 <thead>
@@ -261,11 +260,17 @@
                 <tbody>
                     {% for item in rows %}
                     {% set row_number = loop.index %}
-                    <tr>
+                    <tr data-row-key="position:{{ item.position.position_id }}">
                         {% for column in columns %}
                         <td data-column-key="{{ column.key }}" {% if not column.default_visible %} hidden{% endif %}>
                             {% if column.key == "assignment" %}
-                            <p>Офіційно: {{ people_labels.get(item.assignment.person_id,'Без ПІБ') if item.assignment else 'Вакантна' }}</p>
+                            <div class="assignment-summary">
+                                <button type="button" class="assignment-toggle" data-assignment-toggle aria-expanded="false" aria-controls="assignment-editor-{{ item.position.position_id }}" title="Офіційно: {{ people_labels.get(item.assignment.person_id,'Без ПІБ') if item.assignment else 'Вакантна' }} — редагувати призначення">Офіційно: {{ people_labels.get(item.assignment.person_id,'Без ПІБ') if item.assignment else 'Вакантна' }}</button>
+                                <span class="small text-warning" data-assignment-draft hidden>Чернетка</span>
+                                {% for mirage in (mirages_by_position|default({})).get(item.position.position_id,[]) %}<div class="assignment-mirage" title="{{ people_labels.get(mirage.person_id,'Без ПІБ') }} · Міраж — не офіційне призначення"><a href="/person_full_info/{{ mirage.person_id }}">{{ people_labels.get(mirage.person_id,'Без ПІБ') }}</a> · Міраж</div>{% endfor %}
+                            </div>
+                            <div class="assignment-editor" id="assignment-editor-{{ item.position.position_id }}" data-assignment-editor hidden>
+                            <div class="d-flex gap-2 mb-2"><button type="button" class="btn btn-sm btn-outline-secondary" data-assignment-close>Згорнути (чернетка збережеться)</button><button type="button" class="btn btn-sm btn-outline-danger" data-assignment-cancel>Скасувати зміни</button></div>
                             {% if item.assignment %}<p>Наказ призначення {{ item.assignment.assignment_order_number or 'Не зазначено' }} · {{ item.assignment.assignment_order_date or 'Дата невідома' }}</p><details data-staff-tools><summary>Накази та звільнення</summary>{{ orders(item.assignment) }}{{ release(item.assignment) }}</details>{% endif %}
                             {% for mirage in (mirages_by_position|default({})).get(item.position.position_id,[]) %}<div class="text-secondary border-start ps-2 my-2">♧ Міраж: {{ people_labels.get(mirage.person_id,'Без ПІБ') }} — очікує наказу. {{ mirage.note or '' }}{{ mirage_actions(mirage) }}</div>{% endfor %}
                             <details><summary>Додати Міраж</summary><form data-personnel-form method="post" action="/personnel/mirages"><input type="hidden" name="position_id" value="{{ item.position.position_id }}"><label>Військовослужбовець<select class="form-select" name="person_id" required>{% for candidate in people %}<option value="{{ candidate.id }}">{{ candidate.rank }} {{ candidate.label }} · {{ candidate.birth }}</option>{% endfor %}</select></label><label>Примітка<input class="form-control" name="note" maxlength="1000"></label><button class="btn btn-outline-secondary">Додати попереднє закріплення</button></form></details>
@@ -282,8 +287,9 @@
                                 </details><p class="small text-danger mb-0" data-assignment-status role="status"></p>
                                 <button type="submit" class="btn btn-sm btn-primary align-self-start">Зберегти</button>
                             </form>
+                            </div>
                             {% else %}
-                            <span data-column-value title="{{ row_number if column.key == "row_number" else item["values"][column.key] }}">{{ row_number if column.key == "row_number" else item["values"][column.key] }}</span>
+                            <span data-column-value title="{{ row_number if column.key == "row_number" else item["values"][column.key] }}">{% if item.assignment and column.key in ['row_number','full_name'] %}<a href="/person_full_info/{{ item.assignment.person_id }}">{{ row_number if column.key == 'row_number' else item['values'][column.key] }}</a>{% else %}{{ row_number if column.key == "row_number" else item["values"][column.key] }}{% endif %}</span>
                             {% endif %}
                         </td>
                         {% endfor %}
@@ -306,11 +312,13 @@
     <script src="/static/js/table_filters.js"></script>
     <script src="/static/js/table_history.js"></script>
     <script src="/static/js/table_selection.js"></script>
+    <script src="/static/js/table_appearance.js"></script>
     <script src="/static/js/column_visibility.js"></script>
     <script src="/static/js/date_filter.js"></script>
     <script src="/static/js/person_picker.js"></script>
     <script src="/static/js/staff_assignments.js"></script>
     <script src="/static/js/personnel_forms.js"></script>
+    <script src="/static/js/table_workspace.js"></script>
     <script>
         const filterForm = document.getElementById("position-filters");
         const savedFilters = document.getElementById("active-column-filters");

@@ -18,6 +18,7 @@
 | Документи, копії, персональні сесії та аудит | `docs/DOCUMENTS.md`, `app/document_schemas.py`, `app/models/documents.py`, `app/models/accounts.py`, `app/services/documents.py`, `app/services/document_files.py`, `app/services/document_storage.py`, `app/services/accounts.py`, `app/security/accounts.py`, `app/routers/documents.py`, `app/routers/accounts.py`, `app/database/migrate_documents.py` |
 | Посади, призначення, фільтри | `app/routers/person_positions.py`, `app/services/service_person_positions.py`, `app/repositories/position_table_repository.py`, `app/models/person_positions.py`, `app/templates/person_positions.html`, `tests/test_person_positions.py` |
 | Каталог полів, видимість колонок, Checkbox Tree | `app/table_fields.py`, `docs/TABLE_FIELDS.md`, `app/table_columns.py`, `app/templates/components/column_visibility.html`, `app/static/js/column_*.js`, `app/static/js/table_*.js`, `app/static/css/column_visibility.css`, `tests/test_table_columns.py`, `tests/js/`, `tests/browser/` |
+| Навігація, оформлення обох таблиць, згортані редактори | `docs/TABLE_UI.md`, `app/templates/components/app_navigation.html`, `app/static/css/app_layout.css`, `app/static/js/table_appearance.js`, `app/static/js/table_workspace.js`, `app/templates/persons.html`, `app/templates/person_positions.html` |
 | Події | `app/services/service_for_person_event.py`, `app/services/service_common_event_func.py`, `app/repositories/event_repository.py`, `app/models/person_event.py`, `app/validators/event_validatotor.py` |
 | Довідники та початкові дані | `app/models/reference_book.py`, `app/seeds/seed_structure.py`, `app/seeds/seed_reference.py`, `app/config.py`, `reference_data.xlsx` |
 | Окреме засівання тестових людей | `app/services/seed_test_people.py`, аркуш `persons` у `reference_data.xlsx`, `tests/test_seed_test_people.py` |
@@ -173,9 +174,11 @@ flowchart LR
 | `table_filters.js` | `QueryFilterAdapter`: читання/нормалізація дозволених параметрів, вилучення фільтрів прихованих колонок, побудова URL зі збереженням інших параметрів. |
 | `table_history.js` | Чистий `TableHistory` для п'яти знімків; `TableTimeline` узгоджує історію, UI, URL, поточні налаштування та браузерні переходи. |
 | `table_selection.js` | `TableSelection`: виділення комірок, TSV/HTML, Clipboard API та fallback; працює з DOM і чинним контролером, формат зберігається окремо за ID таблиці. |
+| `table_appearance.js` | AppearanceModel/TableAppearance: висота всіх рядків, базовий/колонковий шрифт, геометричний масштаб і локальні заливки стабільних записів. |
+| `table_workspace.js` | Межі viewport, top-layer dropdown-меню та один розгорнутий редактор призначення зі збереженням/явним скасуванням чернетки. Кадрових запитів не виконує. |
 | `column_visibility.js` | `ColumnController`: з'єднує компоненти для кожного `[data-column-picker]`, застосовує стан до DOM і зберігає наявну поведінку меню. |
 
-Скрипти без збирача працюють у спільному namespace `TableColumns`. Порядок підключення: Bootstrap → `table_state.js` → `column_tree.js` → `column_presets.js` → `column_interactions.js` → `table_filters.js` → `table_history.js` → `table_selection.js` → `column_visibility.js`. CSS — `app/static/css/column_visibility.css`. Чисті модулі стану, фільтрів та історії також експортуються для Node-тестів; frontend-фреймворків не додано.
+Скрипти без збирача працюють у спільному namespace `TableColumns`. Порядок підключення: Bootstrap → `table_state.js` → `column_tree.js` → `column_presets.js` → `column_interactions.js` → `table_filters.js` → `table_history.js` → `table_selection.js` → `table_appearance.js` → `column_visibility.js`; `table_workspace.js` — після сторінкових кадрових обробників. CSS — `app/static/css/column_visibility.css` і `app_layout.css`. Чисті модулі стану, фільтрів, оформлення та історії також експортуються для Node-тестів; frontend-фреймворків не додано. Поточні деталі обох таблиць, геометрії/збереження та чернеток — [TABLE_UI.md](TABLE_UI.md).
 
 #### Застосування вигляду
 
@@ -251,7 +254,7 @@ ClipboardItem/write використовується для HTML, writeText — 
 
 | Шаблон у `app/templates/` | Призначення |
 | --- | --- |
-| `persons.html` | Список людей, вибір сортування, локальне приховування окремих колонок через JavaScript. |
+| `persons.html` | Список людей зі старим серверним сортуванням; PERSONS_COLUMNS і спільні менеджер колонок/пресети/виділення/копіювання/оформлення. |
 | `person_form.html` | Базове редагування, внесення статі; три поля дати народження, підказки та клієнтські перевірки. |
 | `person_create.html`, `person_created.html`, `person_name_cases.html` | Поетапне створення, повідомлення успіху та редагування форм конкретного історичного ПІБ; спільний макрос name_case_fields.html. |
 | `admin/*.html` | Вхід, централізований розділ, словники, редактор, preview/підтвердження Excel. Словникові мутації потребують admin-сесії та CSRF, крім явно ввімкненого локального режиму розробки. |

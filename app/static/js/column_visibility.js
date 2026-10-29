@@ -53,12 +53,13 @@
             this.timeline = new api.TableTimeline(this);
             this.timeline.initialise();
             if (api.TableSelection) this.selection = new api.TableSelection(this);
+            if (api.TableAppearance) this.appearance = new api.TableAppearance(this);
             this.table.addEventListener("click", event => {
                 const select = event.target.closest("[data-column-select]");
                 if (select && this.selection) {
                     const key=select.closest("[data-column-key]")?.dataset.columnKey;
                     bootstrap.Dropdown.getOrCreateInstance(select.closest(".dropdown").querySelector("[data-bs-toggle=dropdown]")).hide();
-                    this.selection.selectColumn(key); return;
+                    this.selection.selectColumn(key,event); return;
                 }
                 const button = event.target.closest("[data-column-hide]");
                 if (!button) return;

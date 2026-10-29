@@ -1,3 +1,4 @@
+const {openAssignment,openStaffActions}=require('./table_helpers.cjs');
 const assert=require('node:assert/strict');
 const path=require('node:path');
 module.exports=async({context,base})=>{
@@ -8,13 +9,13 @@ module.exports=async({context,base})=>{
     const confirm=page.locator('#staff-assignment-confirm');
     const scenario=async(name,fn)=>{await fn();console.log(`PASS staff: ${name}`);};
     async function pick(number,person){
-        await row(number).locator('[data-person-label]').click();
+        await openAssignment(row(number));await row(number).locator('[data-person-label]').click();
         await row(number).locator(`[data-person-option="${person}"]`).click();
     }
     try{
         await page.goto(base+'/person-positions');await page.evaluate(()=>localStorage.clear());await page.reload();
         await scenario('three-line selector, free first, partial birthday search and name search',async()=>{
-            await row(30).locator('[data-person-label]').click();
+            await openAssignment(row(30));await row(30).locator('[data-person-label]').click();
             const picker=row(30).locator('[data-person-picker]');
             const options=picker.locator('[data-person-option]:not([data-person-option=""])');
             assert.equal(await options.first().getAttribute('data-person-option'),'3');
@@ -47,14 +48,14 @@ module.exports=async({context,base})=>{
             await Promise.all([page.waitForNavigation(),confirm.locator('[data-assignment-confirm-yes]').click()]);
             assert.equal(await row(10).locator('[data-person-value]').inputValue(),'');
             assert.equal(await row(30).locator('[data-person-value]').inputValue(),'1');
-            await row(30).locator('.person-assignment-form [type=submit]').click();
+            await openAssignment(row(30));await row(30).locator('.person-assignment-form [type=submit]').click();
             await row(30).locator('[data-assignment-status]').filter({hasText:'уже призначений'}).waitFor();
             await pick(10,'3');
             await Promise.all([page.waitForNavigation(),row(10).locator('.person-assignment-form [type=submit]').click()]);
             assert.equal(await row(10).locator('[data-person-value]').inputValue(),'3');
         });
         await scenario('history shows retained source and explicit atomic version closure',async()=>{
-            await page.getByRole('link',{name:'Версії та історія призначень'}).click();
+            await page.getByRole('link',{name:'Історія штату',exact:true}).click();
             assert.ok((await page.locator('body').innerText()).includes('Історичні призначення'));
             assert.equal(await page.locator('form[action$="/correct"] [name="assigned_from"]').count(),4);
             const section=page.locator('details').filter({has:page.locator('summary',{hasText:'Явно закрити'})});
@@ -67,7 +68,7 @@ module.exports=async({context,base})=>{
         });
         await scenario('Excel upload previews only positions, confirmation imports a vacant version; replay conflicts',async()=>{
             await page.goto(base+'/person-positions');
-            await page.getByRole('button',{name:'Завантажити штатну структуру',exact:true}).click();
+            await openStaffActions(page);await page.getByRole('button',{name:'Завантажити штатну структуру',exact:true}).click();
             const modal=page.locator('#staff-import-modal');
             await modal.locator('[name="file"]').setInputFiles(path.resolve(__dirname,'../../reference_data.xlsx'));
             await modal.locator('[name="name"]').fill('Браузерна архівна версія');

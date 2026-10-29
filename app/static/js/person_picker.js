@@ -8,6 +8,10 @@
         const show=option=>{label.textContent=option.dataset.personName || '— Звільнити посаду —';};
         const initial=options.find(option=>option.dataset.personOption===value.value);
         if(initial)show(initial);
+        value.form?.addEventListener('reset',()=>queueMicrotask(()=>{
+            const original=options.find(option=>option.dataset.personOption===value.value);if(original)show(original);
+            search.value='';search.dispatchEvent(new Event('input'));
+        }));
         search.addEventListener('input',()=>{
             const query=search.value.trim().toLocaleLowerCase('uk');let count=0;
             options.forEach(option=>{option.hidden=Boolean(option.dataset.personOption)&&!option.dataset.personSearch.toLocaleLowerCase('uk').includes(query);if(!option.hidden&&option.dataset.personOption)count++;});

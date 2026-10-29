@@ -7,9 +7,11 @@
     <title>{{ current_name.surname }} {{ current_name.name }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
         integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+<link href="/static/css/app_layout.css" rel="stylesheet">
 </head>
 
 <body style="padding: 10px;">
+{% include "components/app_navigation.html" %}
 
     {% include "person/components/full_info_top_navigation.html" %}
 

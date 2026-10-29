@@ -9,6 +9,7 @@ from app.services.person_registration import register_person
 from app.name_cases import CASES, NAME_PARTS, SEXES
 from sqlalchemy.exc import SQLAlchemyError
 from app.templating import templates
+from app.table_columns import PERSONS_COLUMNS
 
 
 router = APIRouter()
@@ -30,7 +31,7 @@ def get_persons_page(request: Request,
     return templates.TemplateResponse(
         request=request,
         name="persons.html",
-        context={"persons": persons,
+        context={"persons": persons, "table_columns": PERSONS_COLUMNS,
                 "sort_by": sort_by,
                 "direction": direction,},
     )

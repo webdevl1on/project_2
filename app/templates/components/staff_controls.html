@@ -1,7 +1,7 @@
-<div class="d-flex gap-2 flex-wrap mb-3">
+<details><summary>Додаткові дії</summary><div class="d-flex gap-2 flex-wrap mb-1">
 <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#staff-import-modal">Завантажити штатну структуру</button>
 <a href="/staff/history{% if chosen_version %}?version_id={{ chosen_version.id }}{% endif %}" class="btn btn-outline-secondary">Версії та історія призначень</a>
-</div>
+</div></details>
 {% if staff_message %}<div class="alert alert-info" role="status">{{ staff_message }}</div>{% endif %}
 <div class="modal fade" id="staff-import-modal" tabindex="-1" aria-labelledby="staff-import-title" aria-hidden="true">
 <div class="modal-dialog"><div class="modal-content">

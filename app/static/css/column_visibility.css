@@ -2,6 +2,8 @@
     width: 360px;
     max-width: calc(100vw - 24px);
     white-space: normal;
+    max-height: 80dvh;
+    overflow-y: auto;
 }
 
 .column-visibility-tree {

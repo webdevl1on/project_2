@@ -83,13 +83,13 @@
                 if (event.button !== 0) return;
                 event.preventDefault();
                 event.stopPropagation();
-                this.resizing = { key: column.key, x: event.clientX, width: header.getBoundingClientRect().width };
+                this.resizing = { key: column.key, x: event.clientX, scale:(this.controller.appearance?.state.scale||100)/100, width: this.controller.state.widths[column.key] };
                 this.table.classList.add("column-resizing");
                 handle.setPointerCapture(event.pointerId);
             });
             handle.addEventListener("pointermove", event => {
                 if (!this.resizing || this.resizing.key !== column.key) return;
-                this.setWidth(column.key, this.resizing.width + event.clientX - this.resizing.x);
+                this.setWidth(column.key, this.resizing.width + (event.clientX - this.resizing.x)/this.resizing.scale);
             });
             const end = () => {
                 if (!this.resizing) return;
@@ -115,13 +115,14 @@
         }
         renderWidths() {
             const { layout, widths } = this.controller.state;
+            const scale=(this.controller.appearance?.state.scale||100)/100;
             const cols = layout.visible.map(key => {
                 const col = document.createElement("col");
-                col.style.width = `${widths[key]}px`;
+                col.style.width = `${widths[key]*scale}px`;
                 return col;
             });
             this.colgroup.replaceChildren(...cols);
-            this.table.style.width = `${layout.visible.reduce((total, key) => total + widths[key], 0)}px`;
+            this.table.style.width = `${scale*layout.visible.reduce((total, key) => total + widths[key], 0)}px`;
             this.table.querySelectorAll("[data-column-resize]").forEach(handle => {
                 handle.setAttribute("aria-valuenow", Math.round(widths[handle.dataset.columnResize]));
             });

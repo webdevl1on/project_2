@@ -60,6 +60,9 @@
         constructor(controller) {
             this.controller = controller; this.table = controller.table; this.picker = controller.picker;
             this.selected = new Set(); this.anchor = null;
+            this.mode='cells';this.columnAnchor=null;
+            this.picker.querySelector('[data-selection-mode]')?.addEventListener('change',event=>{this.mode=event.target.value;this.anchor=null;this.columnAnchor=null;});
+            this.picker.querySelector('[data-selection-clear]')?.addEventListener('click',()=>this.clear());
             this.button = this.picker.querySelector('[data-table-copy]');
             this.status = this.picker.querySelector('[data-copy-status]');
             this.storageKey = `project2:table-copy:${controller.config.id}`;
@@ -83,13 +86,20 @@
                 this.base = event.ctrlKey || event.metaKey ? new Set(this.selected) : new Set();
                 if (!event.shiftKey || !this.anchor || !this.grid().flat().includes(this.anchor)) this.anchor = cell;
                 this.dragging = true; this.table.classList.add('table-selection-dragging'); this.range(cell);
+                this.pointerStart=[event.clientX,event.clientY];this.pointerMoved=false;
+                const gesture=this.rangeCells(cell);
+                this.toggleCells=(event.ctrlKey||event.metaKey)&&!event.shiftKey&&gesture.every(value=>this.base.has(value))?gesture:null;
             });
             document.addEventListener('pointermove', event => {
                 if (!this.dragging) return;
+                if(Math.hypot(event.clientX-this.pointerStart[0],event.clientY-this.pointerStart[1])>3)this.pointerMoved=true;
                 const cell = document.elementFromPoint(event.clientX, event.clientY)?.closest('td[data-column-key]');
                 if (this.grid().flat().includes(cell)) this.range(cell);
             });
-            const stop = () => { this.dragging = false; this.table.classList.remove('table-selection-dragging'); };
+            const stop = event => {
+                if(this.dragging&&event.type==='pointerup'&&this.toggleCells&&!this.pointerMoved){this.toggleCells.forEach(cell=>this.selected.delete(cell));this.render();}
+                this.toggleCells=null;this.dragging = false; this.table.classList.remove('table-selection-dragging');
+            };
             document.addEventListener('pointerup', stop); document.addEventListener('pointercancel', stop);
             window.addEventListener('blur', stop);
             this.table.addEventListener('keydown', event => {
@@ -107,29 +117,41 @@
                     return column && (column.informational || column.system) && !cell.hidden && getComputedStyle(cell).display !== 'none';
                 })).filter(row => row.length);
         }
-        selectColumn(key) {
-            const cells=this.grid().flat().filter(cell=>cell.dataset.columnKey===key);
+        selectColumn(key,event={}) {
+            const grid=this.grid(),keys=grid[0]?.map(cell=>cell.dataset.columnKey)||[];
+            const start=event.shiftKey&&keys.includes(this.columnAnchor)?keys.indexOf(this.columnAnchor):keys.indexOf(key),end=keys.indexOf(key);
+            const chosen=keys.slice(Math.min(start,end),Math.max(start,end)+1);
+            const cells=grid.flat().filter(cell=>chosen.includes(cell.dataset.columnKey));
             if (!cells.length) return;
             window.getSelection()?.removeAllRanges();
-            this.selected=new Set(cells); this.anchor=cells[0]; this.dragging=false; this.table.classList.remove('table-selection-dragging');
+            const additive=event.ctrlKey||event.metaKey,remove=additive&&cells.every(cell=>this.selected.has(cell));
+            if(!additive)this.selected.clear();cells.forEach(cell=>remove?this.selected.delete(cell):this.selected.add(cell));
+            if(!event.shiftKey)this.columnAnchor=key;
+            this.anchor=cells[0]; this.dragging=false; this.table.classList.remove('table-selection-dragging');
             this.status.textContent=''; this.render(); this.table.focus({preventScroll:true});
         }
         range(end) {
+            this.selected = new Set(this.base);
+            this.rangeCells(end).forEach(cell=>this.selected.add(cell));this.render();
+        }
+        rangeCells(end) {
             const grid = this.grid(), locate = cell => {
                 const row = grid.findIndex(row => row.includes(cell)); return [row, grid[row]?.indexOf(cell)];
             };
-            const [r1,c1] = locate(this.anchor), [r2,c2] = locate(end);
-            if (r1 < 0 || r2 < 0) return;
-            this.selected = new Set(this.base);
+            let [r1,c1] = locate(this.anchor), [r2,c2] = locate(end);
+            if (r1 < 0 || r2 < 0) return [];
+            if(this.mode==='rows'){c1=0;c2=grid[0].length-1;}
+            if(this.mode==='columns'){r1=0;r2=grid.length-1;}
+            const cells=[];
             for (let r=Math.min(r1,r2);r<=Math.max(r1,r2);r++)
-                for (let c=Math.min(c1,c2);c<=Math.max(c1,c2);c++) if (grid[r][c]) this.selected.add(grid[r][c]);
-            this.render();
+                for (let c=Math.min(c1,c2);c<=Math.max(c1,c2);c++) if (grid[r][c]) cells.push(grid[r][c]);
+            return cells;
         }
         render() {
             this.table.querySelectorAll('td[data-column-key]').forEach(cell => cell.classList.toggle('table-cell-selected', this.selected.has(cell)));
             this.button.disabled = !this.selected.size;
         }
-        clear() { this.selected.clear(); this.anchor=null; this.dragging=false; this.table.classList.remove('table-selection-dragging'); this.render(); }
+        clear() { this.selected.clear(); this.anchor=null; this.columnAnchor=null;this.dragging=false; this.table.classList.remove('table-selection-dragging'); this.render(); }
         matrix() {
             const grid = this.grid(), positions=[];
             grid.forEach((row,r) => row.forEach((cell,c) => { if (this.selected.has(cell)) positions.push([r,c]); }));
@@ -143,13 +165,14 @@
                     // in future tables are supported by a clone with interactive UI removed.
                     const clean = node => {
                         const clone=node.cloneNode(true);
-                        clone.querySelectorAll('input,textarea,select,button,a,[contenteditable],svg,[aria-hidden="true"],[role="img"],[data-icon],.bi,.fa').forEach(node=>node.remove());
+                        clone.querySelectorAll('input,textarea,select,button,form,[contenteditable],svg,[aria-hidden="true"],[role="img"],[data-icon],.bi,.fa').forEach(node=>node.remove());
+                        clone.querySelectorAll('a').forEach(node=>node.replaceWith(...node.childNodes));
                         return clone.textContent;
                     };
                     let value='';
                     if (this.selected.has(cell)) {
                         const values=cell.querySelectorAll('[data-column-value]');
-                        if (values.length) value=Array.from(values).filter(node=>!interactive(node)).map(clean).join(' ');
+                        if (values.length) value=Array.from(values).filter(node=>!node.closest('form,button,input,select,textarea')).map(clean).join(' ');
                         else value=clean(cell).trim();
                     }
                     row.push(value);

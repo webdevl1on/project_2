@@ -1,6 +1,8 @@
 {% from 'components/date_input.html' import date_input %}{% from 'components/name_case_fields.html' import name_case_fields %}
-<!doctype html><html lang="uk"><head><meta charset="utf-8"><title>Додати людину</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"></head>
-<body class="container py-4"><h1>Додати людину</h1>
+<!doctype html><html lang="uk"><head><meta charset="utf-8"><title>Додати людину</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"><link href="/static/css/app_layout.css" rel="stylesheet">
+</head>
+<body class="container py-4">
+{% include "components/app_navigation.html" %}<h1>Додати людину</h1>
 {% if error %}<div class="alert alert-danger" role="alert" tabindex="-1" data-form-error>{{ error }}</div>{% endif %}
 <form method="post" action="/persons/new" data-person-create data-name-case-form data-error-fields="{{ (error_fields or [])|tojson|forceescape }}">
 <fieldset class="mb-4"><legend class="h4">1. Стать</legend>{% for value,label in sexes.items() %}<div class="form-check form-check-inline"><input class="form-check-input" type="radio" id="sex_{{ value }}" name="sex" value="{{ value }}" required {{ 'checked' if form_data.get('sex')==value else '' }}><label class="form-check-label" for="sex_{{ value }}">{{ label }}</label></div>{% endfor %}</fieldset>
