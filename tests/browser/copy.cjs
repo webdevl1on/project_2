@@ -122,7 +122,7 @@ module.exports=async({context,base})=>{
                 const c=TableColumns.controllers.get('person-positions');
                 c.commitLayout({visible:['row_number','birth_date','position_number'],order:['row_number','birth_date','position_number']});
             });
-            await cell(1,'row_number').click();await cell(1,'position_number').click({modifiers:['Shift']});
+            await cell(1,'row_number').locator('[data-column-value]').click();await cell(1,'position_number').click({modifiers:['Shift']});
             assert.deepEqual((await matrix())[0],['1','15.03.1993','10']);
             await page.evaluate(()=>TableColumns.controllers.get('person-positions').commitLayout({visible:['row_number','position_number'],order:['row_number','position_number']}));
             await table.locator('th[data-column-key="position_number"] [data-bs-toggle]').click();

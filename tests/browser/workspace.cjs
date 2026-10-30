@@ -19,6 +19,37 @@ module.exports=async({context,base})=>{
    assert.equal(await row(30).locator('[data-column-key="row_number"] a').count(),0);
    const heights=await table().locator('tbody tr').evaluateAll(rows=>rows.map(r=>r.getBoundingClientRect().height));assert.ok(heights.every(h=>Math.abs(h-40)<2),JSON.stringify(heights));
   });
+  await scenario('profile icon alone navigates, leaves selection untouched, and is excluded from Excel/Word copy',async()=>{
+   await page.evaluate(()=>{const c=TableColumns.controllers.get('person-positions');c.commitLayout({visible:[...c.state.layout.visible,'full_name'],order:c.state.layout.order});});
+   const name=row(10).locator('[data-column-key="full_name"]');
+   assert.equal(await name.locator('a').count(),0);
+   await name.click();const nameMatrix=await controller();assert.match(nameMatrix[0][0],/Альфа/);
+   const link=row(10).locator('.staff-profile-link');
+   assert.equal(await link.getAttribute('title'),'Відкрити анкету');
+   assert.equal(await link.getAttribute('aria-label'),'Відкрити анкету');
+   await link.evaluate(n=>n.addEventListener('click',event=>event.preventDefault(),{once:true}));
+   const beforeURL=page.url();await link.locator('svg').click();
+   assert.equal(page.url(),beforeURL);assert.deepEqual(await controller(),nameMatrix);
+   assert.equal(await table().locator('[data-assignment-editor]:visible').count(),0);
+   await page.evaluate(()=>{window.profileCopies=[];Object.defineProperty(navigator,'clipboard',{configurable:true,value:{
+    writeText:async text=>profileCopies.push({text}),
+    write:async items=>{const item=items[0];profileCopies.push({text:await(await item.getType('text/plain')).text(),html:await(await item.getType('text/html')).text()});}
+   }});});
+   for(const format of ['excel','word']){
+    await picker().locator(`[data-copy-format][value="${format}"]`).check();
+    for(const [cell,expected] of [[name,nameMatrix[0][0]],[row(10).locator('[data-column-key="row_number"] [data-column-value]'),'1']]){
+     await cell.click();const copyCount=await page.evaluate(()=>profileCopies.length);await picker().locator('[data-table-copy]').click();
+     await page.waitForFunction(count=>profileCopies.length>count,copyCount);
+     assert.equal(await page.evaluate(()=>profileCopies.at(-1).text),expected);
+     if(format==='word')assert.doesNotMatch(await page.evaluate(()=>profileCopies.at(-1).html),/svg|Відкрити анкету|person_full_info/);
+    }
+   }
+   await visit('/person-positions?occupancy=occupied&sort_by=position_number&direction=desc');
+   assert.equal(await row(20).locator('[data-column-key="row_number"] [data-column-value]').innerText(),'1');
+   assert.equal(await row(20).locator('.staff-profile-link').getAttribute('href'),'/person_full_info/2');
+   await Promise.all([page.waitForURL(base+'/person_full_info/2'),row(20).locator('.staff-profile-link').click()]);
+   await visit('/person-positions');await page.evaluate(()=>localStorage.clear());await page.reload();
+  });
   await scenario('one expanded assignment editor preserves drafts, cancellation and server errors',async()=>{
    await openAssignment(row(10));const date=row(10).locator('.person-assignment-form [name="on"]'),initial=await date.inputValue();
    await date.fill('2020-02-02');await openAssignment(row(20));assert.equal(await row(10).locator('[data-assignment-editor]').isHidden(),true);

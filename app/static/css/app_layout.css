@@ -36,6 +36,10 @@
 [data-table-styled] td[data-user-fill] {background-color:var(--table-user-fill);--bs-table-bg-type:transparent;--bs-table-bg-state:var(--table-user-fill);}
 [data-table-styled] td.table-cell-selected {background-color:var(--table-selection-bg)!important;--bs-table-bg-state:var(--table-selection-bg)!important;outline:1px solid var(--table-selection-border);outline-offset:-1px;}
 .assignment-summary {display:block;max-height:calc(var(--table-row-height,40px) - 8px);overflow:hidden;font-size:inherit;}
+.staff-row-number {display:flex;align-items:center;gap:3px;}
+.staff-row-number [data-column-value] {min-width:0;}
+.staff-profile-link {display:inline-flex;align-items:center;justify-content:center;flex:0 0 18px;height:20px;color:#084298;border:1px solid #cbd5e1;border-radius:3px;}
+.staff-profile-link:hover,.staff-profile-link:focus-visible {background:#e8effa;}
 .assignment-summary .assignment-toggle {font-size:inherit;padding:0;border:0;background:transparent;color:#084298;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;}
 .assignment-mirage {font-size:.85em;color:#667085;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .assignment-editor {border-top:1px solid #dce1e7;padding-top:.35rem;min-width:260px;font-size:.875rem;}

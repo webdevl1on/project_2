@@ -65,3 +65,32 @@ def test_router_exposes_only_existing_filter_keys_to_url_adapter(db):
     assert adapter["keys"] == list(FILTER_KEYS)
     assert adapter["extra"] == {"occupancy": "all", "mirage":"all"}
     assert "data-column-filters" in response.body.decode()
+
+
+def test_staff_profile_button_uses_assigned_person_id_and_keeps_values_plain():
+    from types import SimpleNamespace
+    from lxml import html
+
+    rows = []
+    for position_id, assignment in [(91, SimpleNamespace(person_id=987)), (92, None)]:
+        values = {key: "-" for key in PERSON_POSITIONS_FIELDS}
+        values["full_name"] = "Тестове ПІБ" if assignment else "-"
+        rows.append({"position": Position(position_id=position_id, position_number=position_id * 10),
+                     "assignment": assignment, "values": values})
+    rendered = templates.env.get_template("person_positions.html").render(
+        table_columns=PERSON_POSITIONS_COLUMNS, rows=rows, people=[], people_labels={987: "Тестове ПІБ"},
+        total=2, occupied=1, vacant=1, active_filters={}, sort_urls={}, filter_numbers={},
+        sort_commands={}, active_query="", filter_order="", occupancy="all",
+        sort_by="position_number", direction="asc",
+    )
+    document = html.fromstring(rendered)
+    numbers = document.xpath('//tbody/tr/td[@data-column-key="row_number"]')
+    assert [cell.xpath('./div/span[@data-column-value]')[0].text for cell in numbers] == ["1", "2"]
+    link = numbers[0].xpath('.//a')[0]
+    assert link.get("href") == "/person_full_info/987"
+    assert link.get("title") == link.get("aria-label") == "Відкрити анкету"
+    assert link.xpath('./svg[@aria-hidden="true"]')
+    assert not numbers[1].xpath('.//a')
+    names = document.xpath('//tbody/tr/td[@data-column-key="full_name"]')
+    assert not any(cell.xpath('.//a') for cell in names)
+    assert names[0].xpath('./span[@data-column-value]')[0].text == "Тестове ПІБ"

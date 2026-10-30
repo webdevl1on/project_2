@@ -289,7 +289,18 @@
                             </form>
                             </div>
                             {% else %}
-                            <span data-column-value title="{{ row_number if column.key == "row_number" else item["values"][column.key] }}">{% if item.assignment and column.key in ['row_number','full_name'] %}<a href="/person_full_info/{{ item.assignment.person_id }}">{{ row_number if column.key == 'row_number' else item['values'][column.key] }}</a>{% else %}{{ row_number if column.key == "row_number" else item["values"][column.key] }}{% endif %}</span>
+                            {% if column.key == "row_number" %}
+                            <div class="staff-row-number">
+                                <span data-column-value title="{{ row_number }}">{{ row_number }}</span>
+                                {% if item.assignment %}
+                                <a class="staff-profile-link" href="/person_full_info/{{ item.assignment.person_id }}" title="Відкрити анкету" aria-label="Відкрити анкету">
+                                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false"><circle cx="8" cy="5" r="3"/><path d="M2 15v-2a6 6 0 0 1 12 0v2"/></svg>
+                                </a>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <span data-column-value title="{{ item['values'][column.key] }}">{{ item['values'][column.key] }}</span>
+                            {% endif %}
                             {% endif %}
                         </td>
                         {% endfor %}
