@@ -37,3 +37,5 @@ app.include_router(admin_tcc.router)
 from app.routers import accounts, documents
 app.include_router(accounts.router)
 app.include_router(documents.router)
+from app.routers import medical
+app.include_router(medical.router)

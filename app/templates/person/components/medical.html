@@ -1,0 +1,24 @@
+<section data-medical-panel="{{ medical_kind }}" data-person-id="{{ person_id }}" class="mb-3">
+<h2 class="h5">{{ medical_labels[medical_kind] }}</h2>
+<div data-medical-message role="status" aria-live="polite"></div>
+<div data-medical-login>
+<p>Для перегляду й змін потрібен персональний вхід.</p>
+<form data-medical-auth class="d-flex gap-2 flex-wrap"><label>Користувач<input name="username" autocomplete="username" class="form-control" required></label><label>Пароль<input name="password" type="password" autocomplete="current-password" class="form-control" required></label><button class="btn btn-primary align-self-end">Увійти</button></form>
+</div>
+<div data-medical-content hidden>
+{% if medical_kind == 'exams' %}<p data-active-exam></p><button class="btn btn-sm btn-outline-secondary mb-2" data-exam-auto type="button">Повернути автоматичний вибір ВЛК</button>{% endif %}
+{% if medical_kind == 'tasks' %}<div data-pending-exams></div>{% endif %}
+<details data-medical-editor><summary>Створити / редагувати запис</summary>
+<form data-medical-form class="row g-2 my-2">
+{% for key,label,type,options in medical_fields[medical_kind] %}
+<div class="col-md-6"><label class="w-100">{{ label }}
+{% if type in ['select','injury'] %}<select name="{{ key }}" class="form-select" {% if type == 'injury' %}data-injury-choice{% endif %}>
+{% if key in ['fitness','injury_id'] %}<option value="">Не зазначено</option>{% endif %}
+{% if type == 'select' %}{% for code,text in options.items() %}<option value="{{ code }}">{{ text }}</option>{% endfor %}{% endif %}</select>
+{% else %}<input name="{{ key }}" type="{{ type }}" class="{{ 'form-check-input' if type == 'checkbox' else 'form-control' }}" {% if options %}maxlength="{{ options }}"{% endif %} {% if medical_kind == 'dna' and key == 'collected_on' %}required{% endif %}>{% endif %}</label></div>
+{% endfor %}
+<div><button class="btn btn-primary">Зберегти</button> <button class="btn btn-outline-secondary" type="button" data-medical-new>Новий запис</button></div>
+</form></details>
+<div data-medical-list class="mt-3"></div>
+{% if medical_kind == 'tasks' %}<details><summary>Журнал змін</summary><div data-medical-audit></div></details>{% endif %}
+</div></section>

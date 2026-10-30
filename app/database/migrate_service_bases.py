@@ -6,6 +6,7 @@ import uuid
 from pathlib import Path
 from datetime import datetime, UTC
 from app import models
+from app.models.medical import NEW_TABLE_NAMES as MEDICAL_TABLES
 from app.database.base import Base
 from app.database.maintenance import database_lease
 from app.database.migrate_contacts import columns, integrity, create_table
@@ -30,6 +31,7 @@ def migrate(database):
             installed = {r[0] for r in connection.execute("SELECT name FROM sqlite_master WHERE type='trigger'")}
             indexes = {r[0] for r in connection.execute("SELECT name FROM sqlite_master WHERE type='index'")}
             for table in Base.metadata.sorted_tables:
+                if table.name in MEDICAL_TABLES: continue
                 from app.models.documents import NEW_TABLE_NAMES as DOCUMENT_TABLES
                 if table.name in DOCUMENT_TABLES: continue
                 if table.name not in present:
@@ -52,6 +54,7 @@ def migrate(database):
             connection.execute('BEGIN IMMEDIATE')
             try:
                 for table in Base.metadata.sorted_tables:
+                    if table.name in MEDICAL_TABLES: continue
                     from app.models.documents import NEW_TABLE_NAMES as DOCUMENT_TABLES
                     if table.name in DOCUMENT_TABLES: continue
                     if table.name in NEW_TABLE_NAMES and table.name not in present:

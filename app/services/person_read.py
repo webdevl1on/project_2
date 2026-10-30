@@ -49,4 +49,9 @@ def full_profile(db,person_id):
     from app.repositories.service_history_repository import ServiceHistoryRepository
     result['service_chronology']=chronology(db,person_id)
     result['profile_mirages']=ServiceHistoryRepository.mirages(db,person_id=person_id)
+    from app.services.medical import active_exam
+    from app.medical_catalog import FITNESS, FORM_FIELDS, LABELS, DOCUMENT_ROLES
+    result['active_medical_exam'],result['medical_warning']=active_exam(db,person_id)
+    result.update(medical_fitness=FITNESS,medical_fields=FORM_FIELDS,medical_labels=LABELS,medical_documents=DOCUMENT_ROLES)
+    result['medical_metadata']={'fields':FORM_FIELDS,'labels':LABELS,'documents':DOCUMENT_ROLES,'fitness':FITNESS}
     return result

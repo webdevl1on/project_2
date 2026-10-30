@@ -3,6 +3,7 @@ from app.repositories.position_table_repository import (
     FILTER_COLUMNS, DATE_FILTER_COLUMNS, SORT_COLUMNS,
 )
 from app.services.staff_service import today, StaffService
+from app.medical_catalog import FITNESS
 from app.table_columns import PERSON_POSITIONS_FIELDS
 
 HISTORY_SOURCES = tuple(zip(("name", "person_rank", "passport", "service"),
@@ -17,7 +18,11 @@ def _row(record):
     keys = ("position", "assignment", "person", "name", "person_rank", "rank", "passport", "service")
     row = dict(zip(keys, record[:8]))
     row["full_address"] = record[16] if len(record)>16 else None
+    row['medical_exam']=record[17] if len(record)>17 else None
+    projected=[field.key for field in PERSON_POSITIONS_FIELDS.values() if field.source=='person' and field.group in ('medical','injuries','awards','tasks','dna')]
+    row['medical_values']=dict(zip(projected,record[19:]))
     row["warnings"] = []
+    if len(record)>18 and record[18]:row['warnings'].append('Активне ВЛК не визначено: однакові або відсутні дати.')
     for index, (source, _, label) in enumerate(HISTORY_SOURCES):
         total, active = record[8 + index * 2:10 + index * 2]
         if total and total > 1 and active != 1:
@@ -48,14 +53,17 @@ class ServicePersonPositionFunc:
                 records = repository.records(column_filters, occupancy, exclude_key=key)
                 candidates = [_row(record) for record in records]
             if field.data_type == "partial_date":
-                values = [field.value(row) for row in candidates if row[field.source] is not None]
+                values = [field.value(row) for row in candidates if row.get(field.source) is not None]
+                from datetime import date
+                from app.utils.date_utils import DateComponents
+                values=[DateComponents(v.day,v.month,v.year) if type(v) is date else v for v in values if v is not None]
                 options[key] = {plural: sorted({getattr(value, part) for value in values if getattr(value, part) is not None})
                                 for plural, part in (("days", "day"), ("months", "month"), ("years", "year"))}
             else:
                 values = {field.value(row) for row in candidates}
                 known = sorted(value for value in values if value is not None and value != "")
                 items = [{"value": str(int(value)) if field.data_type == "boolean" else str(value),
-                          "label": ("Так" if value else "Ні") if field.data_type == "boolean" else str(value)} for value in known]
+                          "label": ("Так" if value else "Ні") if field.data_type == "boolean" else FITNESS.get(value,str(value)) if key=="medical_fitness" else str(value)} for value in known]
                 if None in values or "" in values:
                     items.insert(0, {"value": EMPTY_FILTER_VALUE, "label": "Порожньо"})
                 options[key] = items

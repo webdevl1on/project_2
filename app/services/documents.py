@@ -16,11 +16,11 @@ WRITE_ROLES = ('admin','editor')
 
 
 @contextmanager
-def document_transaction(db):
+def document_transaction(db, *, subject="документа"):
     try:
         with service_transaction(db,immediate=True):yield db
     except SQLAlchemyError:
-        raise ValueError('Конфлікт збереження документа; усю операцію скасовано.') from None
+        raise ValueError(f'Конфлікт збереження {subject}; усю операцію скасовано.') from None
 
 
 def seed_types(db):

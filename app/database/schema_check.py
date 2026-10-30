@@ -33,10 +33,15 @@ def require_current_schema(engine):
         required = required_sqlite_triggers() | {"exact_assignment_orders_insert","exact_assignment_orders_update", 'exact_service_basis_insert', 'exact_service_basis_update'}
         from app.models.documents import GUARD_NAMES
         required |= GUARD_NAMES
+        from app.models.medical import GUARDS
+        required |= GUARDS
         with engine.connect() as connection:
             installed=set(connection.execute(text("SELECT name FROM sqlite_master WHERE type='trigger'")).scalars())
         missing.extend("trigger:"+name for name in sorted(required-installed))
     if missing:
+        from app.models.medical import NEW_TABLE_NAMES as MEDICAL_TABLES, GUARDS
+        if set(missing) <= MEDICAL_TABLES | {"trigger:"+name for name in GUARDS}:
+            raise ValueError("Потрібна безпечна міграція: python -m app.database.migrate_medical --database PATH. Автоматично БД не змінено.")
         from app.models.documents import NEW_TABLE_NAMES as DOCUMENT_TABLES, GUARD_NAMES
         if set(missing) <= DOCUMENT_TABLES | {'trigger:'+name for name in GUARD_NAMES}:
             raise ValueError('Потрібна безпечна міграція: python -m app.database.migrate_documents --database PATH. Автоматично БД не змінено.')

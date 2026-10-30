@@ -44,7 +44,12 @@ class PositionTableRepository:
             query = (query.outerjoin(selection, selection.c.person_id == Person.person_id)
                      .outerjoin(model, model.__mapper__.primary_key[0] == selection.c.chosen_id)
                      .add_columns(selection.c.total, selection.c.active_count))
-        return query.outerjoin(Rank, PersonRank.rank_id == Rank.rank_id).add_columns(PERSON_POSITIONS_FIELDS["full_address"].expression)
+        from app.repositories.medical_repository import active_exam_selection
+        from app.models import MedicalExam
+        chosen=active_exam_selection()
+        return (query.outerjoin(Rank, PersonRank.rank_id == Rank.rank_id).add_columns(PERSON_POSITIONS_FIELDS["full_address"].expression)
+                .outerjoin(chosen,chosen.c.person_id==Person.person_id).outerjoin(MedicalExam,MedicalExam.id==chosen.c.chosen_id)
+                .add_columns(MedicalExam,chosen.c.ambiguous,*[field.expression for field in PERSON_POSITIONS_FIELDS.values() if field.source=='person' and field.group in ('medical','injuries','awards','tasks','dna')]))
 
     @staticmethod
     def _normalise_values(values):

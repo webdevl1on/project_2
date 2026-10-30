@@ -87,3 +87,7 @@ python -m app.services.seed_test_people --database data/database/project2.db
 | Нові перевірки етапу | `tests/test_partial_date_models.py`, `tests/test_database_commands.py`, `tests/browser/domain_dates.cjs`; доповнено чинні тести дат, засівання та колонок |
 
 Результати повного набору тестів та відомі обмеження — у [CURRENT_STATE.md](CURRENT_STATE.md).
+
+## Предметні дати ВЛК та пов’язаних процесів
+
+У [MEDICAL_AND_AWARDS.md](MEDICAL_AND_AWARDS.md) нові MedicalExam, Injury, Award і DnaSample використовують точні Date: відсутня дата зберігається як NULL, окрім обов’язкової дати здачі ДНК. PartialDateMixin до них не застосовується. Сервіс перевіряє повний ISO-ввід/календар, ORM і SQLite guards відхиляють некоректні дати. Активне ВЛК за відсутніх дат не обирається довільно. Нові колонки використовують DateBinding.exact та чинне форматування, без зміни механізму неповних дат інших полів. Системні позначки нових сутностей і журналу точні UTC; HistoryModel/PersonEvent незмінні.

@@ -7,6 +7,7 @@ from pathlib import Path
 import sqlite3
 import uuid
 from app import models
+from app.models.medical import NEW_TABLE_NAMES as MEDICAL_TABLES
 from app.database.base import Base
 from app.database.maintenance import database_lease
 from app.database.migrate_contacts import create_table, columns, integrity
@@ -51,6 +52,7 @@ def migrate(database):
             present={r[0] for r in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             installed={r[0] for r in connection.execute("SELECT name FROM sqlite_master WHERE type='trigger'")}
             for table in Base.metadata.sorted_tables:
+                if table.name in MEDICAL_TABLES: continue
                 if table.name in NEW_TABLE_NAMES:continue
                 if table.name not in present or not {c.name for c in table.columns}<=columns(connection,table.name):
                     raise ValueError(f'Попередня схема {table.name} неповна; спочатку виконайте попередні міграції.')
@@ -72,6 +74,7 @@ def migrate(database):
             connection.execute('BEGIN IMMEDIATE')
             try:
                 for table in Base.metadata.sorted_tables:
+                    if table.name in MEDICAL_TABLES: continue
                     if table.name in NEW_TABLE_NAMES:create_table(connection,table)
                 class Adapter:
                     def exec_driver_sql(self,sql):connection.execute(sql)

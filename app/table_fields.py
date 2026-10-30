@@ -4,6 +4,9 @@ Only these server-declared sources can become SQL expressions. Table layouts
 select catalogue keys; HTML receives serializable metadata, never ORM objects.
 """
 from dataclasses import dataclass
+from datetime import date
+from app.models.medical import MedicalExam
+from app.medical_catalog import FITNESS
 
 from sqlalchemy import case, func
 
@@ -19,12 +22,13 @@ from app.utils.date_utils import DateComponents, format_partial_date, format_sys
 SOURCES = {
     "position": Position, "person": Person, "name": PersonName,
     "person_rank": PersonRank, "rank": Rank, "passport": Passport,
-    "service": PersonServiceHistory,
+    "service": PersonServiceHistory, "medical_exam": MedicalExam,
 }
 GROUPS = {
     "position": "Штатна посада", "rank": "Військове звання",
     "person": "Особисті дані", "service": "Військова служба",
     "documents": "Документи", "system_data": "Системні дані",
+    "medical": "ВЛК", "injuries":"Поранення", "awards":"Нагородження", "tasks":"Завдання", "dna":"ДНК",
 }
 
 
@@ -42,6 +46,9 @@ class TableField:
 
     @property
     def expression(self):
+        if self.group in ("medical","injuries","awards","tasks","dna") and self.source=="person":
+            from app.repositories.medical_table import expression
+            return expression(self.key)
         if self.key == 'full_address':
             from sqlalchemy import select
             from app.models import PersonAddress
@@ -66,6 +73,7 @@ class TableField:
         if self.data_type != "partial_date":
             return None
         model = SOURCES[self.source]
+        if self.prefix is None:return DateBinding.exact(self.date_field,self.expression)
         return DateBinding(self.date_field, *(getattr(model, f"{self.prefix}_{part}") for part in ("day", "month", "year")))
 
     @property
@@ -73,6 +81,7 @@ class TableField:
         return SOURCES[self.source].__mapper__.primary_key[0]
 
     def value(self, row):
+        if self.group in ('medical','injuries','awards','tasks','dna') and self.source=='person':return row.get('medical_values',{}).get(self.key) if row.get('person') is not None else None
         if self.key == 'full_address':return row.get('full_address')
         record = row.get(self.source)
         if record is None:
@@ -80,6 +89,7 @@ class TableField:
         if self.key == "full_name":
             return " ".join(value for value in (record.surname, record.name, record.patronymic) if value)
         if self.data_type == "partial_date":
+            if self.prefix is None:return getattr(record,self.attribute)
             return DateComponents(*(getattr(record, f"{self.prefix}_{part}") for part in ("day", "month", "year")))
         return getattr(record, self.attribute)
 
@@ -87,6 +97,8 @@ class TableField:
         value = self.value(row)
         if value is None or value == "":
             return "-"
+        if type(value) is date:return format_partial_date(value.day,value.month,value.year)
+        if self.key=="medical_fitness":return FITNESS.get(value,"-")
         if isinstance(value, DateComponents):
             if all(part is None for part in (value.day, value.month, value.year)):
                 return "-"
@@ -100,7 +112,7 @@ class TableField:
     def metadata(self):
         model = SOURCES[self.source]
         attributes = [f"{self.prefix}_{part}" for part in ("day", "month", "year")] if self.prefix else [self.attribute]
-        computed = self.key in ("full_name","full_address")
+        computed = self.key in ("full_name","full_address") or (self.source=="person" and self.group in ("medical","injuries","awards","tasks","dna"))
         result = {
             "key": self.key, "label": self.label, "group": self.group,
             "source": {"model": model.__name__, "attributes": ["surname", "name", "patronymic"] if self.key == "full_name" else ["person_id"] if computed else attributes,
@@ -109,7 +121,7 @@ class TableField:
             "nullable": True if computed else any(getattr(model, attr).property.columns[0].nullable for attr in attributes),
             "optional_record": self.source != "position",
             "selection_source": "person_rank" if self.source == "rank" else self.source,
-            "historical": self.source in ("name", "person_rank", "passport", "service"),
+            "historical": self.source in ("name", "person_rank", "passport", "service", "medical_exam"),
             "system_data": self.group == "system_data",
             "filterable": self.filterable, "sortable": True,
             "informational": True, "system": False, "draggable": True, "resizable": True,
@@ -170,3 +182,15 @@ for source, label in (("name", "ПІБ"), ("person_rank", "Звання"), ("pas
         _add(f"{source}_{attr}", f"{label}: {suffix}", "system_data", source, attr, data_type=kind)
 
 _add("full_address", "Повна адреса реєстрації", "person", "person", "full_address")
+
+# Subject dates here are exact; DateBinding reuses the existing component UI.
+for key,label,attr in [('medical_fitness','Поточна придатність','fitness'),('medical_issued_on','Дата активного ВЛК','issued_on'),('medical_number','Номер активної довідки ВЛК','number'),('medical_institution','Установа активного ВЛК','institution'),('medical_diagnosis','Діагноз активного ВЛК','diagnosis')]:
+    _add(key,label,'medical','medical_exam',attr,**({'data_type':'partial_date','date_field':DateField(key,label)} if attr=='issued_on' else {}))
+for key,label,group in [('pending_exam_count','Непройдені ВЛК','medical'),('planned_exam_count','Заплановані ВЛК','medical'),('needed_exam_count','Потребують ВЛК','medical'),('injury_count','Кількість поранень','injuries'),('award_count','Кількість нагороджень','awards'),('open_task_count','Невиконані завдання','tasks'),('dna_count','Кількість здач зразків ДНК','dna')]:
+    _add(key,label,group,'person',data_type='integer')
+from app.medical_catalog import AWARD_STATES
+for code,label in AWARD_STATES.items():_add('award_'+code.lower()+'_count','Нагородження: '+label,'awards','person',data_type='integer')
+for key,label,group in [('latest_injury_date','Дата останнього поранення','injuries'),('dna_collected_on','Остання дата здачі ДНК','dna')]:
+    _add(key,label,group,'person',data_type='partial_date',date_field=DateField(key,label))
+_add('dna_envelope_number','Номер конверта ДНК','dna','person')
+_add('dna_storage_unit','Місце зберігання ДНК','dna','person')

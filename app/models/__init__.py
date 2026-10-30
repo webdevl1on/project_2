@@ -45,3 +45,5 @@ __all__ += ['PersonServiceBasis', 'TccOffice', 'TccImport']
 from app.models.accounts import User, UserSession
 from app.models.documents import DocumentType, PersonDocumentState, PersonDocument, DocumentDetails, DrivingCategory, DocumentFile, DocumentAudit
 __all__ += ['User', 'UserSession', 'DocumentType', 'PersonDocumentState', 'PersonDocument', 'DocumentDetails', 'DrivingCategory', 'DocumentFile', 'DocumentAudit']
+from app.models.medical import MedicalExam, Injury, Award, DnaSample, PersonnelTask, MedicalSelection, MedicalDocumentLink, PersonnelAudit
+__all__ += ['MedicalExam','Injury','Award','DnaSample','PersonnelTask','MedicalSelection','MedicalDocumentLink','PersonnelAudit']

@@ -151,3 +151,7 @@ python -m app.services.bootstrap_account --database data/database/project2.db --
 - `docs/CURRENT_STATE.md`
 - `tests/browser/column_visibility.cjs`
 - `tests/browser/serve_column_visibility.py`
+
+## Предметні медичні зв’язки
+
+[MEDICAL_AND_AWARDS.md](MEDICAL_AND_AWARDS.md) додає MedicalDocumentLink для ВЛК, поранень і нагороджень. Файли, авторизація та DocumentAudit залишаються цими самими. Предметні вкладки вже мають GUI входу й керування прив’язаними копіями; загальна вкладка «Документи» все ще без повного редактора. Нові оболонки other поза загальним поточним слотом не дублюють реквізити предметних сутностей. Транзакційна обгортка тепер приймає необов’язкову назву предмета для повідомлення про конфлікт, з попередньою поведінкою за замовчуванням.

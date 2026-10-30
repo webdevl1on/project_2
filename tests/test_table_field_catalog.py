@@ -64,7 +64,7 @@ def test_catalogue_covers_all_displayable_mapped_attributes():
         actual = {column.name for column in inspect(model).columns} - excluded
         assert actual <= covered, (model.__name__, actual - covered)
     assert all(field.group not in ("events", "event_types", "event_subtypes") for field in FIELDS.values())
-    assert len(FIELDS) == 55
+    assert len([f for f in FIELDS.values() if f.group not in ("medical","injuries","awards","tasks","dna")]) == 55
     assert set(PERSON_POSITIONS_FIELDS) == set(FIELDS)
 
 
