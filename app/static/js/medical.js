@@ -10,9 +10,11 @@
  function button(text,fn){const n=el('button',text,'btn btn-sm btn-outline-secondary me-2 my-1');n.type='button';n.addEventListener('click',async()=>{n.disabled=true;try{await fn();}catch(e){message(n.closest('[data-medical-panel]'),e.message,true);}finally{n.disabled=false;}});return n;}
  function edit(panel,record){const form=panel.querySelector('[data-medical-form]');form.reset();form.dataset.key=record?.id||'';form.dataset.revision=record?.revision||'';
   for(const field of meta.fields[panel.dataset.medicalPanel]){const input=form.elements[field[0]];if(input.type==='checkbox')input.checked=!!record?.[field[0]];else if(record)input.value=record[field[0]]??'';}
+  for(const input of form.elements)input.disabled=false;
+  if(record?.kind==='injury_vlk')for(const key of ['injury_id','award_id','status','decision_reason'])form.elements[key].disabled=true;
   panel.querySelector('[data-medical-editor]').open=true;form.querySelector('input,select')?.focus();
  }
- function related(card,kind,id){if(!id)return;const a=el('a',`${meta.labels[kind]} №${id} `);a.href='#'+kind;a.addEventListener('click',()=>{const p=panels.find(p=>p.dataset.medicalPanel===kind);const row=state[kind].find(r=>r.id===id);if(row)edit(p,row);});card.append(a);}
+ function related(card,kind,id){if(!id)return;const a=el('a',`${meta.labels[kind]} №${id} `);a.href='#'+kind;a.addEventListener('click',()=>{const p=panels.find(p=>p.dataset.medicalPanel===kind);const row=state[kind].find(r=>r.id===id);if(row){if(kind==='tasks'&&row.status!=='OPEN'){p.querySelector('[data-task-history]').checked=true;render();}edit(p,row);}});card.append(a);}
  function documentUI(panel,card,kind,row){if(!meta.documents[kind])return;
   const details=el('details'),summary=el('summary','Документи та копії');details.append(summary);card.append(details);
   const fk={exams:'exam_id',injuries:'injury_id',awards:'award_id'}[kind];
@@ -38,15 +40,27 @@
   panel.querySelector('[data-medical-editor]').hidden=role==='viewer';
   panel.querySelectorAll('[data-injury-choice]').forEach(select=>{const current=select.value;select.replaceChildren(new Option('Не зазначено',''),...state.injuries.map(r=>new Option(`№${r.id} · ${r.occurred_on||'Дата невідома'} · ${r.description||''}`,r.id)));select.value=current;});
   const list=panel.querySelector('[data-medical-list]');const expanded=new Set([...list.querySelectorAll('[data-medical-record]')].filter(card=>card.querySelector('details')?.open).map(card=>card.dataset.medicalRecord));list.replaceChildren();
-  for(const row of state[kind]){const card=el('article',undefined,'border rounded p-2 mb-2');card.dataset.medicalRecord=row.id;card.append(el('h3',`Запис №${row.id}`,'h6'));
+  for(const row of state[kind]){if(kind==='tasks'&&row.status!=='OPEN'&&!panel.querySelector('[data-task-history]').checked)continue;const card=el('article',undefined,'border rounded p-2 mb-2');card.dataset.medicalRecord=row.id;if(kind==='tasks')card.dataset.taskKind=row.kind;card.append(el('h3',`Запис №${row.id}`,'h6'));
    for(const [key,label,type,options] of meta.fields[kind]){const raw=row[key];if(raw!==null&&raw!==undefined&&raw!=='')card.append(el('p',`${label}: ${type==='select'?options[raw]||raw:type==='checkbox'?(raw?'Так':'Ні'):raw}`,'mb-1 text-break'));}
+   if(row.vlk_stage_label)card.append(el('p',row.vlk_stage_label,'fw-semibold'));
+   if(row.kind==='injury_vlk'){
+    card.append(el('p',row.stage_label,'fw-semibold'));
+    if(row.stage==='NOT_NEEDED')card.append(el('p',row.decision_reason||'Причина раніше не зазначена.'));
+    for(const id of row.exam_ids)related(card,'exams',id);
+    if(role!=='viewer'){
+     if(row.status==='OPEN'){
+      card.append(button('ВЛК не потрібна',async()=>{const reason=prompt('Причина: чому ВЛК не потрібна?');if(reason===null)return;await request(`${base}/tasks/${row.id}/vlk-decision`,{action:'not_needed',reason,revision:row.revision});await load();message(panel,'Рішення щодо ВЛК збережено.');}));
+      card.append(button('Відкрити ВЛК',()=>{const target=panels.find(p=>p.dataset.medicalPanel==='exams');edit(target,null);const form=target.querySelector('[data-medical-form]');form.elements.status.value='NEEDS_EXAM';form.elements.basis.value='INJURY';form.elements.injury_id.value=String(row.injury_id);location.hash='exams';}));
+     }else if(row.stage==='NOT_NEEDED')card.append(button('Скасувати рішення «ВЛК не потрібна»',async()=>{const reason=prompt('Причина скасування рішення');if(reason===null)return;await request(`${base}/tasks/${row.id}/vlk-decision`,{action:'reopen',reason,revision:row.revision});await load();message(panel,'Рішення скасовано; стан перераховано за пов’язаними ВЛК.');}));
+    }
+   }
    if(role!=='viewer')card.append(button('Редагувати',()=>edit(panel,row)));
    if(kind==='exams'&&row.status==='COMPLETED'&&role!=='viewer')card.append(button('Зробити активним',async()=>{await request(base+'/active',{exam_id:row.id,revision:state.selection.revision});await load();message(panel,'Ручний вибір активного ВЛК збережено.');window.refreshProfileOverview?.();}));
    related(card,'injuries',row.injury_id);related(card,'awards',row.award_id);
    if(kind==='injuries')for(const target of ['exams','awards','tasks'])for(const r of state[target].filter(r=>r.injury_id===row.id))related(card,target,r.id);
    documentUI(panel,card,kind,row);if(expanded.has(String(row.id))&&card.querySelector('details'))card.querySelector('details').open=true;list.append(card);
   }
-  if(!state[kind].length)list.append(el('p','Записів немає.'));
+  if(!list.children.length)list.append(el('p',kind==='tasks'?'Відкритих завдань немає. Для історії увімкніть показ завершених.':'Записів немає.'));
   if(kind==='exams'){panel.querySelector('[data-active-exam]').textContent=state.active_warning||(state.active_exam?`Активне ВЛК №${state.active_exam.id}: ${meta.fitness[state.active_exam.fitness]||'Придатність не зазначена'} (${state.selection.exam_id?'ручний вибір':'автоматично'})`:'Активного завершеного ВЛК немає.');panel.querySelector('[data-exam-auto]').hidden=role==='viewer';}
   if(kind==='tasks'){const pending=panel.querySelector('[data-pending-exams]');pending.replaceChildren(el('h3',`Непройдені ВЛК: ${state.pending_exams.length}`,'h6'));for(const r of state.pending_exams)related(pending,'exams',r.id);for(const warning of state.warnings)pending.append(el('p',warning,'text-warning'));
    const audit=panel.querySelector('[data-medical-audit]');audit.replaceChildren(...state.audit.map(r=>el('p',`${r.occurred_at} · користувач №${r.actor_id} · ${r.entity} №${r.entity_id} · ${r.operation} · ${JSON.stringify(r.changes)}`,'small text-break')));
@@ -54,6 +68,7 @@
  }}
  async function load(){state=await request(base);render();}
  for(const panel of panels){
+  panel.querySelector('[data-task-history]')?.addEventListener('change',render);
   panel.querySelector('[data-medical-auth]').addEventListener('submit',async event=>{event.preventDefault();const form=event.target;try{const result=await request('/auth/login',{username:form.username.value,password:form.password.value});csrf=result.csrf_token;form.password.value='';const me=await request('/auth/me');role=me.role;await load();message(panel,'Вхід виконано.');}catch(error){message(panel,error.message,true);}});
   panel.querySelector('[data-medical-new]').addEventListener('click',()=>edit(panel,null));
   panel.querySelector('[data-exam-auto]')?.addEventListener('click',async()=>{try{await request(base+'/active',{exam_id:null,revision:state.selection.revision});await load();message(panel,'Увімкнено автоматичний вибір.');window.refreshProfileOverview?.();}catch(error){message(panel,error.message,true);}});

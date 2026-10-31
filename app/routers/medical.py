@@ -35,3 +35,12 @@ async def save(request:Request,person_id:int,kind:str,key:int|None=None,user=Dep
     data=await payload(request)
     try:return {'ok':True,**medical.save(db,user.id,person_id,kind,data.get('fields'),key=key,revision=data.get('revision'))}
     except (ValueError,PermissionError) as error:return failure(error)
+
+
+@router.post('/tasks/{key:int}/vlk-decision')
+async def vlk_decision(request:Request,person_id:int,key:int,user=Depends(current_user),db:Session=Depends(get_db)):
+    data=await payload(request)
+    try:
+        medical.vlk_decision(db,user.id,person_id,key,data.get('action'),data.get('reason'),data.get('revision'))
+        return {'ok':True}
+    except (ValueError,PermissionError) as error:return failure(error)

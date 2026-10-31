@@ -38,7 +38,11 @@ def require_current_schema(engine):
         with engine.connect() as connection:
             installed=set(connection.execute(text("SELECT name FROM sqlite_master WHERE type='trigger'")).scalars())
         missing.extend("trigger:"+name for name in sorted(required-installed))
+    if 'personnel_tasks' in tables and 'one_injury_vlk_task' not in {i['name'] for i in inspector.get_indexes('personnel_tasks')}:
+        missing.append('index:one_injury_vlk_task')
     if missing:
+        if set(missing)=={'index:one_injury_vlk_task'}:
+            raise ValueError('Потрібна адитивна міграція: python -m app.database.migrate_injury_vlk --database PATH. Автоматично БД не змінено.')
         from app.models.medical import NEW_TABLE_NAMES as MEDICAL_TABLES, GUARDS
         if set(missing) <= MEDICAL_TABLES | {"trigger:"+name for name in GUARDS}:
             raise ValueError("Потрібна безпечна міграція: python -m app.database.migrate_medical --database PATH. Автоматично БД не змінено.")

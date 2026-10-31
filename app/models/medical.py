@@ -72,7 +72,7 @@ class PersonnelTask(Owned, SystemTimestamps, Base):
     status: Mapped[str] = mapped_column(String(20), default='OPEN')
     manual_decision: Mapped[bool] = mapped_column(default=False)
     decision_reason: Mapped[str | None] = mapped_column(String(1000))
-    __table_args__ = (CheckConstraint("status IN ('OPEN','COMPLETED','CANCELLED')"), CheckConstraint("kind!='injury_award' OR injury_id IS NOT NULL"), Index('one_injury_award_task','injury_id',unique=True,sqlite_where=text("kind='injury_award'")))
+    __table_args__ = (CheckConstraint("status IN ('OPEN','COMPLETED','CANCELLED')"), CheckConstraint("kind!='injury_award' OR injury_id IS NOT NULL"), Index('one_injury_award_task','injury_id',unique=True,sqlite_where=text("kind='injury_award'")), Index('one_injury_vlk_task','injury_id',unique=True,sqlite_where=text("kind='injury_vlk'")))
 
 class MedicalDocumentLink(SystemTimestamps, Base):
     __tablename__ = 'medical_document_links'

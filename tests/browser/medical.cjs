@@ -3,7 +3,7 @@ module.exports=async({context,base,adminToken})=>{
  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
  const panel=kind=>page.locator(`[data-medical-panel="${kind}"]`),form=kind=>panel(kind).locator('[data-medical-form]');
  const tab=async kind=>page.locator(`#tab-${kind}`).click();
- const records=kind=>panel(kind).locator('[data-medical-record]');
+ const records=kind=>panel(kind).locator(kind==='tasks'?'[data-medical-record][data-task-kind=injury_award]':'[data-medical-record]');
  const newRecord=async kind=>{await tab(kind);const details=panel(kind).locator('[data-medical-editor]');if(!await details.evaluate(n=>n.open))await details.locator('summary').click();await panel(kind).locator('[data-medical-new]').click();};
  const save=async kind=>{await form(kind).locator('button').filter({hasText:/^Зберегти$/}).click();await panel(kind).locator('[data-medical-message]').filter({hasText:/^Збережено/}).waitFor();};
  const scenario=async(name,fn)=>{await fn();console.log('PASS medical: '+name);};
@@ -14,7 +14,7 @@ module.exports=async({context,base,adminToken})=>{
    assert.equal(await page.locator('#tab-service-history').count(),1);assert.equal(await page.locator('#tab-contacts').count(),1);
   });
   await scenario('injury independent of exams, automatic task exists once and linked sections work',async()=>{
-   await newRecord('injuries');await form('injuries').locator('[name=description]').fill('Синтетичне поранення');await form('injuries').locator('[name=exam_not_needed]').check();await save('injuries');assert.equal(await records('injuries').count(),1);
+   await newRecord('injuries');await form('injuries').locator('[name=description]').fill('Синтетичне поранення');await save('injuries');assert.equal(await records('injuries').count(),1);
    await form('injuries').locator('[name=area]').fill('Тестовий район');await save('injuries');await tab('tasks');assert.equal(await records('tasks').count(),1);assert.match(await records('tasks').innerText(),/Відкрите/);
    assert.equal(await records('exams').count(),0);assert.equal(await records('awards').count(),0);
   });
@@ -31,7 +31,7 @@ module.exports=async({context,base,adminToken})=>{
   await scenario('award status alone never closes task; evidence errors preserve form then confirmed report closes task',async()=>{
    await newRecord('awards');await form('awards').locator('[name=name]').fill('Тестова нагорода');await form('awards').locator('[name=injury_id]').selectOption('1');await form('awards').locator('[name=status]').selectOption('NOT_APPROPRIATE');await save('awards');await tab('tasks');assert.match(await records('tasks').innerText(),/Відкрите/);
    await tab('awards');await form('awards').locator('[name=refusal_confirmed]').check();await form('awards').locator('button').filter({hasText:/^Зберегти$/}).click();await panel('awards').locator('[data-medical-message]').filter({hasText:/рапорт потребує/}).waitFor();assert.equal(await form('awards').locator('[name=name]').inputValue(),'Тестова нагорода');assert.equal(await form('awards').locator('[name=refusal_confirmed]').isChecked(),true);assert.equal(await panel('awards').locator('[data-medical-editor]').evaluate(n=>n.open),true);
-   await form('awards').locator('[name=refusal_on]').fill('2026-06-01');await form('awards').locator('[name=refusal_number]').fill('0001');await form('awards').locator('[name=refusal_reason]').fill('Тестова причина');await save('awards');await tab('tasks');assert.match(await records('tasks').innerText(),/Завершене/);
+   await form('awards').locator('[name=refusal_on]').fill('2026-06-01');await form('awards').locator('[name=refusal_number]').fill('0001');await form('awards').locator('[name=refusal_reason]').fill('Тестова причина');await save('awards');await tab('tasks');await panel('tasks').locator('[data-task-history]').check();assert.match(await records('tasks').innerText(),/Завершене/);
    await records('tasks').getByRole('button',{name:'Редагувати',exact:true}).click();await form('tasks').locator('[name=status]').selectOption('CANCELLED');await form('tasks').locator('[name=decision_reason]').fill('Ручне рішення');await save('tasks');assert.match(await panel('tasks').locator('[data-pending-exams]').innerText(),/ручне рішення/);
   });
   await scenario('multiple categorized protected copies reuse existing documents and audit',async()=>{

@@ -1,0 +1,31 @@
+const assert=require('node:assert/strict');
+module.exports=async({context,base,adminToken})=>{
+ const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const panel=k=>page.locator(`[data-medical-panel=${k}]`),tab=async k=>page.locator(`#tab-${k}`).click();
+ const task=()=>panel('tasks').locator('[data-task-kind=injury_vlk]');
+ const save=async k=>{await panel(k).locator('[data-medical-form]').getByRole('button',{name:'Зберегти',exact:true}).click();await panel(k).locator('[data-medical-message]').filter({hasText:/^Збережено/}).waitFor();};
+ try{
+  await context.request.post(base+'/_column-test/documents/setup');await page.goto(base+'/person_full_info/1#injuries');
+  const login=panel('injuries').locator('[data-medical-auth]');await login.locator('[name=username]').fill('doc-admin');await login.locator('[name=password]').fill(adminToken);await login.locator('button').click();await panel('injuries').locator('[data-medical-content]').waitFor({state:'visible'});
+  await panel('injuries').locator('[data-medical-editor] summary').click();
+  assert.equal(await panel('injuries').locator('[name=exam_not_needed]').count(),0);
+  await panel('injuries').locator('[name=description]').fill('Синтетичне поранення');await save('injuries');
+  await tab('tasks');assert.equal(await task().count(),1);assert.match(await task().innerText(),/Очікує рішення щодо ВЛК/);
+  console.log('PASS injury VLK: registration creates decision task without choosing or creating an exam');
+  page.once('dialog',d=>d.accept(''));await task().getByRole('button',{name:'ВЛК не потрібна',exact:true}).click();await panel('tasks').locator('[data-medical-message]').filter({hasText:/Вкажіть причину/}).waitFor();
+  assert.equal(await task().count(),1);
+  page.once('dialog',d=>d.accept('Тестова медична причина'));await task().getByRole('button',{name:'ВЛК не потрібна',exact:true}).click();await panel('tasks').locator('[data-medical-message]').filter({hasText:'Рішення щодо ВЛК збережено'}).waitFor();assert.equal(await task().count(),0);
+  await panel('tasks').locator('[data-task-history]').check();assert.match(await task().innerText(),/Завершено: ВЛК не потрібна/);assert.match(await task().innerText(),/Тестова медична причина/);
+  await tab('injuries');assert.match(await panel('injuries').locator('[data-medical-record]').innerText(),/Завершено: ВЛК не потрібна/);
+  await tab('tasks');page.once('dialog',d=>d.accept('Виправлення помилки'));await task().getByRole('button',{name:'Скасувати рішення «ВЛК не потрібна»',exact:true}).click();await panel('tasks').locator('[data-medical-message]').filter({hasText:/Рішення скасовано/}).waitFor();
+  console.log('PASS injury VLK: reason is required; completed decision stays in history and is explicitly reversible');
+  await task().getByRole('button',{name:'Відкрити ВЛК',exact:true}).click();await panel('exams').waitFor({state:'visible'});
+  const form=panel('exams').locator('[data-medical-form]');assert.equal(await form.locator('[name=basis]').inputValue(),'INJURY');assert.equal(await form.locator('[name=injury_id]').inputValue(),'1');assert.equal(await form.locator('[name=status]').inputValue(),'NEEDS_EXAM');
+  await save('exams');await tab('tasks');assert.match(await task().innerText(),/Очікує проходження ВЛК/);assert.equal(await task().getByRole('link',{name:/ВЛК №1/}).count(),1);
+  await task().getByRole('link',{name:/ВЛК №1/}).click();await panel('exams').waitFor({state:'visible'});await form.locator('[name=status]').selectOption('PLANNED');await save('exams');await tab('tasks');assert.match(await task().innerText(),/Очікує проходження ВЛК/);
+  await task().getByRole('link',{name:/ВЛК №1/}).click();await panel('exams').waitFor({state:'visible'});await form.locator('[name=status]').selectOption('COMPLETED');await save('exams');await tab('tasks');assert.match(await task().innerText(),/Завершено: ВЛК пройдено/);
+  await task().getByRole('link',{name:/ВЛК №1/}).click();await panel('exams').waitFor({state:'visible'});await form.locator('[name=status]').selectOption('NEEDS_EXAM');await save('exams');await tab('tasks');assert.match(await task().innerText(),/Очікує проходження ВЛК/);
+  assert.equal(await task().count(),1);assert.deepEqual(errors,[]);
+  console.log('PASS injury VLK: prefill, planned/completed transitions and reopening preserve one task');
+ }finally{await page.close();}
+};

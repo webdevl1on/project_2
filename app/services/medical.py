@@ -2,7 +2,7 @@
 from datetime import date
 from app.models import MedicalSelection, PersonnelTask, PersonnelAudit, MedicalDocumentLink, PersonDocument, DocumentDetails
 from app.models.medical import MODELS
-from app.medical_catalog import FORM_FIELDS, DOCUMENT_ROLES, EXAM_STATES, FITNESS, AWARD_STATES, BASES, TASK_STATES
+from app.medical_catalog import FORM_FIELDS, DOCUMENT_ROLES, EXAM_STATES, FITNESS, AWARD_STATES, BASES, TASK_STATES, VLK_TASK_STAGES
 from app.repositories.medical_repository import MedicalRepository as Repo
 from app.repositories.document_repository import DocumentRepository as Docs
 from app.services.accounts import authorize
@@ -31,9 +31,11 @@ def snapshot(row):
     return {c.name:(v.isoformat() if isinstance(v,date) else v) for c in row.__table__.columns if c.name not in ('created_at','updated_at') for v in [getattr(row,c.name)]}
 
 
-def audit(db,actor,pid,kind,row,operation,old):
+def audit(db,actor,pid,kind,row,operation,old,*,details=None):
     new=snapshot(row)
-    Repo.add(db,PersonnelAudit(person_id=pid,actor_id=actor,entity=kind,entity_id=row.id if hasattr(row,'id') else pid,operation=operation,changes={key:{'old':old.get(key),'new':new.get(key)} for key in old.keys()|new.keys() if old.get(key)!=new.get(key)}))
+    changes={key:{'old':old.get(key),'new':new.get(key)} for key in old.keys()|new.keys() if old.get(key)!=new.get(key)}
+    if details:changes['decision']={'old':None,'new':details}
+    Repo.add(db,PersonnelAudit(person_id=pid,actor_id=actor,entity=kind,entity_id=row.id if hasattr(row,'id') else pid,operation=operation,changes=changes))
 
 
 def _link(db,pid,kind,value):
@@ -92,7 +94,49 @@ def _sync(db,actor,pid):
             if task.status!=desired:warnings.append(f'Завдання №{task.id}: ручне рішення збережено; автоматичний стан був би «{TASK_STATES[desired]}».')
         elif task.status!=desired or task.award_id!=award_id:
             old=snapshot(task);task.status=desired;task.award_id=award_id;db.flush();audit(db,actor,pid,'tasks',task,'automatic_sync',old)
+    _sync_vlk(db,actor,pid,injuries,tasks)
     return warnings
+
+
+def vlk_stage(injury,exams):
+    if injury.exam_not_needed:return 'NOT_NEEDED'
+    if any(e.status=='COMPLETED' for e in exams):return 'EXAM_COMPLETED'
+    return 'WAITING_EXAM' if exams else 'WAITING_DECISION'
+
+
+def _sync_vlk(db,actor,pid,injuries,tasks):
+    exams=Repo.rows(db,'exams',pid)
+    for injury in injuries:
+        task=next((t for t in tasks if t.kind=='injury_vlk' and t.injury_id==injury.id),None)
+        stage=vlk_stage(injury,[e for e in exams if e.injury_id==injury.id])
+        desired='COMPLETED' if stage in ('NOT_NEEDED','EXAM_COMPLETED') else 'OPEN'
+        if task is None:
+            task=Repo.add(db,PersonnelTask(person_id=pid,kind='injury_vlk',injury_id=injury.id,title=f'Визначити необхідність проходження ВЛК за пораненням №{injury.id}',status=desired,manual_decision=injury.exam_not_needed))
+            db.flush();audit(db,actor,pid,'tasks',task,'automatic_create',{})
+        elif task.status!=desired or task.manual_decision!=injury.exam_not_needed:
+            old=snapshot(task);task.status=desired;task.manual_decision=injury.exam_not_needed
+            db.flush();audit(db,actor,pid,'tasks',task,'automatic_sync',old)
+
+
+def vlk_decision(db,actor,pid,key,action,reason,revision):
+    reason=_text(reason,1000)
+    if not reason:raise ValueError('Вкажіть причину рішення щодо ВЛК.')
+    if action not in ('not_needed','reopen'):raise ValueError('Невідома дія щодо ВЛК.')
+    with document_transaction(db,subject='рішення щодо ВЛК'):
+        authorize(db,actor,WRITE_ROLES)
+        if revision is None:raise ValueError('Потрібна revision завдання.')
+        task=record(db,pid,'tasks',key,revision)
+        if task.kind!='injury_vlk':raise ValueError('Це не завдання ВЛК за пораненням.')
+        injury=record(db,pid,'injuries',task.injury_id)
+        if action=='reopen' and not injury.exam_not_needed:raise ValueError('Немає рішення «ВЛК не потрібна» для скасування.')
+        old_task=snapshot(task);old_injury=snapshot(injury)
+        injury.exam_not_needed=action=='not_needed'
+        task.decision_reason=reason if injury.exam_not_needed else None
+        task.manual_decision=injury.exam_not_needed
+        db.flush();audit(db,actor,pid,'injuries',injury,'vlk_decision',old_injury,details={'action':action,'reason':reason})
+        # Synchronization and both audit entries belong to this same transaction.
+        task.status='COMPLETED' if injury.exam_not_needed else ('COMPLETED' if any(e.injury_id==injury.id and e.status=='COMPLETED' for e in Repo.rows(db,'exams',pid)) else 'OPEN')
+        db.flush();audit(db,actor,pid,'tasks',task,'vlk_decision',old_task,details={'action':action,'reason':reason})
 
 
 def save(db,actor,pid,kind,data,*,key=None,revision=None):
@@ -110,7 +154,10 @@ def save(db,actor,pid,kind,data,*,key=None,revision=None):
         if kind=='exams' and key is not None and values['status']!='COMPLETED':
             choice=Repo.selection(db,pid)
             if choice and choice.exam_id==key:raise ValueError('Спочатку скасуйте ручний вибір активного ВЛК.')
-        if kind=='tasks':
+        if kind=='tasks' and key is not None and row.kind=='injury_vlk':
+            for field in ('injury_id','award_id','status','decision_reason'):
+                if values[field]!=getattr(row,field):raise ValueError('Для зміни рішення ВЛК використайте окрему дію у картці завдання.')
+        elif kind=='tasks':
             if key is not None and row.kind=='injury_award' and values['injury_id']!=row.injury_id:raise ValueError('Джерело автоматичного завдання не змінюється.')
             if values['status']!='OPEN':
                 if not values['decision_reason']:raise ValueError('Вкажіть причину ручного завершення або скасування.')
@@ -118,7 +165,7 @@ def save(db,actor,pid,kind,data,*,key=None,revision=None):
             if key is None or values['status']!=row.status or (values['status']!='OPEN' and values['decision_reason']!=row.decision_reason):row.manual_decision=True
         for name,value in values.items():setattr(row,name,value)
         db.flush();audit(db,actor,pid,kind,row,'update' if key is not None else 'create',old)
-        warnings=_sync(db,actor,pid) if kind in ('injuries','awards') else []
+        warnings=_sync(db,actor,pid) if kind in ('injuries','awards','exams') else []
         result=row.id
     return {'id':result,'warnings':warnings}
 
@@ -178,6 +225,17 @@ def page(db,actor,pid):
                   selection={'exam_id':choice.exam_id if choice else None,'revision':choice.revision if choice else None})
     result['links']=[{**snapshot(link),'files':[{'id':f.id,'name':f.original_name,'revision':f.revision} for f in Repo.files(db,link.document_id)],'document_revision':Docs.document(db,link.document_id).revision} for link in Repo.links(db,pid)]
     result['audit']=[{'id':r.id,'actor_id':r.actor_id,'occurred_at':r.occurred_at.isoformat()+'Z','entity':r.entity,'entity_id':r.entity_id,'operation':r.operation,'changes':r.changes} for r in Repo.audits(db,pid)]
+    injuries={r.id:r for r in Repo.rows(db,'injuries',pid)}
+    exams=Repo.rows(db,'exams',pid)
+    for task in result['tasks']:
+        if task['kind']=='injury_vlk' and task['injury_id'] in injuries:
+            related=[e for e in exams if e.injury_id==task['injury_id']]
+            stage=vlk_stage(injuries[task['injury_id']],related)
+            task.update(stage=stage,stage_label=VLK_TASK_STAGES[stage],exam_ids=[e.id for e in related])
+    for injury in result['injuries']:
+        task=next((t for t in result['tasks'] if t['kind']=='injury_vlk' and t['injury_id']==injury['id']),None)
+        stage=vlk_stage(injuries[injury['id']],[e for e in exams if e.injury_id==injury['id']])
+        injury.update(vlk_stage=stage,vlk_stage_label=VLK_TASK_STAGES[stage],vlk_task_id=task['id'] if task else None)
     result['pending_exams']=[r for r in result['exams'] if r['status']!='COMPLETED']
     result['warnings']=[f'Завдання №{t["id"]}: діє ручне рішення.' for t in result['tasks'] if t['manual_decision']]
     return result

@@ -18,7 +18,7 @@ def edit(db,pid,kind,key,**changes):
     fields={f[0]:getattr(row,f[0]) for f in service.FORM_FIELDS[kind]}
     return service.save(db,1,pid,kind,{**fields,**changes},key=key,revision=row.revision)
 def count(db,model):return db.scalar(select(func.count()).select_from(model))
-def task(db,pid):return service.Repo.rows(db,'tasks',pid)[0]
+def task(db,pid):return next(t for t in service.Repo.rows(db,'tasks',pid) if t.kind=='injury_award')
 
 @pytest.mark.parametrize('basis',['INJURY','ILLNESS','OTHER'])
 def test_exam_bases_repeat_and_incomplete_control(factory,prepared,basis):
@@ -71,10 +71,10 @@ def test_exact_subject_dates_reject_partial_invalid(factory,prepared,value):
 def test_injury_independent_unknown_dates_no_fake_exam_award_and_idempotent_task(factory,prepared):
     pid=prepared[3]
     with factory() as db:
-        key=create(db,pid,'injuries',description='Без відомої дати',exam_not_needed=True)
+        key=create(db,pid,'injuries',description='Без відомої дати')
         edit(db,pid,'injuries',key,area='Тестовий район')
         assert count(db,MedicalExam)==count(db,Award)==0
-        assert count(db,PersonnelTask)==1
+        assert count(db,PersonnelTask)==2
         assert db.get(Injury,key).occurred_on is None
         assert task(db,pid).status=='OPEN'
 

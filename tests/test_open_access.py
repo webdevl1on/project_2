@@ -40,7 +40,7 @@ def test_medical_crud_document_files_override_and_real_audit(opened):
     me=client.get('/auth/me').json()
     injury=client.post(url+'/injuries',json={'fields':{'description':'Тестове поранення'}})
     assert injury.status_code==200
-    data=client.get(url).json();assert len(data['tasks'])==1
+    data=client.get(url).json();assert len(data['tasks'])==2
     row=data['injuries'][0]
     assert client.post(url+f'/injuries/{row["id"]}',json={'fields':{'area':'Тестовий район'},'revision':row['revision']}).status_code==200
     assert all(e['actor_id']==me['id'] for e in client.get(url).json()['audit'])
