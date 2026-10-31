@@ -63,5 +63,5 @@
    }catch(error){message(panel,error.message,true);form.querySelector('input,select')?.focus();}finally{submit.disabled=false;}
   });
  }
- request('/auth/me').then(async me=>{csrf=me.csrf_token;role=me.role;await load();}).catch(()=>{});
+ request('/auth/me').then(async me=>{csrf=me.csrf_token;role=me.role;panels.forEach(panel=>panel.querySelector('[data-dev-auth-warning]').hidden=!me.dev_auth_bypass);await load();}).catch(error=>{panels.forEach(panel=>{panel.querySelector('[data-medical-login]').hidden=false;message(panel,error.message,true);});});
 })();

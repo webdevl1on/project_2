@@ -31,9 +31,14 @@ async function main() {
     }
     const adminToken = randomBytes(32).toString("base64url");
     const privateStorage = fs.mkdtempSync(path.join(os.tmpdir(),'project2-document-browser-'));
+    const devEnv={};
+    if(process.env.COLUMN_STAGE==='dev_auth'){
+        const devDatabase=path.join(privateStorage,'dev_auth_test.sqlite3');fs.writeFileSync(devDatabase,'');
+        Object.assign(devEnv,{PROJECT2_DEV_AUTH_BYPASS:'1',PROJECT2_DEV_AUTH_DATABASE:devDatabase});
+    }
     const server = spawn(process.env.PYTHON || "python3",
         ["-m", "tests.browser.serve_column_visibility", String(port)], {
-            cwd: root, env: { ...process.env, PROJECT2_ADMIN_TOKEN: adminToken, PROJECT2_ADMIN_ALLOW_HTTP: "1", PROJECT2_AUTH_ALLOW_LOCAL_HTTP: '1', PROJECT2_DOCUMENT_STORAGE: privateStorage },
+            cwd: root, env: { ...process.env, ...devEnv, PROJECT2_ADMIN_TOKEN: adminToken, PROJECT2_ADMIN_ALLOW_HTTP: "1", PROJECT2_AUTH_ALLOW_LOCAL_HTTP: '1', PROJECT2_DOCUMENT_STORAGE: privateStorage },
         });
     let serverOutput = "";
     server.stderr.on("data", data => { serverOutput += data; });
@@ -63,7 +68,7 @@ async function main() {
         });
         const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "history_forms", "name_cases", "geography", "contacts", "personnel", "service_bases", "documents", "workspace", "medical"];
         if (process.env.COLUMN_STAGE) {
-            assert.ok(suites.includes(process.env.COLUMN_STAGE));
+            assert.ok([...suites,'dev_auth'].includes(process.env.COLUMN_STAGE));
             await require(`./${process.env.COLUMN_STAGE}.cjs`)({ context, base, adminToken });
             return;
         }

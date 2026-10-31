@@ -26,12 +26,15 @@ async def login(request: Request, db: Session = Depends(get_db)):
 
 @router.get('/me')
 def me(request:Request,user=Depends(current_user),db:Session=Depends(get_db)):
+    if getattr(request.state,'dev_auth_bypass',False):
+        return JSONResponse({'id':user.id,'username':user.username,'display_name':user.display_name,'role':user.role,'csrf_token':request.state.dev_csrf,'dev_auth_bypass':True},headers={'Cache-Control':'no-store'})
     return JSONResponse(accounts.session_info(db,request.cookies[COOKIE]), headers={'Cache-Control':'no-store'})
 
 
 @router.post('/logout')
 def logout(request: Request, user=Depends(current_user), db: Session = Depends(get_db)):
-    accounts.logout(db, request.cookies[COOKIE]); response = JSONResponse({'ok':True})
+    if not getattr(request.state,'dev_auth_bypass',False):accounts.logout(db, request.cookies[COOKIE])
+    response = JSONResponse({'ok':True})
     response.delete_cookie(COOKIE, path='/'); return response
 
 

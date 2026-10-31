@@ -1,7 +1,8 @@
 <section data-medical-panel="{{ medical_kind }}" data-person-id="{{ person_id }}" class="mb-3">
 <h2 class="h5">{{ medical_labels[medical_kind] }}</h2>
 <div data-medical-message role="status" aria-live="polite"></div>
-<div data-medical-login>
+<p data-dev-auth-warning class="alert alert-warning py-1 small" hidden>Режим розробки — авторизацію вимкнено</p>
+<div data-medical-login hidden>
 <p>Для перегляду й змін потрібен персональний вхід.</p>
 <form data-medical-auth class="d-flex gap-2 flex-wrap"><label>Користувач<input name="username" autocomplete="username" class="form-control" required></label><label>Пароль<input name="password" type="password" autocomplete="current-password" class="form-control" required></label><button class="btn btn-primary align-self-end">Увійти</button></form>
 </div>

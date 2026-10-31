@@ -27,7 +27,29 @@ def secure_transport(request):
         raise HTTPException(403, 'Персональний вхід потребує HTTPS; локальний HTTP вмикається окремо.')
 
 
+def dev_request(request):
+    if os.environ.get('PROJECT2_DEV_AUTH_BYPASS')!='1':return False
+    from ipaddress import ip_address
+    try:local=request.client and ip_address(request.client.host).is_loopback
+    except ValueError:local=False
+    proxy=any(k=='forwarded' or k.startswith('x-forwarded-') or k in ('x-real-ip','via','cf-connecting-ip','true-client-ip') for k in request.headers)
+    if not local or request.url.hostname not in ('localhost','127.0.0.1','::1') or proxy:return False
+    check_origin(request)
+    if request.headers.get('sec-fetch-site') not in (None,'same-origin','none'):raise HTTPException(403,'Для режиму розробки потрібен прямий локальний запит.')
+    return True
+
+
 def current_user(request: Request, db: Session = Depends(get_db)):
+    if dev_request(request):
+        from app.services import dev_auth
+        try:user=dev_auth.identity(db)
+        except ValueError as error:raise HTTPException(503,str(error)) from error
+        token=dev_auth.csrf(user)
+        if request.method not in ('GET','HEAD','OPTIONS') and not hmac.compare_digest(request.headers.get('x-csrf-token',''),token):
+            raise HTTPException(403,'Неправильний CSRF-токен.')
+        request.state.dev_auth_bypass=True
+        request.state.dev_csrf=token
+        return user
     secure_transport(request)
     try: user, session = accounts.authenticate(db, request.cookies.get(COOKIE, ''))
     except PermissionError as error: raise HTTPException(401, str(error)) from error

@@ -144,3 +144,7 @@ python -m app.services.seed_test_people --database data/database/medical_check.s
 - `tests/browser/catalog.cjs`
 - `tests/browser/column_visibility.cjs`
 - `tests/test_table_field_catalog.py`
+
+## Локальна розробка без входу
+
+Окремий PROJECT2_DEV_AUTH_BYPASS=1 підтримується через чинний current_user; підготовка тестової БД/реального editor-автора та PowerShell-команди описані в [DOCUMENTS.md](DOCUMENTS.md#локальний-тестовий-режим-без-введення-пароля). Дані вкладок завантажуються без логіна; видно попередження про режим розробки. Write зберігає CSRF і реального автора. Режим недоступний через LAN, proxy або чужий Origin, не створює облікових записів через HTTP і не змінює моделі/кадрові правила/синхронізацію завдань.

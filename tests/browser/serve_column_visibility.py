@@ -17,7 +17,8 @@ from app.routers.person_positions import templates
 from tests.test_person_positions import make_position, make_rank
 
 
-engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+import os
+engine = create_engine("sqlite:///"+os.environ["PROJECT2_DEV_AUTH_DATABASE"] if os.environ.get("PROJECT2_DEV_AUTH_DATABASE") else "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
 from tests.staff_fixtures import install_legacy_staff_fixture
 install_legacy_staff_fixture()
 Session = sessionmaker(bind=engine, info={"legacy_staff_fixture":True})
@@ -118,6 +119,9 @@ def document_accounts():
     import os
     from app.services.accounts import create_user
     with Session() as db:
+        if os.environ.get('PROJECT2_DEV_AUTH_BYPASS')=='1':
+            from app.services.dev_auth import initialize
+            return {'user_id':initialize(db)}
         key=create_user(db,'doc-admin','Тестовий адміністратор',os.environ['PROJECT2_ADMIN_TOKEN'],'admin')
     return {'user_id':key,'person_id':3}
 
