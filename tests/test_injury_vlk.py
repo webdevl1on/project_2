@@ -64,7 +64,8 @@ def test_pending_exam_is_not_completion_and_repeated_completed_any_is_sufficient
         assert task(db,pid,injury).status=='COMPLETED'
         second=create(db,pid,'exams',basis='INJURY',injury_id=injury,status='COMPLETED')
         edit(db,pid,'exams',first,status='PLANNED')
-        assert task(db,pid,injury).status=='COMPLETED'
+        assert task(db,pid,injury).status=='OPEN'
+        assert any(t.kind=='exam_vlk' and t.exam_id==second and t.status=='COMPLETED' for t in service.Repo.rows(db,'tasks',pid))
         edit(db,pid,'exams',second,status='NEEDS_EXAM')
         assert task(db,pid,injury).status=='OPEN'
         assert len([t for t in service.Repo.rows(db,'tasks',pid) if t.kind=='injury_vlk'])==1

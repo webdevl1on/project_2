@@ -33,7 +33,7 @@ async def link(request:Request,person_id:int,kind:str,key:int,user=Depends(curre
 @router.post('/{kind}/{key:int}')
 async def save(request:Request,person_id:int,kind:str,key:int|None=None,user=Depends(current_user),db:Session=Depends(get_db)):
     data=await payload(request)
-    try:return {'ok':True,**medical.save(db,user.id,person_id,kind,data.get('fields'),key=key,revision=data.get('revision'))}
+    try:return {'ok':True,**medical.save(db,user.id,person_id,kind,data.get('fields'),key=key,revision=data.get('revision'),basis_document_id=data.get('basis_document_id'))}
     except (ValueError,PermissionError) as error:return failure(error)
 
 

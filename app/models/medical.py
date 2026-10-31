@@ -27,11 +27,14 @@ class MedicalExam(Owned, SystemTimestamps, Base):
     injury_id: Mapped[int | None] = mapped_column(ForeignKey('person_injuries.id'))
     planned_on: Mapped[date | None] = mapped_column(Date)
     issued_on: Mapped[date | None] = mapped_column(Date)
+    ended_on: Mapped[date | None] = mapped_column(Date)
+    interrupted_on: Mapped[date | None] = mapped_column(Date)
+    interruption_reason: Mapped[str | None] = mapped_column(String(2000))
     number: Mapped[str | None] = mapped_column(String(150))
     institution: Mapped[str | None] = mapped_column(String(1000))
     diagnosis: Mapped[str | None] = mapped_column(String(2000))
     fitness: Mapped[str | None] = mapped_column(String(20))
-    __table_args__ = (CheckConstraint("status IN ('NEEDS_EXAM','PLANNED','COMPLETED')"), CheckConstraint("basis IN ('INJURY','ILLNESS','OTHER')"), CheckConstraint("fitness IS NULL OR fitness IN ('FIT','FIT_SUPPORT','UNFIT')"), CheckConstraint("injury_id IS NULL OR basis='INJURY'"))
+    __table_args__ = (CheckConstraint("status IN ('NEEDS_EXAM','PLANNED','COMPLETED','INTERRUPTED')"), CheckConstraint("basis IN ('INJURY','ILLNESS','OTHER')"), CheckConstraint("fitness IS NULL OR fitness IN ('FIT','FIT_SUPPORT','UNFIT')"), CheckConstraint("injury_id IS NULL OR basis='INJURY'"))
 
 class MedicalSelection(SystemTimestamps, Base):
     __tablename__ = 'person_medical_selections'
@@ -64,6 +67,7 @@ class DnaSample(Owned, SystemTimestamps, Base):
 class PersonnelTask(Owned, SystemTimestamps, Base):
     __tablename__ = 'personnel_tasks'
     kind: Mapped[str] = mapped_column(String(100), default='manual')
+    exam_id: Mapped[int | None] = mapped_column(ForeignKey('person_medical_exams.id'))
     injury_id: Mapped[int | None] = mapped_column(ForeignKey('person_injuries.id'))
     award_id: Mapped[int | None] = mapped_column(ForeignKey('person_awards.id'))
     title: Mapped[str] = mapped_column(String(250))
@@ -72,7 +76,7 @@ class PersonnelTask(Owned, SystemTimestamps, Base):
     status: Mapped[str] = mapped_column(String(20), default='OPEN')
     manual_decision: Mapped[bool] = mapped_column(default=False)
     decision_reason: Mapped[str | None] = mapped_column(String(1000))
-    __table_args__ = (CheckConstraint("status IN ('OPEN','COMPLETED','CANCELLED')"), CheckConstraint("kind!='injury_award' OR injury_id IS NOT NULL"), Index('one_injury_award_task','injury_id',unique=True,sqlite_where=text("kind='injury_award'")), Index('one_injury_vlk_task','injury_id',unique=True,sqlite_where=text("kind='injury_vlk'")))
+    __table_args__ = (CheckConstraint("status IN ('OPEN','COMPLETED','CANCELLED')"), CheckConstraint("kind!='injury_award' OR injury_id IS NOT NULL"), Index('one_injury_award_task','injury_id',unique=True,sqlite_where=text("kind='injury_award'")), Index('one_injury_vlk_task','injury_id',unique=True,sqlite_where=text("kind='injury_vlk'")), Index('one_exam_control_task','exam_id',unique=True,sqlite_where=text("kind IN ('injury_vlk','exam_vlk') AND status!='CANCELLED' AND exam_id IS NOT NULL")))
 
 class MedicalDocumentLink(SystemTimestamps, Base):
     __tablename__ = 'medical_document_links'
@@ -103,7 +107,7 @@ def install_guards(connection):
     checks = {
       'exam_owner': ('person_medical_exams', "NEW.injury_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM person_injuries i WHERE i.id=NEW.injury_id AND i.person_id=NEW.person_id)"),
       'award_owner': ('person_awards', "NEW.injury_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM person_injuries i WHERE i.id=NEW.injury_id AND i.person_id=NEW.person_id)"),
-      'task_owner': ('personnel_tasks', "(NEW.injury_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM person_injuries i WHERE i.id=NEW.injury_id AND i.person_id=NEW.person_id)) OR (NEW.award_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM person_awards a WHERE a.id=NEW.award_id AND a.person_id=NEW.person_id))"),
+      'task_owner': ('personnel_tasks', "(NEW.exam_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM person_medical_exams e WHERE e.id=NEW.exam_id AND e.person_id=NEW.person_id)) OR (NEW.injury_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM person_injuries i WHERE i.id=NEW.injury_id AND i.person_id=NEW.person_id)) OR (NEW.award_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM person_awards a WHERE a.id=NEW.award_id AND a.person_id=NEW.person_id))"),
       'selection': ('person_medical_selections', "NEW.exam_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM person_medical_exams e WHERE e.id=NEW.exam_id AND e.person_id=NEW.person_id AND e.status='COMPLETED')"),
       'link': ('medical_document_links', ' OR '.join(f"(NEW.{fk} IS NOT NULL AND NOT EXISTS (SELECT 1 FROM {table} r JOIN person_documents d ON d.person_id=r.person_id WHERE r.id=NEW.{fk} AND d.id=NEW.document_id))" for fk,table in [('exam_id','person_medical_exams'),('injury_id','person_injuries'),('award_id','person_awards')])),
     }
@@ -121,6 +125,8 @@ def install_guards(connection):
             if isinstance(col.type,String) and col.type.length:checks.append(f"length(NEW.{col.name})>{col.type.length}")
         for op in ('insert','update'):
             connection.exec_driver_sql(f"CREATE TRIGGER IF NOT EXISTS medical_values_{model.__tablename__}_{op} BEFORE {op.upper()} ON {model.__tablename__} WHEN {' OR '.join(checks)} BEGIN SELECT RAISE(ABORT,'invalid calendar date or text length'); END")
+    connection.exec_driver_sql("CREATE TRIGGER IF NOT EXISTS medical_exam_no_new_interrupted BEFORE INSERT ON person_medical_exams WHEN NEW.status='INTERRUPTED' BEGIN SELECT RAISE(ABORT,'plan the exam before interruption'); END")
+    connection.exec_driver_sql("CREATE TRIGGER IF NOT EXISTS medical_exam_interrupted_history BEFORE UPDATE ON person_medical_exams WHEN OLD.status='INTERRUPTED' AND NEW.status!='INTERRUPTED' BEGIN SELECT RAISE(ABORT,'create a new exam after interruption'); END")
     connection.exec_driver_sql("CREATE TRIGGER IF NOT EXISTS medical_selected_exam_update BEFORE UPDATE ON person_medical_exams WHEN NEW.status!='COMPLETED' AND EXISTS (SELECT 1 FROM person_medical_selections s WHERE s.exam_id=NEW.id) BEGIN SELECT RAISE(ABORT,'clear manual selection first'); END")
 
 @event.listens_for(Base.metadata,'after_create')
@@ -139,3 +145,5 @@ for model in MODELS.values():
 
 
 GUARDS |= {f'medical_values_{m.__tablename__}_{op}' for m in MODELS.values() for op in ('insert','update')} | {'medical_selected_exam_update'}
+
+GUARDS |= {'medical_exam_no_new_interrupted','medical_exam_interrupted_history'}

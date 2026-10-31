@@ -3,7 +3,7 @@ module.exports=async({context,base,adminToken})=>{
  const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
  const panel=k=>page.locator(`[data-medical-panel=${k}]`),tab=async k=>page.locator(`#tab-${k}`).click();
  const task=()=>panel('tasks').locator('[data-task-kind=injury_vlk]');
- const save=async k=>{await panel(k).locator('[data-medical-form]').getByRole('button',{name:'Зберегти',exact:true}).click();await panel(k).locator('[data-medical-message]').filter({hasText:/^Збережено/}).waitFor();};
+ const save=async k=>{if(k==='exams'){const f=panel(k).locator('[data-medical-form]'),s=await f.locator('[name=status]').inputValue();if(s==='PLANNED')await f.locator('[name=planned_on]').fill('2026-01-01');if(s==='COMPLETED'){await f.locator('[name=issued_on]').fill('2026-01-03');await f.locator('[name=number]').fill('001');await f.locator('[name=fitness]').selectOption('FIT');}}await panel(k).locator('[data-medical-form]').getByRole('button',{name:'Зберегти',exact:true}).click();await panel(k).locator('[data-medical-message]').filter({hasText:/^(Збережено|Запис створено|Зміни збережено)/}).waitFor();};
  try{
   await context.request.post(base+'/_column-test/documents/setup');await page.goto(base+'/person_full_info/1#injuries');
   const login=panel('injuries').locator('[data-medical-auth]');await login.locator('[name=username]').fill('doc-admin');await login.locator('[name=password]').fill(adminToken);await login.locator('button').click();await panel('injuries').locator('[data-medical-content]').waitFor({state:'visible'});

@@ -39,9 +39,9 @@ def test_local_api_csrf_audit_files_and_disable(setup,monkeypatch,tmp_path):
         me=client.get('/auth/me').json();assert me['dev_auth_bypass'] and me['id']==actor
         headers={'X-CSRF-Token':me['csrf_token']};url=f'/persons/{pid}/medical'
         assert client.post(url+'/exams',json={'fields':{}}).status_code==403
-        key=client.post(url+'/exams',json={'fields':{'basis':'ILLNESS'}},headers=headers).json()['id']
+        key=client.post(url+'/exams',json={'fields':{'basis':'ILLNESS','basis_note':'Тестова підстава'}},headers=headers).json()['id']
         record=client.get(url).json()['exams'][0]
-        assert client.post(url+f'/exams/{key}',json={'revision':record['revision'],'fields':{'status':'PLANNED'}},headers=headers).status_code==200
+        assert client.post(url+f'/exams/{key}',json={'revision':record['revision'],'fields':{'status':'PLANNED','planned_on':'2026-01-01'}},headers=headers).status_code==200
         assert all(r['actor_id']==actor for r in client.get(url).json()['audit'])
         docs=f'/persons/{pid}/documents';doc=client.post(docs,json={'type':'other','details':{}},headers=headers).json()['id']
         revision=next(r['revision'] for r in client.get(docs).json()['documents'] if r['id']==doc)

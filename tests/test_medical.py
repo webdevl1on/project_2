@@ -12,10 +12,23 @@ from tests.test_documents import prepared
 from tests.test_name_cases import factory,client
 
 
-def create(db,pid,kind,**fields):return service.save(db,1,pid,kind,fields)['id']
+def create(db,pid,kind,**fields):
+    if kind=='exams':
+        fields={'basis_note':'Тестова підстава',**fields}
+        if fields.get('status')=='PLANNED':fields={'planned_on':'2025-01-01',**fields}
+        if fields.get('status')=='COMPLETED':fields={'issued_on':'2026-01-01','number':'001','fitness':'FIT',**fields}
+    return service.save(db,1,pid,kind,fields)['id']
+
+def legacy_exam(db,pid,**fields):
+    row=MedicalExam(person_id=pid,**fields);db.add(row);db.commit();return row.id
 def edit(db,pid,kind,key,**changes):
     row=service.record(db,pid,kind,key)
     fields={f[0]:getattr(row,f[0]) for f in service.FORM_FIELDS[kind]}
+    if kind=='exams' and changes.get('status')=='COMPLETED':
+        for k,v in [('issued_on',date(2026,1,1)),('number','001'),('fitness','FIT')]:
+            if not fields.get(k) and k not in changes:fields[k]=v
+    if kind=='exams' and changes.get('status')=='PLANNED' and not fields.get('planned_on'):fields['planned_on']=date(2025,1,1)
+    if kind=='exams' and changes.get('status') not in (None,'COMPLETED'):fields['fitness']=None
     return service.save(db,1,pid,kind,{**fields,**changes},key=key,revision=row.revision)
 def count(db,model):return db.scalar(select(func.count()).select_from(model))
 def task(db,pid):return next(t for t in service.Repo.rows(db,'tasks',pid) if t.kind=='injury_award')
@@ -55,7 +68,7 @@ def test_ambiguous_latest_date_never_arbitrary(factory,prepared,issued):
     pid=prepared[3]
     with factory() as db:
         first=create(db,pid,'exams',status='COMPLETED',issued_on='2026-01-01')
-        create(db,pid,'exams',status='COMPLETED',issued_on=issued)
+        (legacy_exam(db,pid,status='COMPLETED') if issued is None else create(db,pid,'exams',status='COMPLETED',issued_on=issued))
         assert service.active_exam(db,pid)[0] is None
         assert 'однакові або відсутні' in service.active_exam(db,pid)[1]
         service.select_active(db,1,pid,first)

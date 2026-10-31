@@ -98,24 +98,73 @@ def _sync(db,actor,pid):
     return warnings
 
 
+def exam_stage(exam):
+    return 'EXAM_COMPLETED' if exam.status=='COMPLETED' else 'INTERRUPTED' if exam.status=='INTERRUPTED' else 'WAITING_EXAM'
+
+
 def vlk_stage(injury,exams):
     if injury.exam_not_needed:return 'NOT_NEEDED'
-    if any(e.status=='COMPLETED' for e in exams):return 'EXAM_COMPLETED'
-    return 'WAITING_EXAM' if exams else 'WAITING_DECISION'
+    if any(e.status!='COMPLETED' for e in exams):return 'INTERRUPTED' if all(e.status in ('COMPLETED','INTERRUPTED') for e in exams) else 'WAITING_EXAM'
+    return 'EXAM_COMPLETED' if exams else 'WAITING_DECISION'
 
 
 def _sync_vlk(db,actor,pid,injuries,tasks):
-    exams=Repo.rows(db,'exams',pid)
+    exams=Repo.rows(db,'exams',pid);by_id={e.id:e for e in exams}
+    controls=[t for t in tasks if t.kind in ('injury_vlk','exam_vlk')]
+    def update(task,**values):
+        if all(getattr(task,k)==v for k,v in values.items()):return
+        old=snapshot(task)
+        for k,v in values.items():setattr(task,k,v)
+        db.flush();audit(db,actor,pid,'tasks',task,'automatic_sync',old)
+    # Release invalid injury bindings first; standalone controls follow their exam.
+    for task in controls:
+        exam=by_id.get(task.exam_id)
+        if task.kind=='injury_vlk' and exam and (exam.injury_id!=task.injury_id or next(i for i in injuries if i.id==task.injury_id).exam_not_needed):
+            update(task,exam_id=None)
     for injury in injuries:
-        task=next((t for t in tasks if t.kind=='injury_vlk' and t.injury_id==injury.id),None)
-        stage=vlk_stage(injury,[e for e in exams if e.injury_id==injury.id])
-        desired='COMPLETED' if stage in ('NOT_NEEDED','EXAM_COMPLETED') else 'OPEN'
+        task=next((t for t in controls if t.kind=='injury_vlk' and t.injury_id==injury.id),None)
         if task is None:
-            task=Repo.add(db,PersonnelTask(person_id=pid,kind='injury_vlk',injury_id=injury.id,title=f'Визначити необхідність проходження ВЛК за пораненням №{injury.id}',status=desired,manual_decision=injury.exam_not_needed))
-            db.flush();audit(db,actor,pid,'tasks',task,'automatic_create',{})
-        elif task.status!=desired or task.manual_decision!=injury.exam_not_needed:
-            old=snapshot(task);task.status=desired;task.manual_decision=injury.exam_not_needed
-            db.flush();audit(db,actor,pid,'tasks',task,'automatic_sync',old)
+            task=Repo.add(db,PersonnelTask(person_id=pid,kind='injury_vlk',injury_id=injury.id,title=f'Визначити необхідність проходження ВЛК за пораненням №{injury.id}',status='OPEN',manual_decision=False))
+            db.flush();audit(db,actor,pid,'tasks',task,'automatic_create',{});controls.append(task)
+        if not injury.exam_not_needed and task.exam_id is None:
+            related=sorted((e for e in exams if e.injury_id==injury.id),key=lambda e:e.id)
+            if related:
+                exam=related[0]
+                previous=next((t for t in controls if t.kind=='exam_vlk' and t.exam_id==exam.id and t.status!='CANCELLED'),None)
+                if previous:update(previous,status='CANCELLED',decision_reason=f'Контроль передано до завдання №{task.id}')
+                update(task,exam_id=exam.id)
+        exam=by_id.get(task.exam_id)
+        desired='COMPLETED' if injury.exam_not_needed or (exam and exam.status=='COMPLETED') else 'OPEN'
+        update(task,status=desired,manual_decision=injury.exam_not_needed)
+    for exam in exams:
+        control=next((t for t in controls if t.exam_id==exam.id and t.status!='CANCELLED'),None)
+        if control is None:
+            control=Repo.add(db,PersonnelTask(person_id=pid,kind='exam_vlk',exam_id=exam.id,injury_id=exam.injury_id,title=f'Контроль проходження ВЛК №{exam.id}',status='COMPLETED' if exam.status=='COMPLETED' else 'OPEN',manual_decision=False))
+            db.flush();audit(db,actor,pid,'tasks',control,'automatic_create',{});controls.append(control)
+        elif control.kind=='exam_vlk':update(control,injury_id=exam.injury_id,status='COMPLETED' if exam.status=='COMPLETED' else 'OPEN')
+
+
+def validate_exam(db,pid,values,previous,document_id):
+    status=values['status']
+    if status=='INTERRUPTED' and (previous is None or previous.status not in ('PLANNED','INTERRUPTED')):
+        raise ValueError('Перервати можна лише раніше заплановане ВЛК.')
+    if previous and previous.status=='INTERRUPTED' and status!='INTERRUPTED':raise ValueError('Після переривання створіть новий запис і нове направлення.')
+    if status=='PLANNED' and values['planned_on'] is None:raise ValueError('Вкажіть дату початку ВЛК.')
+    if status=='COMPLETED' and not all(values[k] for k in ('issued_on','number','fitness')):raise ValueError('Для завершеного ВЛК потрібні дата довідки, номер і придатність.')
+    if status=='INTERRUPTED' and not (values['planned_on'] and values['interrupted_on'] and values['interruption_reason']):raise ValueError('Вкажіть дату початку, дату та причину переривання.')
+    if status!='INTERRUPTED' and (values['interrupted_on'] or values['interruption_reason']):raise ValueError('Реквізити переривання дозволені лише для перерваного ВЛК.')
+    for earlier,later in [('planned_on','ended_on'),('planned_on','issued_on'),('ended_on','issued_on'),('planned_on','interrupted_on')]:
+        if values[earlier] and values[later] and values[later]<values[earlier]:raise ValueError('Неправильна послідовність дат ВЛК.')
+    if status=='INTERRUPTED' and values['ended_on']:raise ValueError('Перерване ВЛК не має дати завершення.')
+    document=None
+    if document_id is not None:
+        if type(document_id) is not int:raise ValueError('Потрібен цілий ID документа-підстави.')
+        document=Docs.document(db,document_id)
+        if not document or document.person_id!=pid:raise ValueError('Документ-підстава цієї особи не знайдено.')
+    linked=previous and any(link.exam_id==previous.id and link.category in ('recommendation','referral','discharge','other') for link in Repo.links(db,pid))
+    if status in ('NEEDS_EXAM','PLANNED') and not (values['injury_id'] or values['basis_note'] or document or linked):
+        raise ValueError('Вкажіть поранення, документ-підставу або опис підстави ВЛК.')
+    return document
 
 
 def vlk_decision(db,actor,pid,key,action,reason,revision):
@@ -135,11 +184,11 @@ def vlk_decision(db,actor,pid,key,action,reason,revision):
         task.manual_decision=injury.exam_not_needed
         db.flush();audit(db,actor,pid,'injuries',injury,'vlk_decision',old_injury,details={'action':action,'reason':reason})
         # Synchronization and both audit entries belong to this same transaction.
-        task.status='COMPLETED' if injury.exam_not_needed else ('COMPLETED' if any(e.injury_id==injury.id and e.status=='COMPLETED' for e in Repo.rows(db,'exams',pid)) else 'OPEN')
+        _sync_vlk(db,actor,pid,Repo.rows(db,'injuries',pid),Repo.rows(db,'tasks',pid))
         db.flush();audit(db,actor,pid,'tasks',task,'vlk_decision',old_task,details={'action':action,'reason':reason})
 
 
-def save(db,actor,pid,kind,data,*,key=None,revision=None):
+def save(db,actor,pid,kind,data,*,key=None,revision=None,basis_document_id=None):
     with document_transaction(db,subject="кадрового запису"):
         authorize(db,actor,WRITE_ROLES)
         if Repo.person(db,pid) is None:raise ValueError('Особу не знайдено.')
@@ -151,10 +200,11 @@ def save(db,actor,pid,kind,data,*,key=None,revision=None):
         else:
             values=validated(db,pid,kind,data)
             row=Repo.add(db,MODELS[kind](person_id=pid));old={}
+        basis_document=validate_exam(db,pid,values,row if key is not None else None,basis_document_id) if kind=='exams' else None
         if kind=='exams' and key is not None and values['status']!='COMPLETED':
             choice=Repo.selection(db,pid)
             if choice and choice.exam_id==key:raise ValueError('Спочатку скасуйте ручний вибір активного ВЛК.')
-        if kind=='tasks' and key is not None and row.kind=='injury_vlk':
+        if kind=='tasks' and key is not None and row.kind in ('injury_vlk','exam_vlk'):
             for field in ('injury_id','award_id','status','decision_reason'):
                 if values[field]!=getattr(row,field):raise ValueError('Для зміни рішення ВЛК використайте окрему дію у картці завдання.')
         elif kind=='tasks':
@@ -165,6 +215,9 @@ def save(db,actor,pid,kind,data,*,key=None,revision=None):
             if key is None or values['status']!=row.status or (values['status']!='OPEN' and values['decision_reason']!=row.decision_reason):row.manual_decision=True
         for name,value in values.items():setattr(row,name,value)
         db.flush();audit(db,actor,pid,kind,row,'update' if key is not None else 'create',old)
+        if basis_document and not any(l.exam_id==row.id and l.document_id==basis_document.id and l.category=='other' for l in Repo.links(db,pid)):
+            Repo.add(db,MedicalDocumentLink(exam_id=row.id,document_id=basis_document.id,category='other'))
+            document_audit(db,actor,basis_document,'medical_link',{'entity':'exams','id':row.id,'category':'other'})
         warnings=_sync(db,actor,pid) if kind in ('injuries','awards','exams') else []
         result=row.id
     return {'id':result,'warnings':warnings}
@@ -196,6 +249,8 @@ def link_document(db,actor,pid,kind,key,category,*,document_id=None,revision=Non
     with document_transaction(db,subject="кадрового запису"):
         authorize(db,actor,WRITE_ROLES);target=record(db,pid,kind,key,revision)
         if revision is None:raise ValueError('Потрібна revision предметного запису.')
+        if kind=='exams' and category=='referral' and document_id is not None and any(l.exam_id and l.exam_id!=key and l.category=='referral' and l.document_id==document_id for l in Repo.links(db,pid)):
+            raise ValueError('Для нового проходження потрібне нове направлення.')
         if document_id is not None:
             if type(document_id) is not int:raise ValueError('Потрібен цілий ID документа.')
             doc=Docs.document(db,document_id)
@@ -228,14 +283,16 @@ def page(db,actor,pid):
     injuries={r.id:r for r in Repo.rows(db,'injuries',pid)}
     exams=Repo.rows(db,'exams',pid)
     for task in result['tasks']:
-        if task['kind']=='injury_vlk' and task['injury_id'] in injuries:
-            related=[e for e in exams if e.injury_id==task['injury_id']]
-            stage=vlk_stage(injuries[task['injury_id']],related)
+        if task['kind'] in ('injury_vlk','exam_vlk'):
+            related=[e for e in exams if e.id==task['exam_id']]
+            stage='NOT_NEEDED' if task['kind']=='injury_vlk' and injuries[task['injury_id']].exam_not_needed else exam_stage(related[0]) if related else 'WAITING_DECISION'
             task.update(stage=stage,stage_label=VLK_TASK_STAGES[stage],exam_ids=[e.id for e in related])
     for injury in result['injuries']:
         task=next((t for t in result['tasks'] if t['kind']=='injury_vlk' and t['injury_id']==injury['id']),None)
         stage=vlk_stage(injuries[injury['id']],[e for e in exams if e.injury_id==injury['id']])
         injury.update(vlk_stage=stage,vlk_stage_label=VLK_TASK_STAGES[stage],vlk_task_id=task['id'] if task else None)
+    result['exams'].sort(key=lambda r:(0 if r['status']!='COMPLETED' else 1, -(date.fromisoformat(r['interrupted_on'] or r['ended_on'] or r['issued_on'] or r['planned_on']).toordinal() if any(r[k] for k in ('interrupted_on','ended_on','issued_on','planned_on')) else 0),-r['id']))
+    for r in result['exams']:r['is_current']=bool(chosen and r['id']==chosen.id)
     result['pending_exams']=[r for r in result['exams'] if r['status']!='COMPLETED']
     result['warnings']=[f'Завдання №{t["id"]}: діє ручне рішення.' for t in result['tasks'] if t['manual_decision']]
     return result

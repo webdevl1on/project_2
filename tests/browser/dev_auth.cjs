@@ -10,10 +10,10 @@ module.exports=async({context,base})=>{
   assert.match(await panel.locator('[data-dev-auth-warning]').innerText(),/Авторизацію.*вимкнено/);
   console.log('PASS dev auth: no login, visible development warning');
   await panel.locator('[data-medical-editor] summary').click();
-  const form=panel.locator('[data-medical-form]');await form.locator('[name=basis]').selectOption('ILLNESS');
+  const form=panel.locator('[data-medical-form]');await form.locator('[name=basis]').selectOption('ILLNESS');await form.locator('[name=basis_note]').fill('Тестова підстава');
   await form.getByRole('button',{name:'Зберегти',exact:true}).click();
-  await panel.locator('[data-medical-message]').filter({hasText:/Збережено/}).waitFor();
-  await form.locator('[name=basis_note]').fill('Тестове уточнення');await form.getByRole('button',{name:'Зберегти',exact:true}).click();
+  await panel.locator('[data-medical-message]').filter({hasText:/Запис створено|Зміни збережено/}).waitFor();
+  await panel.locator('[data-medical-record]').locator('[data-exam-card] > summary').click();await panel.getByRole('button',{name:'Редагувати',exact:true}).click();await form.locator('[name=basis_note]').fill('Тестове уточнення');await form.getByRole('button',{name:'Зберегти',exact:true}).click();
   await panel.locator('[data-medical-record]').filter({hasText:'Тестове уточнення'}).waitFor();
   const result=await page.evaluate(async()=>{
    const me=await(await fetch('/auth/me')).json();

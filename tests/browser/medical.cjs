@@ -5,7 +5,7 @@ module.exports=async({context,base,adminToken})=>{
  const tab=async kind=>page.locator(`#tab-${kind}`).click();
  const records=kind=>panel(kind).locator(kind==='tasks'?'[data-medical-record][data-task-kind=injury_award]':'[data-medical-record]');
  const newRecord=async kind=>{await tab(kind);const details=panel(kind).locator('[data-medical-editor]');if(!await details.evaluate(n=>n.open))await details.locator('summary').click();await panel(kind).locator('[data-medical-new]').click();};
- const save=async kind=>{await form(kind).locator('button').filter({hasText:/^Зберегти$/}).click();await panel(kind).locator('[data-medical-message]').filter({hasText:/^Збережено/}).waitFor();};
+ const save=async kind=>{if(kind==='exams'){const f=form(kind),s=await f.locator('[name=status]').inputValue();if(s==='PLANNED'&&!await f.locator('[name=planned_on]').inputValue())await f.locator('[name=planned_on]').fill('2026-01-01');if(s==='COMPLETED'&&!await f.locator('[name=number]').inputValue())await f.locator('[name=number]').fill('001');}await form(kind).locator('button').filter({hasText:/^Зберегти$/}).click();await panel(kind).locator('[data-medical-message]').filter({hasText:/^(Збережено|Запис створено|Зміни збережено)/}).waitFor();};
  const scenario=async(name,fn)=>{await fn();console.log('PASS medical: '+name);};
  try{
   await context.request.post(base+'/_column-test/documents/setup');await page.goto(base+'/person_full_info/1');
@@ -22,10 +22,10 @@ module.exports=async({context,base,adminToken})=>{
    await newRecord('exams');await form('exams').locator('[name=status]').selectOption('PLANNED');await form('exams').locator('[name=basis]').selectOption('INJURY');await form('exams').locator('[name=injury_id]').selectOption('1');await save('exams');
    await tab('tasks');assert.match(await panel('tasks').locator('[data-pending-exams]').innerText(),/Непройдені ВЛК: 1/);
    await newRecord('exams');await form('exams').locator('[name=status]').selectOption('COMPLETED');await form('exams').locator('[name=basis]').selectOption('ILLNESS');await form('exams').locator('[name=issued_on]').fill('2026-05-01');await form('exams').locator('[name=fitness]').selectOption('FIT_SUPPORT');await save('exams');
-   assert.match(await panel('exams').locator('[data-active-exam]').innerText(),/Придатний до служби/);
+   assert.match(await panel('exams').locator('[data-active-exam]').innerText(),/Обмежено придатний/);
    await newRecord('exams');await form('exams').locator('[name=status]').selectOption('COMPLETED');await form('exams').locator('[name=issued_on]').fill('2026-05-01');await form('exams').locator('[name=fitness]').selectOption('UNFIT');await save('exams');assert.match(await panel('exams').locator('[data-active-exam]').innerText(),/не визначено/);
-   await records('exams').filter({hasText:'Запис №2'}).getByRole('button',{name:'Зробити активним',exact:true}).click();await panel('exams').locator('[data-active-exam]').filter({hasText:'ручний вибір'}).waitFor();
-   await tab('general');await page.locator('#profile-overview').filter({hasText:'Придатний до служби'}).waitFor();
+   await records('exams').filter({hasText:'Запис №2'}).locator('[data-exam-card] > summary').click();await records('exams').filter({hasText:'Запис №2'}).getByRole('button',{name:'Зробити активним',exact:true}).click();await panel('exams').locator('[data-active-exam]').filter({hasText:'ручний вибір'}).waitFor();
+   await tab('general');await page.locator('#profile-overview').filter({hasText:'Обмежено придатний'}).waitFor();
    await tab('exams');await panel('exams').locator('[data-exam-auto]').click();await panel('exams').locator('[data-active-exam]').filter({hasText:'не визначено'}).waitFor();
   });
   await scenario('award status alone never closes task; evidence errors preserve form then confirmed report closes task',async()=>{
