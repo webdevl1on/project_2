@@ -28,3 +28,9 @@ def legacy_staff_sessions(request):
     event.listen(Session,"after_transaction_create",mark)
     try:yield
     finally:event.remove(Session,"after_transaction_create",mark)
+
+
+@pytest.fixture(autouse=True)
+def existing_security_contract(monkeypatch):
+    # Existing regressions exercise the retained, explicitly enabled protection.
+    monkeypatch.setenv('PROJECT2_AUTH_ENABLED','1')

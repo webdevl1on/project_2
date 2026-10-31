@@ -5,12 +5,16 @@ from sqlalchemy.orm import Session
 from app.database.db import get_db
 from app.security.accounts import COOKIE, current_user, check_origin, secure_transport
 from app.services import accounts
+from app.security.access_mode import open_access
 
 router = APIRouter(prefix='/auth', tags=['Accounts'])
 
 
 @router.post('/login')
 async def login(request: Request, db: Session = Depends(get_db)):
+    if open_access():
+        user=current_user(request,db)
+        return me(request,user,db)
     secure_transport(request); check_origin(request)
     # JSON only: a cross-site HTML form cannot initiate a login.
     if request.headers.get('content-type','').split(';')[0] != 'application/json': raise HTTPException(415, 'Потрібен JSON.')
@@ -26,6 +30,8 @@ async def login(request: Request, db: Session = Depends(get_db)):
 
 @router.get('/me')
 def me(request:Request,user=Depends(current_user),db:Session=Depends(get_db)):
+    if getattr(request.state,'open_access',False):
+        return JSONResponse({'id':user.id,'username':user.username,'display_name':user.display_name,'role':user.role,'csrf_token':'','open_access':True},headers={'Cache-Control':'no-store'})
     if getattr(request.state,'dev_auth_bypass',False):
         return JSONResponse({'id':user.id,'username':user.username,'display_name':user.display_name,'role':user.role,'csrf_token':request.state.dev_csrf,'dev_auth_bypass':True},headers={'Cache-Control':'no-store'})
     return JSONResponse(accounts.session_info(db,request.cookies[COOKIE]), headers={'Cache-Control':'no-store'})
@@ -33,7 +39,7 @@ def me(request:Request,user=Depends(current_user),db:Session=Depends(get_db)):
 
 @router.post('/logout')
 def logout(request: Request, user=Depends(current_user), db: Session = Depends(get_db)):
-    if not getattr(request.state,'dev_auth_bypass',False):accounts.logout(db, request.cookies[COOKIE])
+    if not getattr(request.state,'dev_auth_bypass',False) and not getattr(request.state,'open_access',False):accounts.logout(db, request.cookies[COOKIE])
     response = JSONResponse({'ok':True})
     response.delete_cookie(COOKIE, path='/'); return response
 

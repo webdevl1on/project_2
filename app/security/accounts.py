@@ -5,6 +5,7 @@ from fastapi import Request, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database.db import get_db
 from app.services import accounts
+from app.security.access_mode import open_access
 
 COOKIE = 'project2_user'
 
@@ -40,6 +41,12 @@ def dev_request(request):
 
 
 def current_user(request: Request, db: Session = Depends(get_db)):
+    if open_access():
+        from app.services.open_access import identity
+        try:user=identity(db)
+        except ValueError as error:raise HTTPException(503,str(error)) from error
+        request.state.open_access=True
+        return user
     if dev_request(request):
         from app.services import dev_auth
         try:user=dev_auth.identity(db)

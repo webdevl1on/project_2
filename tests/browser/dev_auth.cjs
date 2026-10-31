@@ -7,7 +7,7 @@ module.exports=async({context,base})=>{
   const panel=page.locator('[data-medical-panel=exams]');
   await panel.locator('[data-medical-content]').waitFor({state:'visible'});
   assert.equal(await panel.locator('[data-medical-login]').isHidden(),true);
-  assert.match(await panel.locator('[data-dev-auth-warning]').innerText(),/авторизацію вимкнено/);
+  assert.match(await panel.locator('[data-dev-auth-warning]').innerText(),/Авторизацію.*вимкнено/);
   console.log('PASS dev auth: no login, visible development warning');
   await panel.locator('[data-medical-editor] summary').click();
   const form=panel.locator('[data-medical-form]');await form.locator('[name=basis]').selectOption('ILLNESS');

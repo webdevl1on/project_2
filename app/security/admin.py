@@ -6,6 +6,7 @@ import os
 import secrets
 import time
 from fastapi import HTTPException, Request
+from app.security.access_mode import open_access
 
 COOKIE = "project2_admin"
 TTL = 8 * 60 * 60
@@ -20,6 +21,7 @@ _DEV_OWNER = _LocalDevOwner(secrets.token_hex(32))
 
 def dev_admin_open(request: Request):
     """Explicit development opt-in for direct loopback connections only."""
+    if open_access():return True
     if os.environ.get("PROJECT2_DEV_ADMIN_OPEN") != "1":
         return False
     if not request.client:

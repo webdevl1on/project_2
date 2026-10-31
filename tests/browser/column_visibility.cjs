@@ -31,7 +31,7 @@ async function main() {
     }
     const adminToken = randomBytes(32).toString("base64url");
     const privateStorage = fs.mkdtempSync(path.join(os.tmpdir(),'project2-document-browser-'));
-    const devEnv={};
+    const devEnv={PROJECT2_AUTH_ENABLED:process.env.COLUMN_STAGE==='open_access'?'0':'1'};
     if(process.env.COLUMN_STAGE==='dev_auth'){
         const devDatabase=path.join(privateStorage,'dev_auth_test.sqlite3');fs.writeFileSync(devDatabase,'');
         Object.assign(devEnv,{PROJECT2_DEV_AUTH_BYPASS:'1',PROJECT2_DEV_AUTH_DATABASE:devDatabase});
@@ -68,7 +68,7 @@ async function main() {
         });
         const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "history_forms", "name_cases", "geography", "contacts", "personnel", "service_bases", "documents", "workspace", "medical"];
         if (process.env.COLUMN_STAGE) {
-            assert.ok([...suites,'dev_auth'].includes(process.env.COLUMN_STAGE));
+            assert.ok([...suites,'dev_auth','open_access'].includes(process.env.COLUMN_STAGE));
             await require(`./${process.env.COLUMN_STAGE}.cjs`)({ context, base, adminToken });
             return;
         }

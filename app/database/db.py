@@ -9,7 +9,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "project2.db"
 
 # Explicit development target only. Missing configuration never redirects main DB.
-if os.environ.get('PROJECT2_DEV_AUTH_BYPASS')=='1' and os.environ.get('PROJECT2_DEV_AUTH_DATABASE'):
+if os.environ.get('PROJECT2_AUTH_ENABLED','0')=='1' and os.environ.get('PROJECT2_DEV_AUTH_BYPASS')=='1' and os.environ.get('PROJECT2_DEV_AUTH_DATABASE'):
     # Avoid importing services here: transactions imports this module.
     import re
     candidate=Path(os.environ['PROJECT2_DEV_AUTH_DATABASE']).resolve()
