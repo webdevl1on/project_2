@@ -31,6 +31,8 @@ def migrate(database):
             installed = {r[0] for r in connection.execute("SELECT name FROM sqlite_master WHERE type='trigger'")}
             indexes = {r[0] for r in connection.execute("SELECT name FROM sqlite_master WHERE type='index'")}
             for table in Base.metadata.sorted_tables:
+                from app.models.profile_records import NEW_TABLE_NAMES as PROFILE_TABLES
+                if table.name in PROFILE_TABLES: continue
                 if table.name in MEDICAL_TABLES: continue
                 from app.models.documents import NEW_TABLE_NAMES as DOCUMENT_TABLES
                 if table.name in DOCUMENT_TABLES: continue
@@ -54,6 +56,8 @@ def migrate(database):
             connection.execute('BEGIN IMMEDIATE')
             try:
                 for table in Base.metadata.sorted_tables:
+                    from app.models.profile_records import NEW_TABLE_NAMES as PROFILE_TABLES
+                    if table.name in PROFILE_TABLES: continue
                     if table.name in MEDICAL_TABLES: continue
                     from app.models.documents import NEW_TABLE_NAMES as DOCUMENT_TABLES
                     if table.name in DOCUMENT_TABLES: continue

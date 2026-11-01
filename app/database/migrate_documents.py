@@ -52,6 +52,8 @@ def migrate(database):
             present={r[0] for r in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             installed={r[0] for r in connection.execute("SELECT name FROM sqlite_master WHERE type='trigger'")}
             for table in Base.metadata.sorted_tables:
+                from app.models.profile_records import NEW_TABLE_NAMES as PROFILE_TABLES
+                if table.name in PROFILE_TABLES: continue
                 if table.name in MEDICAL_TABLES: continue
                 if table.name in NEW_TABLE_NAMES:continue
                 if table.name not in present or not {c.name for c in table.columns}<=columns(connection,table.name):
@@ -74,6 +76,8 @@ def migrate(database):
             connection.execute('BEGIN IMMEDIATE')
             try:
                 for table in Base.metadata.sorted_tables:
+                    from app.models.profile_records import NEW_TABLE_NAMES as PROFILE_TABLES
+                    if table.name in PROFILE_TABLES: continue
                     if table.name in MEDICAL_TABLES: continue
                     if table.name in NEW_TABLE_NAMES:create_table(connection,table)
                 class Adapter:

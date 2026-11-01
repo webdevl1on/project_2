@@ -22,6 +22,12 @@ async def payload(request):
     return data
 
 
+@router.get('/catalog')
+def editor_catalog(person_id:int,user=Depends(current_user),db:Session=Depends(get_db)):
+    try:return JSONResponse(service.editor_catalog(db,user.id,person_id),headers={'Cache-Control':'no-store'})
+    except (PermissionError,ValueError) as error:return failure(error)
+
+
 @router.get('/audit')
 def audit_log(person_id:int,user=Depends(current_user),db:Session=Depends(get_db)):
     try:

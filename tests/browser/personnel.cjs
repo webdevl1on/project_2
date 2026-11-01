@@ -4,7 +4,7 @@ module.exports=async({context,base})=>{
  const page=await context.newPage(), errors=[];page.on('pageerror',error=>errors.push(error.message));
  await page.setViewportSize({width:1600,height:1200});
  const row=number=>page.locator('#person-positions tbody tr').filter({has:page.locator('[data-column-key="position_number"] [data-column-value]',{hasText:String(number)})});
- async function submit(form,label){await Promise.all([page.waitForNavigation(),form.getByRole('button',{name:label,exact:true}).click()]);}
+ async function submit(form,label){if(await page.locator('#personTabs').count()){await Promise.all([page.waitForResponse(r=>r.request().method()==='POST'&&r.ok()),form.getByRole('button',{name:label,exact:true}).click()]);await page.locator('[data-profile-toast]').filter({hasText:/Зміни збережено|Запис додано/}).waitFor();}else await Promise.all([page.waitForNavigation(),form.getByRole('button',{name:label,exact:true}).click()]);}
  await page.goto(base+'/person-positions');await page.evaluate(()=>localStorage.clear());await page.reload();
  const date=await page.locator('#position-filters [name="as_of"]').inputValue();
  await openAssignment(row(30));
@@ -19,9 +19,9 @@ module.exports=async({context,base})=>{
  await convert.locator(':scope > summary').click();await convert.locator('[name="on"]').fill(date);await convert.locator('[name="assignment_order_number"]').fill('00125');await convert.locator('[name="assignment_order_date"]').fill('2026-01-01');
  page.once('dialog',dialog=>dialog.accept());await submit(convert,'Перевірити та підтвердити');
  await page.goto(base+'/person_full_info/3#service-history');
- await page.locator('#service-history').waitFor({state:'visible'});
+ await page.locator('#service-history').waitFor({state:'visible'});await page.locator('[data-service-history-card] > summary').first().click();
  assert.match(await page.locator('#service-history').innerText(),/00125/);
- let orders=page.locator('#service-history details').filter({has:page.locator('summary',{hasText:'Накази призначення / звільнення'})});
+ let orders=page.locator('#service-history [data-service-history-card] details').filter({has:page.locator('summary',{hasText:'Накази призначення / звільнення'})});
  await orders.locator('summary').click();await orders.locator('[name="assignment_order_number"]').fill('00126');await submit(orders,'Зберегти лише накази');
  await page.goto(base+'/person-positions');await openAssignment(row(30));assert.match(await row(30).innerText(),/00126/);
  console.log('PASS personnel: conversion creates one official assignment and profile order editing updates the staff table');
@@ -31,7 +31,7 @@ module.exports=async({context,base})=>{
  console.log('PASS personnel: one current personal number is editable without history duplication');
  await page.goto(base+'/person_full_info/3#addresses');
  const registration=page.locator('[data-geo-block="registration"]');await registration.locator('summary').click();await registration.locator('[name="country"]').fill('Україна');await registration.locator('[name="settlement"]').fill('Миколаївка Без Довідника');
- await registration.getByRole('button',{name:'Зберегти',exact:true}).click();await registration.getByRole('status').waitFor();
+ await registration.getByRole('button',{name:'Зберегти',exact:true}).click();await page.locator('[data-profile-toast]').filter({hasText:'Зміни збережено'}).waitFor();
  await page.goto(base+'/person-positions');
  await page.locator('[data-column-toggle]').click();await page.locator('#person-positions-column-choice-full_address').check();await page.locator('[data-column-apply]').click();
  await page.goto(base+'/person-positions?full_address__contains='+encodeURIComponent('МИКОЛАЇ'));
@@ -41,7 +41,7 @@ module.exports=async({context,base})=>{
  const next=new Date(date+'T12:00:00Z');next.setUTCDate(next.getUTCDate()+1);const effective=next.toISOString().slice(0,10);
  await release.locator('[name="release_effective"]').fill(effective);await release.locator('[name="confirmed"]').check();await submit(release,'Звільнити з посади');
  await page.goto(base+'/person-positions?as_of='+effective);assert.match(await row(30).innerText(),/Вакантна/);
- await page.goto(base+'/person_full_info/3#service-history');assert.match(await page.locator('#service-history').innerText(),new RegExp('Звільнено з: '+effective));
+ await page.goto(base+'/person_full_info/3#service-history');await page.locator('[data-service-history-card] > summary').first().click();assert.match(await page.locator('#service-history').innerText(),new RegExp('Звільнено з: '+effective.split('-').reverse().join('\\.')));
  console.log('PASS personnel: Unicode server search finds manual addresses and explicit release frees the position on the correct day');
  assert.deepEqual(errors,[]);await page.close();
 };

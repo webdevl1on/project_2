@@ -6,10 +6,11 @@ module.exports = async ({context, base, adminToken}) => {
     page.on('pageerror', error => errors.push(error.message));
     const scenario = async (name, check) => { await check(); console.log(`PASS service bases: ${name}`); };
     const submit = async form => {
+        const original=await form.elementHandle();
         const request = page.waitForResponse(response => response.request().method() === 'POST' && response.url().includes('/service-bases'));
         await form.getByRole('button', {name:'Зберегти підставу', exact:true}).click();
         const response = await request; assert.equal(response.status(), 200);
-        await page.waitForEvent('load');
+        await page.waitForFunction(node=>!node.isConnected,original);
     };
     const newBasis = () => page.locator('[data-new-basis]');
     const file = () => execFileSync(process.env.PYTHON || 'python3', ['-c',
@@ -44,10 +45,10 @@ module.exports = async ({context, base, adminToken}) => {
         let mobilizationId;
         await scenario('dictionary selection keeps manual document wording and allows mismatch', async () => {
             await page.goto(base+'/person_full_info/3#service-bases');
-            await newBasis().locator('summary').click(); const form = newBasis().locator('form');
+            await page.locator('[data-profile-record-open="basis-new-editor"]').click(); const form = newBasis().locator('form');
             await form.locator('[name="service_type"]').selectOption('mobilization');
             assert.equal(await form.locator('[name="contract_start_date"]').isVisible(),false);
-            await form.locator('[name="mobilization_date"]').fill('2022-02-24');
+            await form.locator('[data-exact-date-for="mobilization_date"]').fill('24.02.2022');
             await form.locator('[name="document_tcc_name"]').fill('Точне історичне формулювання');
             await form.locator('[data-tcc-query]').fill('районний');
             await form.locator('[data-tcc-search]').click(); await form.locator(`[name="tcc_office_id"] option[value="${officeId}"]`).waitFor({state:'attached'});
@@ -57,20 +58,20 @@ module.exports = async ({context, base, adminToken}) => {
             await form.locator('[name="document_verified"]').check();
             await submit(form);
             const record = page.locator('[data-service-basis]').first(); mobilizationId=await record.getAttribute('data-service-basis');
-            await record.locator('summary').click();
+            await record.locator('summary').click();await record.locator('[data-profile-record-open]').click();
             assert.match(await record.innerText(),/Розбіжність/);
             assert.equal(await record.locator('[name="document_verified"]').isChecked(),true);
             await page.locator('[data-bs-target="#general"]').click();
             await page.getByText('Вид служби: за мобілізацією',{exact:true}).waitFor();
         });
         await scenario('current contract, independent dates and historical editing preserve drafts after server refusal', async () => {
-            await page.locator('[data-bs-target="#service-bases"]').click(); await newBasis().locator('summary').click();
+            await page.locator('[data-bs-target="#service-bases"]').click(); await page.locator('[data-profile-record-open="basis-new-editor"]').click();
             let form=newBasis().locator('form'); await form.locator('[name="service_type"]').selectOption('contract');
-            await form.locator('[name="contract_signed_date"]').fill('2025-01-01'); await form.locator('[name="contract_start_date"]').fill('2025-02-01');
+            await form.locator('[data-exact-date-for="contract_signed_date"]').fill('01.01.2025'); await form.locator('[data-exact-date-for="contract_start_date"]').fill('01.02.2025');
             await form.locator('[name="contract_unit"]').fill('Тестова частина'); await form.locator('[name="is_current"]').check();
             await submit(form);
             const historical=page.locator(`[data-service-basis="${mobilizationId}"]`);
-            assert.match(await historical.locator('summary').innerText(),/Історична/); await historical.locator('summary').click();
+            assert.match(await historical.locator('summary').innerText(),/Історична/); await historical.locator('summary').click();await historical.locator('[data-profile-record-open]').click();
             form=historical.locator('form'); await form.locator('[name="document_tcc_name"]').fill('Виправлено за документом');
             // A stale revision simulates a real concurrent edit, without changing test-server business rules.
             await form.locator('[name="revision"]').evaluate(input=>input.value='0');
@@ -80,7 +81,7 @@ module.exports = async ({context, base, adminToken}) => {
             assert.equal(await historical.evaluate(element=>element.open),true);
             await page.reload(); await page.locator('[data-bs-target="#general"]').click(); await page.getByText('Вид служби: за контрактом',{exact:true}).waitFor();
             await page.locator('[data-bs-target="#service-bases"]').click();
-            const contract=page.locator('[data-service-basis]').first(); await contract.locator('summary').click();
+            const contract=page.locator('[data-service-basis]').first(); await contract.locator('summary').click();await contract.locator('[data-profile-record-open]').click();
             assert.equal(await contract.locator('[name="contract_signed_date"]').inputValue(),'2025-01-01');
             assert.equal(await contract.locator('[name="enlistment_order_date"]').inputValue(),'');
         });
@@ -89,9 +90,9 @@ module.exports = async ({context, base, adminToken}) => {
             await page.locator('[name="is_active"]').uncheck();
             await Promise.all([page.waitForURL(url=>url.pathname==='/admin/tcc'),page.getByRole('button',{name:'Зберегти ТЦК'}).click()]);
             await page.goto(base+'/person_full_info/3#service-bases');
-            const old=page.locator(`[data-service-basis="${mobilizationId}"]`); await old.locator('summary').click();
+            const old=page.locator(`[data-service-basis="${mobilizationId}"]`); await old.locator('summary').click();await old.locator('[data-profile-record-open]').click();
             assert.equal(await old.locator('[name="document_tcc_name"]').inputValue(),'Точне історичне формулювання');
-            await newBasis().locator('summary').click(); const form=newBasis().locator('form');
+            await page.locator('[data-profile-record-open="basis-new-editor"]').click(); const form=newBasis().locator('form');
             await form.locator('[name="service_type"]').selectOption('mobilization'); await form.locator('[name="document_tcc_name"]').fill('Установа лише в документі');
             await submit(form);
             // Input values are not textContent; identify the latest historical record by its input value.

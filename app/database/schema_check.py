@@ -42,6 +42,9 @@ def require_current_schema(engine):
         missing.append('index:one_injury_vlk_task')
     if 'personnel_tasks' in tables and 'exam_id' in {c['name'] for c in inspector.get_columns('personnel_tasks')} and 'one_exam_control_task' not in {i['name'] for i in inspector.get_indexes('personnel_tasks')}:missing.append('index:one_exam_control_task')
     if missing:
+        from app.models.profile_records import NEW_TABLE_NAMES as PROFILE_TABLES
+        if set(missing) <= PROFILE_TABLES:
+            raise ValueError('Потрібна безпечна міграція: python -m app.database.migrate_profile_records --database PATH. Автоматично БД не змінено.')
         from app.database.migrate_vlk_workflow import ADDED
         workflow={t+'.'+c for t,cols in ADDED.items() for c in cols}|{'index:one_exam_control_task','trigger:medical_exam_no_new_interrupted','trigger:medical_exam_interrupted_history'}
         if set(missing)<=workflow:

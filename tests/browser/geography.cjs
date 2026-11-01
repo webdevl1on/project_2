@@ -9,10 +9,11 @@ module.exports = async ({context, base}) => {
     await page.locator('[data-bs-target="#addresses"]').click();
     const section = kind=>page.locator(`[data-geo-block="${kind}"]`);
     const field = (kind,name)=>section(kind).locator(`[name="${name}"]`);
-    async function open(kind) { await section(kind).locator('summary').click(); }
+    async function open(kind) { if(!await section(kind).locator('details').first().evaluate(n=>n.open))await section(kind).locator('summary').first().click(); }
     async function save(kind) {
+        const previous=await section(kind).elementHandle();
         const done=page.waitForResponse(r=>r.url().includes('/geography/'+kind)&&r.request().method()==='POST');
-        await section(kind).getByRole('button',{name:'Зберегти',exact:true}).click(); return done;
+        await section(kind).getByRole('button',{name:'Зберегти',exact:true}).click(); const response=await done;await page.waitForFunction(n=>!n.isConnected,previous);return response;
     }
     await open('birthplace');
     assert.equal(await section('birthplace').locator('[name="street"]').count(),0);
@@ -20,7 +21,7 @@ module.exports = async ({context, base}) => {
     await field('birthplace','settlement_type').fill('Особливе поселення');
     await field('birthplace','settlement').fill('Історичне');
     await save('birthplace');
-    await section('birthplace').getByRole('status').waitFor();
+    await page.locator('[data-profile-toast].show').waitFor();
     assert.match(await section('birthplace').locator('[data-geo-summary]').innerText(),/Історичне/);
     console.log('PASS geography: partial birthplace without street');
     await open('registration');
@@ -36,7 +37,7 @@ module.exports = async ({context, base}) => {
     assert.equal(await field('registration','street_type').inputValue(),'Давній шлях');
     assert.equal(await section('registration').locator('details').getAttribute('open'),'');
     await field('registration','postal_code').fill('01234');
-    await save('registration'); await section('registration').getByRole('status').waitFor();
+    await save('registration'); await page.locator('[data-profile-toast].show').waitFor();
     console.log('PASS geography: error retains draft; letters, fractions and leading zero persist');
     await open('actual');
     await section('actual').getByRole('button',{name:'Скопіювати адресу реєстрації'}).click();
@@ -46,10 +47,10 @@ module.exports = async ({context, base}) => {
     await field('actual','house').fill('99Б');
     assert.equal(await field('registration','house').inputValue(),'01А/2');
     assert.equal(await field('registration','street_type').inputValue(),'Давній шлях');
-    await save('actual'); await section('actual').getByRole('status').waitFor();
+    await save('actual'); await page.locator('[data-profile-toast].show').waitFor();
     console.log('PASS geography: copied address edits independently');
-    await field('registration','house').fill('03В');
-    await save('registration'); await section('registration').getByRole('status').waitFor();
+    await open('registration');await field('registration','house').fill('03В');
+    await save('registration'); await page.locator('[data-profile-toast].show').waitFor();
     assert.match(await page.locator('[data-geo-history]').innerText(),/01А\/2/);
     await page.reload();
     await page.locator('[data-bs-target="#addresses"]').click();
@@ -94,7 +95,7 @@ module.exports = async ({context, base}) => {
     assert.equal(await field('registration','settlement_type').inputValue(),'село');
     console.log('PASS geography: dictionary type respects manual text and replacement confirmation');
     const clear = (kind,name) => section(kind).locator(`[data-geo-clear-field="${name}"]`);
-    await field('registration','date_start').fill('2026-01-01');
+    await section('registration').locator('[data-exact-date-for=date_start]').fill('01.01.2026');
     await clear('registration','date_start').click();
     assert.equal(await field('registration','date_start').inputValue(),'');
     await clear('registration','street_type').click();

@@ -16,8 +16,10 @@
         const lengths = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
         return day === null || month === null || day <= lengths[month - 1];
     }
-    function initialiseDateInputs() {
-        document.querySelectorAll("[data-date-input]").forEach(group => {
+    function initialiseDateInputs(scope=document) {
+        const groups=[...(scope.matches?.("[data-date-input]")?[scope]:[]),...scope.querySelectorAll("[data-date-input]")];
+        groups.forEach(group => {
+            if(group.dataset.dateReady)return;group.dataset.dateReady="true";
             const policy = JSON.parse(group.dataset.datePolicy);
             const inputs = ["day", "month", "year"].map(part => group.querySelector(`[data-date-part="${part}"]`));
             const validate = () => {
@@ -27,6 +29,7 @@
             };
             inputs.forEach(input => input.addEventListener("input", validate));
             group.closest("form")?.addEventListener("submit", event => {
+                if(!group.isConnected||!group.closest("form"))return;
                 validate();
                 if (!group.closest("form").checkValidity()) { event.preventDefault(); group.closest("form").reportValidity(); }
             });

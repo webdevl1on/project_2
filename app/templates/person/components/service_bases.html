@@ -27,6 +27,6 @@
 {% endmacro %}
 <h2 class="h4">Підстава проходження військової служби</h2>
 <p>Окремі відомості з документів. Збереження не створює призначень або записів незалежної історії служби.</p>
-<details class="border rounded p-3 mb-3" data-new-basis><summary>Додати підставу служби</summary>{{ basis_form() }}</details>
-{% for record in service_bases %}<details class="border rounded p-3 mb-2" data-service-basis="{{ record.id }}"><summary>{{ service_basis_types[record.service_type] }} · {{ 'Поточна' if record.is_current else 'Історична' }} · {{ record.mobilization_date or record.contract_start_date or 'Дата не зазначена' }}</summary>{{ basis_form(record) }}</details>{% else %}<p>Підстави служби не внесено.</p>{% endfor %}
+<button type="button" class="btn btn-primary mb-2" data-profile-record-open="basis-new-editor" data-profile-record-new>+ Новий запис</button><div id="basis-new-editor" class="border rounded p-3 mb-3" data-new-basis hidden>{{ basis_form() }}</div>
+{% for record in service_bases %}<details class="border rounded p-3 mb-2" data-service-basis="{{ record.id }}"><summary>{{ service_basis_types[record.service_type] }} · {{ 'Поточна' if record.is_current else 'Історична' }} · {{ format_calendar_date(record.mobilization_date or record.contract_start_date) if record.mobilization_date or record.contract_start_date else 'Дата не зазначена' }}</summary><button type="button" class="btn btn-sm btn-outline-primary my-2" data-profile-record-open="basis-editor-{{ record.id }}">Редагувати</button><div id="basis-editor-{{ record.id }}" hidden>{{ basis_form(record) }}</div></details>{% else %}<p>Підстави служби не внесено.</p>{% endfor %}
 <datalist id="tcc-regions"></datalist><datalist id="tcc-settlements"></datalist>

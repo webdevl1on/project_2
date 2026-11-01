@@ -4,15 +4,16 @@
     if (!root) return;
     const order = ['country','region','district','community','settlement','street'];
     const states = new WeakMap();
-    const fields = form => [...form.querySelectorAll('input:not([type="hidden"]), textarea, select')];
+    const fields = form => [...form.querySelectorAll('input[name]:not([type="hidden"]), input[data-exact-date-canonical], textarea, select')];
     function refresh(form) {
         for (const input of fields(form)) {
-            let button = input.parentElement.querySelector('[data-geo-clear-field]');
+            const visible=input.hasAttribute('data-exact-date-canonical')?input.parentElement.querySelector('[data-exact-date-for]'):input;
+            let button = [...form.querySelectorAll('[data-geo-clear-field]')].find(node=>node.dataset.geoClearField===input.name);
             if (!button) {
                 const wrapper = document.createElement('div');
                 wrapper.className = 'position-relative';
-                input.before(wrapper); wrapper.append(input);
-                input.style.paddingRight = '3rem'; input.style.minHeight = '44px';
+                visible.before(wrapper); wrapper.append(visible);
+                visible.style.paddingRight = '3rem'; visible.style.minHeight = '44px';
                 button = document.createElement('button');
                 button.type = 'button'; button.dataset.geoClearField = input.name;
                 button.className = 'btn btn-link position-absolute top-0 end-0 text-secondary text-decoration-none';
@@ -22,7 +23,7 @@
                 button.setAttribute('aria-label', `Очистити поле «${label}»`);
                 wrapper.append(button);
             }
-            button.hidden = !input.value; button.style.display = input.value ? '' : 'none';
+            button.hidden = !visible.value; button.style.display = visible.value ? '' : 'none';
         }
     }
     function clearError(form) {
@@ -141,6 +142,7 @@
             refresh(updated.querySelector('[data-geo-form]'));
             root.querySelector('[data-geo-history]').replaceWith(doc.querySelector('[data-geo-history]'));
             updated.querySelector('[role="alert"]')?.focus();
+            if(response.ok){updated.querySelector('details').open=false;updated.querySelectorAll('.alert-success').forEach(n=>n.remove());window.ProfileUI?.toast('Зміни збережено');window.refreshProfileOverview?.();}
         } catch (_) {
             form.querySelector('[data-geo-warning]').textContent = 'Не вдалося зберегти. Введені значення залишено; повторіть спробу.';
         } finally { button.disabled = false; }

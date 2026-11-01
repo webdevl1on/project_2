@@ -26,6 +26,8 @@ def migrate(database):
             installed={r[0] for r in connection.execute("SELECT name FROM sqlite_master WHERE type='trigger'")}
             indexes={r[0] for r in connection.execute("SELECT name FROM sqlite_master WHERE type='index'")}
             for table in Base.metadata.sorted_tables:
+                from app.models.profile_records import NEW_TABLE_NAMES as PROFILE_TABLES
+                if table.name in PROFILE_TABLES: continue
                 if table.name in NEW_TABLE_NAMES:continue
                 if table.name not in present or not {c.name for c in table.columns}<=columns(connection,table.name):raise ValueError('Неповна попередня схема: '+table.name)
             required=required_sqlite_triggers()|DOCUMENT_GUARDS|{'exact_assignment_orders_insert','exact_assignment_orders_update','exact_service_basis_insert','exact_service_basis_update'}
@@ -43,6 +45,8 @@ def migrate(database):
             connection.execute('BEGIN IMMEDIATE')
             try:
                 for table in Base.metadata.sorted_tables:
+                    from app.models.profile_records import NEW_TABLE_NAMES as PROFILE_TABLES
+                    if table.name in PROFILE_TABLES: continue
                     if table.name in NEW_TABLE_NAMES:create_table(connection,table)
                 class Adapter:
                     def exec_driver_sql(self,sql):connection.execute(sql)

@@ -4,7 +4,8 @@
     function mayReplace(current, proposed, confirm) { return !current.trim() || current === proposed || confirm(); }
     if (typeof module === 'object' && module.exports) module.exports = { activeKind, mayReplace };
     if (!root.document) return;
-    document.querySelectorAll('[data-service-basis-form]').forEach(form => {
+    function initialize(scope=document){scope.querySelectorAll('[data-service-basis-form]').forEach(form => {
+        if(form.dataset.basisReady)return;form.dataset.basisReady='true';
         const kind = form.querySelector('[name="service_type"]');
         const sync = () => form.querySelectorAll('[data-basis-fields]').forEach(group => {
             group.hidden = group.dataset.basisFields !== activeKind(kind.value); group.disabled = group.hidden;
@@ -40,7 +41,8 @@
             for (const field of ['region', 'settlement']) if (!form.elements[field].value) form.elements[field].value = office[field] || '';
             hint.textContent = 'Назву з документа можна виправити вручну. Розбіжність не блокує збереження.';
         });
-    });
+    });}
+    root.initServiceBasisForms=initialize;initialize();
     if (document.querySelector('[data-service-basis-form]')) fetch('/tcc/locations').then(response => response.ok ? response.json() : {}).then(data => {
         for (const field of ['region', 'settlement']) for (const value of data[field] || []) document.querySelector(field === 'region' ? '#tcc-regions' : '#tcc-settlements').append(new Option(value, value));
     }).catch(() => {});

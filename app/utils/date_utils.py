@@ -129,5 +129,19 @@ def format_system_timestamp(value):
     return value.strftime("%d.%m.%Y %H:%M:%S.%f UTC")
 
 
+def format_calendar_date(value):
+    """Profile presentation only; API/SQL and independent partial components stay intact."""
+    if value is None or value == "":return "—"
+    if isinstance(value, datetime):return format_system_timestamp(value)
+    if isinstance(value, date):return format_partial_date(value.day,value.month,value.year)
+    if isinstance(value,str):
+        try:
+            if len(value)==10 and value[4]=='-' and value[7]=='-':
+                exact=date.fromisoformat(value)
+                return format_partial_date(exact.day,exact.month,exact.year)
+        except ValueError:pass
+    return str(value)
+
+
 def register_date_globals(environment):
-    environment.globals.update(format_partial_date=format_partial_date, format_system_timestamp=format_system_timestamp)
+    environment.globals.update(format_partial_date=format_partial_date, format_system_timestamp=format_system_timestamp, format_calendar_date=format_calendar_date)

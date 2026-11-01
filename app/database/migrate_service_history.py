@@ -24,6 +24,8 @@ def migrate(database):
             tables={r[0] for r in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             from app.models.service_basis import NEW_TABLE_NAMES
             for table in Base.metadata.sorted_tables:
+                from app.models.profile_records import NEW_TABLE_NAMES as PROFILE_TABLES
+                if table.name in PROFILE_TABLES: continue
                 if table.name in MEDICAL_TABLES: continue
                 from app.models.documents import NEW_TABLE_NAMES as DOCUMENT_TABLES
                 if table.name in DOCUMENT_TABLES: continue

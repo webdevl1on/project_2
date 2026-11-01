@@ -21,7 +21,7 @@ module.exports = async ({context,base}) => {
             await modal.locator('[name="rank_order_day"]').fill('');
             await modal.locator('[name="rank_order_month"]').fill('3');
             const action=await modal.locator('form').getAttribute('action');
-            await Promise.all([page.waitForNavigation(),modal.locator('[type="submit"]').click()]);
+            await Promise.all([page.waitForResponse(r=>r.request().method()==='POST'&&r.url().includes('/person_ranks/')&&r.status()===303),modal.locator('[type="submit"]').click()]);await page.locator('[data-profile-toast]').filter({hasText:'Зміни збережено'}).waitFor();
             await page.locator('[data-bs-target="#ranks"]').click();
             assert.ok((await page.locator('#ranks').innerText()).includes('_.03.1995'));
             assert.equal(await page.locator('#ranks tbody tr').count(),1);
@@ -29,7 +29,7 @@ module.exports = async ({context,base}) => {
             modal=page.locator('.modal.show'); await modal.waitFor({state:'visible'});
             assert.equal(await modal.locator('form').getAttribute('action'),action);
             await modal.locator('[name="rank_order_day"]').fill('15');
-            await Promise.all([page.waitForNavigation(),modal.locator('[type="submit"]').click()]);
+            await Promise.all([page.waitForResponse(r=>r.request().method()==='POST'&&r.url().includes('/person_ranks/')&&r.status()===303),modal.locator('[type="submit"]').click()]);await page.locator('[data-profile-toast]').filter({hasText:'Зміни збережено'}).waitFor();
             await page.locator('[data-bs-target="#ranks"]').click();
             assert.ok((await page.locator('#ranks').innerText()).includes('15.03.1995'));
             assert.equal(await page.locator('#ranks tbody tr').count(),1);

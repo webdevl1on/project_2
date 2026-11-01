@@ -7,9 +7,10 @@
 <form data-medical-auth class="d-flex gap-2 flex-wrap"><label>Користувач<input name="username" autocomplete="username" class="form-control" required></label><label>Пароль<input name="password" type="password" autocomplete="current-password" class="form-control" required></label><button class="btn btn-primary align-self-end">Увійти</button></form>
 </div>
 <div data-medical-content hidden>
-{% if medical_kind == 'exams' %}<button type="button" class="btn btn-sm btn-primary mb-2" data-medical-new>+ Новий запис</button><p data-active-exam></p><button class="btn btn-sm btn-outline-secondary mb-2" data-exam-auto type="button">Повернути автоматичний вибір ВЛК</button>{% endif %}
+<button type="button" class="btn btn-sm btn-primary mb-2" data-medical-new>+ Новий запис</button>
+{% if medical_kind == 'exams' %}<p data-active-exam></p><button class="btn btn-sm btn-outline-secondary mb-2" data-exam-auto type="button">Повернути автоматичний вибір ВЛК</button>{% endif %}
 {% if medical_kind == 'tasks' %}<div data-pending-exams></div>{% endif %}
-<details data-medical-editor><summary>Створити / редагувати запис</summary>
+<details data-medical-editor hidden><summary hidden>Редактор запису</summary>
 <form data-medical-form class="row g-2 my-2">
 {% for key,label,type,options in medical_fields[medical_kind] %}
 <div class="col-md-6" data-medical-field="{{ key }}"><label class="w-100">{{ label }}
@@ -19,11 +20,9 @@
 {% else %}<input name="{{ key }}" type="{{ type }}" class="{{ 'form-check-input' if type == 'checkbox' else 'form-control' }}" {% if options %}maxlength="{{ options }}"{% endif %} {% if medical_kind == 'dna' and key == 'collected_on' %}required{% endif %}>{% endif %}</label></div>
 {% endfor %}
 {% if medical_kind == "exams" %}<div class="col-md-6" data-medical-field="basis_document_id"><label>ID наявного документа-підстави (необов’язково)<input type="number" name="basis_document_id" min="1" class="form-control"></label></div>{% endif %}
-<div><button class="btn btn-primary">Зберегти</button> {% if medical_kind != "exams" %}<button class="btn btn-outline-secondary" type="button" data-medical-new>Новий запис</button>{% endif %}</div>
+<div><button class="btn btn-primary">Зберегти</button> <button class="btn btn-outline-secondary" type="button" data-medical-cancel>Скасувати</button></div>
 </form></details>
 {% if medical_kind == "tasks" %}<label class="small my-2"><input type="checkbox" data-task-history> Показати завершені та скасовані завдання</label>{% endif %}
 <div data-medical-list class="mt-3"></div>
 {% if medical_kind == 'tasks' %}<details><summary>Журнал змін</summary><div data-medical-audit></div></details>{% endif %}
 </div></section>
-
-{% if medical_kind == "exams" %}<div class="toast-container position-fixed bottom-0 end-0 p-3"><div data-medical-toast class="toast" role="status" aria-live="polite"><div class="d-flex"><div class="toast-body"></div><button class="btn-close me-2 m-auto" type="button" data-bs-dismiss="toast" aria-label="Закрити"></button></div></div></div>{% endif %}

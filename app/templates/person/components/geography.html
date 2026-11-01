@@ -45,4 +45,4 @@
 </div></section>
 {% endif %}{% endfor %}
 <div data-geo-history><h2 class="h5">Історія адрес</h2>
-{% for record in geo_history %}<p>{{ address_types[record.kind] }}: {{ format_address(record) or '—' }} ({{ record.date_start or 'початок невідомий' }} — {{ record.date_end or 'завершення невідоме' }})</p>{% else %}<p>Історичних адрес немає.</p>{% endfor %}</div>
+{% for record in geo_history %}<p>{{ address_types[record.kind] }}: {{ format_address(record) or '—' }} ({{ format_calendar_date(record.date_start) or 'початок невідомий' }} — {{ format_calendar_date(record.date_end) or 'завершення невідоме' }})</p>{% else %}<p>Історичних адрес немає.</p>{% endfor %}</div>

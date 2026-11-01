@@ -1,0 +1,4 @@
+:is(.profile-record-summary,.profile-record-card>summary,[data-contact-card]>summary,[data-service-basis]>summary,[data-service-history-card]>summary) {display:flex;align-items:center;gap:.5rem;cursor:pointer;list-style:none;}
+:is(.profile-record-summary,.profile-record-card>summary,[data-contact-card]>summary,[data-service-basis]>summary,[data-service-history-card]>summary)::-webkit-details-marker {display:none;}
+:is(.profile-record-summary,.profile-record-card>summary,[data-contact-card]>summary,[data-service-basis]>summary,[data-service-history-card]>summary)::after {content:'▸';margin-left:auto;flex:none;transition:transform .15s;}
+details[open]>summary::after {transform:rotate(90deg);}

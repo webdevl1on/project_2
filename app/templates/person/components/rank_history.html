@@ -2,7 +2,7 @@
 <h2 class="h4 mt-4">Історія звань</h2>
 <!-- Button trigger modal -->
 <button type=" button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addNewRank">
-    Додати новий запис про звання
+    + Новий запис
 </button>
 <table class="table table-sm">
     <thead>
@@ -37,7 +37,7 @@
                                     aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
-                                <form method="post" class="row g-3"
+                                <form data-profile-history-form method="post" class="row g-3"
                                     action="/person_ranks/{{ person_rank.person_rank_id }}/update">
                                     <div class="col-md-6">
                                         <label for="rank_id">Звання *</label>
@@ -72,7 +72,7 @@
                 {% if person_rank.is_active %}
                 <span class="badge bg-success">Активний</span>
                 {% else %}
-                <form method="post" action="/person_ranks/{{ person_rank.person_rank_id }}/make_active">
+                <form data-profile-history-form method="post" action="/person_ranks/{{ person_rank.person_rank_id }}/make_active">
                     <button class="btn btn-sm btn-success">
                         Зробити активним
                     </button>
@@ -94,7 +94,7 @@
                                     aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
-                                <form method="post" class="row g-3"
+                                <form data-profile-history-form method="post" class="row g-3"
                                     action="/person_ranks/{{ person_rank.person_rank_id }}/delete">
                                     <input type="text" name="confirmation" placeholder="Введіть DELETE" required>
                                     <div class="modal-footer">

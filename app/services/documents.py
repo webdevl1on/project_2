@@ -280,11 +280,11 @@ def list_documents(db,actor_id,person_id,**filters):
             stale=bool(record and record.override_status and record.override_fingerprint!=_fingerprint(values))
             effective=((record.override_status if not stale else None) or auto) if record else auto
             files=Repo.files(db,record.id) if record else []
-            item={'id':record.id if record else None,'type':kind.code,'presence':presence,'presence_revision':state.revision if state else None,
+            item={'id':record.id if record else None,'type':kind.code,'type_name':kind.name,'schema_key':kind.schema_key,'is_primary':kind.is_primary,'presence':presence,'presence_revision':state.revision if state else None,
                   'automatic_status':auto,'effective_status':effective,
                   'override_status':record.override_status if record else None,'override_stale':stale,
                   'override_reason':record.override_reason if record else None,'has_copies':any(not f.is_removed for f in files),
-                  'files':[{'id':f.id,'name':f.original_name,'side':f.side,'removed':f.is_removed} for f in files],
+                  'files':[{'id':f.id,'name':f.original_name,'side':f.side,'removed':f.is_removed,'revision':f.revision} for f in files],
                   'is_current':record.is_current if record else True,'revision':record.revision if record else None,
                   'expiry':expiry(values),'values':values,
                   'category_expiry':{r['category']:expiry(r) for r in values.get('categories',[])},
@@ -300,3 +300,12 @@ def audit_entries(db,actor_id,person_id):
     return [{'id':r.id,'actor_id':r.actor_id,'actor_kind':r.actor_kind,
         'occurred_at':r.occurred_at.isoformat()+'Z','document_id':r.document_id,'file_id':r.file_id,
         'operation':r.operation,'changes':r.changes,'reason':r.reason} for r in Repo.audits(db,person_id)]
+
+
+def editor_catalog(db,actor_id,person_id):
+    """Real type rows plus trusted schemas; no user-provided executable metadata."""
+    authorize(db,actor_id)
+    if Repo.person(db,person_id) is None:raise ValueError('Особу не знайдено.')
+    from app.document_schemas import editor_schema,PRESENCE_LABELS,STATUS_LABELS,EXPIRY_LABELS,FILE_SIDE_LABELS
+    return {'types':[{'code':kind.code,'name':kind.name,'schema_key':kind.schema_key,'is_primary':kind.is_primary,'is_active':kind.is_active,'schema':editor_schema(kind.schema_key)} for kind in Repo.types(db)],
+            'presence':PRESENCE_LABELS,'statuses':STATUS_LABELS,'expiry':EXPIRY_LABELS,'sides':FILE_SIDE_LABELS,'driving_categories':sorted(DRIVING_CATEGORIES)}

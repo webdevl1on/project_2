@@ -26,6 +26,8 @@ def migrate(database):
         try:
             db.execute('PRAGMA foreign_keys=ON');integrity(db)
             for table in Base.metadata.sorted_tables:
+                from app.models.profile_records import NEW_TABLE_NAMES as PROFILE_TABLES
+                if table.name in PROFILE_TABLES: continue
                 if not {c.name for c in table.columns}<=columns(db,table.name):raise ValueError('Попередня схема неповна: '+table.name)
             from app.models.medical import GUARDS
             from app.models.documents import GUARD_NAMES

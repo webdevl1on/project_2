@@ -1,6 +1,7 @@
 async function openAssignment(row) {
     const editor=row.locator('[data-assignment-editor]');
-    if(await editor.isHidden())await row.locator('[data-assignment-toggle]').click();
+    // A real drag/resize intentionally suppresses accidental table clicks for 200 ms.
+    if(await editor.isHidden())await row.locator('[data-assignment-toggle]').click({delay:250});
     await editor.waitFor({state:'visible'});
 }
 async function openStaffActions(page){

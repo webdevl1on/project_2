@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Request, HTTPException
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -33,7 +33,8 @@ def add_new_name_to_person(
         "name_latin": name_latin,
         "patronymic_latin": patronymic_latin,
     }
-    ServicePersonNameFunc.add_new_name(person_id, form_data, db)
+    try:ServicePersonNameFunc.add_new_name(person_id, form_data, db)
+    except ValueError as error:raise HTTPException(400,str(error)) from error
 
     return RedirectResponse(
         url=f"/person_full_info/{person_id}",
@@ -61,7 +62,8 @@ def update_name_to_person(
         "patronymic_latin": patronymic_latin,
     }
 
-    person_name = ServicePersonNameFunc.update_person_name(person_name_id, form_data, db)
+    try:person_name = ServicePersonNameFunc.update_person_name(person_name_id, form_data, db)
+    except ValueError as error:raise HTTPException(400,str(error)) from error
 
     return RedirectResponse(
         url=f"/person_full_info/{person_name.person_id}",

@@ -4,6 +4,7 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="/static/css/person_profile.css" rel="stylesheet">
+    <link href="/static/css/profile_records.css" rel="stylesheet">
     <title>{{ current_name.surname }} {{ current_name.name }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
         integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
@@ -19,7 +20,7 @@
     {% include "person/components/profile_header.html" %}
     {% include "person/components/modal_windows.html" %}
     <ul class="nav nav-pills mb-3" id="personTabs" role="tablist">
-    {% for key,label in [('general','Загальна інформація'),('names','ПІБ'),('ranks','Звання'),('positions','Посада'),('service-bases','Підстави служби'),('service-history','Історія служби'),('addresses','Адреси'),('contacts','Контакти'),('exams','ВЛК'),('injuries','Поранення'),('awards','Нагородження'),('dna','ДНК'),('tasks','Проблемні питання / Завдання'),('documents','Документи'),('family',"Сім'я"),('events','Події')] %}
+    {% for key,label in [('general','Загальна інформація'),('names','ПІБ'),('ranks','Звання'),('positions','Посада'),('service-bases','Підстави служби'),('service-history','Історія служби'),('addresses','Адреси'),('contacts','Контакти'),('exams','ВЛК'),('injuries','Поранення'),('awards','Нагородження'),('dna','ДНК'),('tasks','Проблемні питання / Завдання'),('documents','Документи'),('education','Освіта'),('family',"Сім'я"),('directives','Особисті розпорядження'),('events','Події')] %}
     <li class="nav-item" role="presentation"><button id="tab-{{ key }}" type="button" role="tab" aria-controls="{{ key }}" aria-selected="{{ 'true' if key == 'general' else 'false' }}" class="nav-link {{ 'active' if key == 'general' else '' }}" data-bs-toggle="pill" data-bs-target="#{{ key }}">{{ label }}</button></li>
     {% endfor %}</ul>
     <div class="tab-content">
@@ -30,15 +31,19 @@
     <div class="tab-pane fade" id="names" role="tabpanel" aria-labelledby="tab-names"><details class="mb-3"><summary>Особисті / облікові дані</summary><form data-personnel-form method="post" action="/persons/{{ person_id }}/personal-number"><label>Особистий номер (жетон)<input class="form-control" name="personal_number" maxlength="100" value="{{ person.personal_number or '' }}"></label><button class="btn btn-primary">Зберегти особистий номер</button></form></details>{% include 'person/components/names_history.html' %}</div>
     <div class="tab-pane fade" id="ranks" role="tabpanel" aria-labelledby="tab-ranks">{% include 'person/components/rank_history.html' %}</div>
     <div class="tab-pane fade" id="positions" role="tabpanel" aria-labelledby="tab-positions"><p>{{ profile_assignment[1].name_nominative if profile_assignment else 'Посада не зазначена' }}</p><a href="/staff/history">Відкрити версії та історію призначень</a>
-    {% for assignment,position,version in assignment_history %}<p>{{ version.name }} · {{ position.name_nominative }} · {{ position.unit_short }} · {{ assignment.assigned_from }} — {{ assignment.assigned_to or 'Відкрите' }}</p>{% endfor %}</div>
+    {% for assignment,position,version in assignment_history %}<p>{{ version.name }} · {{ position.name_nominative }} · {{ position.unit_short }} · {{ format_calendar_date(assignment.assigned_from) }} — {{ format_calendar_date(assignment.assigned_to) if assignment.assigned_to else 'Відкрите' }}</p>{% endfor %}</div>
     <div class="tab-pane fade" id="addresses" role="tabpanel" aria-labelledby="tab-addresses"><div id="person-geography" data-person-id="{{ person_id }}">{% include 'person/components/geography.html' %}</div></div>
     <div class="tab-pane fade" id="contacts" role="tabpanel" aria-labelledby="tab-contacts"><div id="person-contacts" data-url="/persons/{{ person_id }}/contacts">{% include 'person/components/contacts.html' %}</div></div>
-    {% for key in ['documents','family','events'] %}<div class="tab-pane fade" id="{{ key }}" role="tabpanel" aria-labelledby="tab-{{ key }}">Розділ у розробці.</div>{% endfor %}
+    <div class="tab-pane fade" id="documents" role="tabpanel" aria-labelledby="tab-documents">{% include 'person/components/documents.html' %}</div>
+    {% for additional_kind in ['education','family','directives'] %}<div class="tab-pane fade" id="{{ additional_kind }}" role="tabpanel" aria-labelledby="tab-{{ additional_kind }}">{% include 'person/components/additional_records.html' %}</div>{% endfor %}
+    <div class="tab-pane fade" id="events" role="tabpanel" aria-labelledby="tab-events">Розділ у розробці.</div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous">
         </script>
 
+    <script src="/static/js/profile_ui.js"></script>
+    <script src="/static/js/profile_dates.js"></script>
     <script src="/static/js/date_input.js"></script>
     <script src="/static/js/geography.js"></script>
     <script src="/static/js/person_profile.js"></script>
@@ -47,6 +52,8 @@
     <script src="/static/js/service_bases.js"></script>
 <script id="medical-ui-metadata" type="application/json">{{ medical_metadata|tojson }}</script>
 <script src="/static/js/medical.js"></script>
+<script src="/static/js/document_ui.js"></script>
+<script src="/static/js/profile_records.js"></script>
 </body>
 
 </html>

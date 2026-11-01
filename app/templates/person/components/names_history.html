@@ -1,7 +1,7 @@
 <h2 class="h4 mt-4">Історія ПІБ</h2>
 <!-- Button trigger modal -->
 <button type=" button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addNewName">
-    Додати нове ім'я
+    + Новий запис
 </button>
 <table class="table table-sm">
     <thead>
@@ -43,7 +43,7 @@
                                     aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
-                                <form method="post" action="/person_name/{{names.person_name_id}}/update"
+                                <form data-profile-history-form method="post" action="/person_name/{{names.person_name_id}}/update"
                                     class="row g-3">
                                     <div class="col-md-6">
                                         <label for="surname">Прізвище *</label>
@@ -87,7 +87,7 @@
                 {% if names.is_active %}
                 <span class="badge bg-success">Активний</span>
                 {% else %}
-                <form method="post" action="/person_name/{{ names.person_name_id }}/make_active">
+                <form data-profile-history-form method="post" action="/person_name/{{ names.person_name_id }}/make_active">
                     <button class="btn btn-sm btn-success">
                         Зробити активним
                     </button>
@@ -109,7 +109,7 @@
                                     aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
-                                <form method="post" class="row g-3"
+                                <form data-profile-history-form method="post" class="row g-3"
                                     action="/person_name/{{ names.person_name_id }}/delete">
                                     <input type="text" name="confirmation" placeholder="Введіть DELETE" required>
                                     <div class="modal-footer">
@@ -135,16 +135,3 @@
 
 
 <!--alerts-->
-
-
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const alert = document.getElementById("errorAlert");
-
-        if (alert) {
-            setTimeout(() => {
-                alert.classList.remove("show");
-            }, 3000);
-        }
-    });
-</script>

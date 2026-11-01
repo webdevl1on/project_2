@@ -18,7 +18,8 @@ from tests.test_person_positions import make_position, make_rank
 
 
 import os
-engine = create_engine("sqlite:///"+os.environ["PROJECT2_DEV_AUTH_DATABASE"] if os.environ.get("PROJECT2_DEV_AUTH_DATABASE") else "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+browser_database = os.environ.get("PROJECT2_DEV_AUTH_DATABASE") or os.environ.get("PROJECT2_BROWSER_DATABASE")
+engine = create_engine("sqlite:///"+browser_database if browser_database else "sqlite://", connect_args={"check_same_thread": False}, **({} if browser_database else {"poolclass":StaticPool}))
 from tests.staff_fixtures import install_legacy_staff_fixture
 install_legacy_staff_fixture()
 Session = sessionmaker(bind=engine, info={"legacy_staff_fixture":True})
@@ -72,6 +73,19 @@ def memory_db():
 
 
 app.dependency_overrides[get_db] = memory_db
+
+
+@app.post('/_column-test/family-geography')
+def family_geography_fixture():
+    from app.models import GeoUnit, GeoAlias
+    with Session() as db:
+        first=GeoUnit(kind='region',name='Тестова область сім’ї',normalized_name='тестова область сім’ї')
+        second=GeoUnit(kind='region',name='Інша область сім’ї',normalized_name='інша область сім’ї')
+        db.add_all([first,second]);db.flush()
+        town=GeoUnit(kind='settlement',name='Місто родини',normalized_name='місто родини',parent_id=first.id)
+        db.add(town);db.flush();db.add(GeoAlias(unit_id=town.id,name='Старе місто родини',normalized_name='старе місто родини',historical=True))
+        db.commit()
+        return {'town':town.id,'region':first.id,'other_region':second.id}
 
 
 @app.get("/_column-test/two-tables", response_class=HTMLResponse)

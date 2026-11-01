@@ -39,3 +39,5 @@ app.include_router(accounts.router)
 app.include_router(documents.router)
 from app.routers import medical
 app.include_router(medical.router)
+from app.routers import profile_records
+app.include_router(profile_records.router)

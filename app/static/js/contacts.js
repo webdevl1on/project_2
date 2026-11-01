@@ -13,7 +13,7 @@
         if(action==='archive'&&!window.confirm('Прибрати контакт до архіву?'))return;
         form.querySelectorAll('.is-invalid').forEach(input=>input.classList.remove('is-invalid'));
         form.querySelectorAll('[data-error-for]').forEach(span=>span.textContent='');
-        const button=event.submitter;button.disabled=true;root.setAttribute('aria-busy','true');
+        const button=event.submitter;if(button)button.disabled=true;root.setAttribute('aria-busy','true');
         const data=new FormData(form);data.set('action',action);
         try{
             const response=await fetch(form.getAttribute('action'),{method:'POST',body:data}),result=await response.json();
@@ -23,8 +23,8 @@
                 if(field){field.classList.add('is-invalid');field.focus();}return;
             }
             const list=await fetch(root.dataset.url,{cache:'no-store'});if(!list.ok)throw new Error();root.innerHTML=await list.text();
-            message('Контакти збережено.');await window.refreshProfileOverview?.();
+            window.ProfileDates?.enhance?.(root);window.ProfileUI?.toast(data.get('revision')?'Зміни збережено':'Запис додано');await window.refreshProfileOverview?.();
         }catch(_){message('Не вдалося завершити збереження. Введені дані залишено; перевірте стан перед повторною спробою.',true);}
-        finally{button.disabled=false;root.removeAttribute('aria-busy');}
+        finally{if(button)button.disabled=false;root.removeAttribute('aria-busy');}
     });
 })();

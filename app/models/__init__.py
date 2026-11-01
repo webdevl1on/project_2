@@ -47,3 +47,5 @@ from app.models.documents import DocumentType, PersonDocumentState, PersonDocume
 __all__ += ['User', 'UserSession', 'DocumentType', 'PersonDocumentState', 'PersonDocument', 'DocumentDetails', 'DrivingCategory', 'DocumentFile', 'DocumentAudit']
 from app.models.medical import MedicalExam, Injury, Award, DnaSample, PersonnelTask, MedicalSelection, MedicalDocumentLink, PersonnelAudit
 __all__ += ['MedicalExam','Injury','Award','DnaSample','PersonnelTask','MedicalSelection','MedicalDocumentLink','PersonnelAudit']
+from app.models.profile_records import PersonEducation, PersonFamilyMember, PersonDirective
+__all__ += ['PersonEducation', 'PersonFamilyMember', 'PersonDirective']

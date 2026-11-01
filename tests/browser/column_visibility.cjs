@@ -31,14 +31,14 @@ async function main() {
     }
     const adminToken = randomBytes(32).toString("base64url");
     const privateStorage = fs.mkdtempSync(path.join(os.tmpdir(),'project2-document-browser-'));
-    const devEnv={PROJECT2_AUTH_ENABLED:process.env.COLUMN_STAGE==='open_access'?'0':'1'};
+    const devEnv={PROJECT2_AUTH_ENABLED:['open_access','profile_dates','document_ui','additional_records'].includes(process.env.COLUMN_STAGE)?'0':'1'};
     if(process.env.COLUMN_STAGE==='dev_auth'){
         const devDatabase=path.join(privateStorage,'dev_auth_test.sqlite3');fs.writeFileSync(devDatabase,'');
         Object.assign(devEnv,{PROJECT2_DEV_AUTH_BYPASS:'1',PROJECT2_DEV_AUTH_DATABASE:devDatabase});
     }
     const server = spawn(process.env.PYTHON || "python3",
         ["-m", "tests.browser.serve_column_visibility", String(port)], {
-            cwd: root, env: { ...process.env, ...devEnv, PROJECT2_ADMIN_TOKEN: adminToken, PROJECT2_ADMIN_ALLOW_HTTP: "1", PROJECT2_AUTH_ALLOW_LOCAL_HTTP: '1', PROJECT2_DOCUMENT_STORAGE: privateStorage },
+            cwd: root, env: { ...process.env, ...devEnv, PROJECT2_BROWSER_DATABASE: path.join(privateStorage,"browser.sqlite3"), PROJECT2_ADMIN_TOKEN: adminToken, PROJECT2_ADMIN_ALLOW_HTTP: "1", PROJECT2_AUTH_ALLOW_LOCAL_HTTP: '1', PROJECT2_DOCUMENT_STORAGE: privateStorage },
         });
     let serverOutput = "";
     server.stderr.on("data", data => { serverOutput += data; });
@@ -58,7 +58,7 @@ async function main() {
             headless: true,
             args: ["--no-sandbox"],
         });
-        const context = await browser.newContext();
+        const context = await browser.newContext({locale:'en-US'});
         context.setDefaultTimeout(10000);
         context.setDefaultNavigationTimeout(20000);
         await context.route("https://cdn.jsdelivr.net/npm/bootstrap@*/dist/**", route => {
@@ -68,7 +68,7 @@ async function main() {
         });
         const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "history_forms", "name_cases", "geography", "contacts", "personnel", "service_bases", "documents", "workspace", "medical", "injury_vlk", "vlk_workflow"];
         if (process.env.COLUMN_STAGE) {
-            assert.ok([...suites,'dev_auth','open_access'].includes(process.env.COLUMN_STAGE));
+            assert.ok([...suites,'dev_auth','open_access','profile_dates','document_ui','additional_records'].includes(process.env.COLUMN_STAGE));
             await require(`./${process.env.COLUMN_STAGE}.cjs`)({ context, base, adminToken });
             return;
         }
@@ -252,6 +252,9 @@ async function main() {
             assert.deepEqual(errors, []);
         });
         for (const suite of suites) { await context.request.post(base+"/_column-test/reset"); await require(`./${suite}.cjs`)({ context, base, adminToken }); }
+    } catch (error) {
+        if(serverOutput.includes("Traceback"))console.error(serverOutput);
+        throw error;
     } finally {
         if (browser) await browser.close();
         server.kill();
