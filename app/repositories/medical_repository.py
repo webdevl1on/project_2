@@ -1,4 +1,5 @@
 """Personnel queries; no commits and no personnel workflow decisions."""
+from app.database.locking import locked_get
 from sqlalchemy import select, func, case, and_
 from app.models import Person, MedicalExam, MedicalSelection, MedicalDocumentLink, PersonnelAudit, DocumentFile
 from app.models.medical import MODELS
@@ -13,13 +14,13 @@ def active_exam_selection():
 
 class MedicalRepository:
     @staticmethod
-    def person(db,pid):return db.get(Person,pid)
+    def person(db,pid):return locked_get(db,Person,pid)
     @staticmethod
-    def get(db,kind,key):return db.get(MODELS[kind],key)
+    def get(db,kind,key):return locked_get(db,MODELS[kind],key)
     @staticmethod
     def rows(db,kind,pid):return list(db.scalars(select(MODELS[kind]).where(MODELS[kind].person_id==pid).order_by(MODELS[kind].id.desc())))
     @staticmethod
-    def selection(db,pid):return db.get(MedicalSelection,pid)
+    def selection(db,pid):return locked_get(db,MedicalSelection,pid)
     @staticmethod
     def active(db,pid):
         chosen=active_exam_selection()

@@ -8,12 +8,12 @@ import tempfile
 import time
 from app.services.staff_tokens import sign, verify, TTL
 
-DIRECTORY = Path(tempfile.gettempdir()) / "project2-name-dictionary-previews"
+DIRECTORY = Path(os.environ.get("PROJECT2_TEMP_STORAGE",tempfile.gettempdir())) / "project2-name-dictionary-previews"
 PURPOSE = "name-dictionary-import"
 
 
 def store(prepared, owner, *, resource='name-dictionary'):
-    DIRECTORY.mkdir(mode=0o700, exist_ok=True)
+    DIRECTORY.mkdir(mode=0o700, parents=True, exist_ok=True)
     for path in DIRECTORY.glob("*.json"):
         if path.stat().st_mtime < time.time() - TTL:
             path.unlink(missing_ok=True)

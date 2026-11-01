@@ -4,31 +4,32 @@ from app.repositories.seed_repository import geo_batch, city_batch, source_rows,
 from app.services.seed_packages import TABLES, KINDS, PARENT_COLUMNS, FK_TABLES, csv_rows, preflight_geography
 
 
-def seed_geography(engine, directory, prepared=None, *, batch_size=500, on_batch=None):
+def seed_geography(engine, directory, prepared=None, *, batch_size=500, on_batch=None, connection=None, dry_run=False, preserve=False):
     prepared=prepared or preflight_geography(directory)
     mappings={}; report={}; sources=prepared['sources']; digest=prepared['digest']
-    with engine.begin() as connection:
-        source_rows(connection,sources)
+    from contextlib import nullcontext
+    with (nullcontext(connection) if connection is not None else engine.begin()) as connection:
+        source_rows(connection,sources,dry_run=dry_run,preserve=preserve)
         for table_name in TABLES:
             iterator=iter(csv_rows(directory,table_name)); count=0; created=0; mapped={}
             while batch:=list(islice(iterator,batch_size)):
                 rows=[r[2] for r in batch]
                 if table_name=='city_districts':
-                    created+=city_batch(connection,rows,mappings['settlements'],sources,digest)
+                    created+=city_batch(connection,rows,mappings['settlements'],sources,digest,dry_run=dry_run,preserve=preserve)
                 elif table_name=='aliases':
                     # Source aliases never replace personal text snapshots.
                     for raw in rows:
                         target=raw['entity_type']; target=target if target in mappings else target+'s'
                         if target=='city_districts': raise ValueError('Alias внутрішньоміського району потребує окремого адаптера.')
                         unit_id=mappings[target][raw['entity_id']]
-                        created+=alias_row(connection,unit_id,raw['alias'])
+                        created+=alias_row(connection,unit_id,raw['alias'],dry_run=dry_run)
                 else:
                     parents={}
                     for raw in rows:
                         for column in PARENT_COLUMNS.get(table_name,()):
                             if raw.get(column):
                                 parents[raw['id']]=mappings[FK_TABLES[column]][raw[column]]; break
-                    ids,added=geo_batch(connection,rows,KINDS[table_name],parents,sources,digest)
+                    ids,added=geo_batch(connection,rows,KINDS[table_name],parents,sources,digest,dry_run=dry_run,preserve=preserve)
                     mapped.update(ids); created+=added
                 count+=len(rows)
                 if on_batch: on_batch(table_name,count)

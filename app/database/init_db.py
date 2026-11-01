@@ -9,7 +9,9 @@ from app.database.base import Base
 import app.models  # Registers all models in Base.metadata.
 
 def init_db(bind=None):
-    Base.metadata.create_all(bind=bind if bind is not None else engine)
+    selected=bind if bind is not None else engine
+    if selected.dialect.name!='sqlite':raise ValueError('PostgreSQL schema must be created through alembic upgrade head.')
+    Base.metadata.create_all(bind=selected)
 
 
 def main(argv=None):
@@ -17,6 +19,7 @@ def main(argv=None):
     parser.add_argument("--database", type=Path, help="Явний шлях до SQLite; типовий — data/database/project2.db")
     parser.add_argument("--recreate", action="store_true", help="Явно дозволити видалення вибраної SQLite та створення нової")
     args = parser.parse_args(argv)
+    if args.database is None and DB_PATH is None:parser.error('PostgreSQL: використайте alembic upgrade head, не init_db.')
     if args.recreate and args.database is None:
         parser.error("--recreate вимагає явного --database; автоматичне видалення типової БД заборонено")
     path = (args.database or DB_PATH).resolve()

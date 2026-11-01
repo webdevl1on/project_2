@@ -1,5 +1,7 @@
 # Підстави військової служби та довідник ТЦК та СП
 
+PostgreSQL: таблиці входять до початкової Alembic-ревізії, one_current_service_basis має postgresql_where; ТЦК можна засівати через seed_postgresql без overwrite. migrate_service_bases — лише legacy SQLite. Старий service_type автоматично не переноситься. Див. [POSTGRESQL_SETUP.md](POSTGRESQL_SETUP.md).
+
 ## Джерела даних
 
 `PersonServiceBasis` у `app/models/service_basis.py` — окрема таблиця `person_service_bases` з FK `person_id`. Вона не створює `PersonAssignment`, `PersonServiceHistory` або Міражів. Старий `PersonServiceHistory.service_type` залишається текстом історичного джерела; автоматичного перенесення чи визначення нової підстави за ним немає.

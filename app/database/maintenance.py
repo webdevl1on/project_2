@@ -34,9 +34,20 @@ def database_lease(database, *, shared=False):
 
 
 async def application_lifespan(app):
-    # This is an async context manager through the decorator below, shared by all workers.
-    from app.database.db import DB_PATH
-    with database_lease(DB_PATH,shared=True): yield
+    from app.database.db import engine, DB_PATH, settings
+    if app.dependency_overrides:  # Test ASGI applications own their isolated schema/session.
+        yield
+        return
+    from app.database.schema_check import require_current_schema
+    try:
+        if engine.dialect.name=='postgresql':
+            require_current_schema(engine)
+            yield
+        else:
+            with database_lease(DB_PATH,shared=True):
+                require_current_schema(engine)
+                yield
+    finally:engine.dispose()
 
 from contextlib import asynccontextmanager
 application_lifespan=asynccontextmanager(application_lifespan)

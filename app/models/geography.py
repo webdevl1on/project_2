@@ -64,5 +64,5 @@ class PersonAddress(GeographicFields, SystemTimestamps, Base):
     __table_args__ = (
         CheckConstraint("kind IN ('registration','actual','correspondence')"),
         CheckConstraint("date_end IS NULL OR date_start IS NULL OR date_end >= date_start"),
-        Index("one_active_address", "person_id", "kind", unique=True, sqlite_where=text("is_active = 1")),
+        Index("one_active_address", "person_id", "kind", unique=True, sqlite_where=text("is_active = true"),postgresql_where=text("is_active = true")),
     )

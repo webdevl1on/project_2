@@ -1,4 +1,5 @@
 """Document queries/writes, without commits or business decisions."""
+from app.database.locking import locked_get
 from sqlalchemy import select
 from app.models import DocumentType, PersonDocumentState, PersonDocument, DocumentDetails, DrivingCategory, DocumentFile, DocumentAudit, Passport, Person
 
@@ -15,16 +16,16 @@ class DocumentRepository:
         return db.scalar(select(PersonDocumentState).where(PersonDocumentState.person_id==person_id, PersonDocumentState.document_type_id==type_id))
 
     @staticmethod
-    def document(db, key): return db.get(PersonDocument, key)
+    def document(db, key): return locked_get(db,PersonDocument,key)
 
     @staticmethod
-    def person(db, key): return db.get(Person, key)
+    def person(db, key): return locked_get(db,Person,key)
 
     @staticmethod
-    def passport(db, key): return db.get(Passport, key)
+    def passport(db, key): return locked_get(db,Passport,key)
 
     @staticmethod
-    def details(db, key): return db.get(DocumentDetails, key)
+    def details(db, key): return locked_get(db,DocumentDetails,key)
 
     @staticmethod
     def records(db, person_id): return list(db.scalars(select(PersonDocument).where(PersonDocument.person_id==person_id).order_by(PersonDocument.id.desc())))
@@ -41,7 +42,7 @@ class DocumentRepository:
         return next((row for row in rows if row.changes.get('request_id')==token),None)
 
     @staticmethod
-    def file(db, key): return db.get(DocumentFile, key)
+    def file(db, key): return locked_get(db,DocumentFile,key)
 
     @staticmethod
     def audits(db, person_id): return list(db.scalars(select(DocumentAudit).where(DocumentAudit.person_id==person_id).order_by(DocumentAudit.id.desc())))

@@ -2,12 +2,21 @@
 
 Карта коду гілки `testing`. Актуальний код має пріоритет; стан реалізації та результати перевірок наведені в [CURRENT_STATE.md](CURRENT_STATE.md).
 
+## Зберігання та міграції
+
+PostgreSQL — цільова БД; `Settings` вимагає явні PROJECT2_ENV/DATABASE_URL і розділяє project2_prod/dev/ci та файлові каталоги. Sync psycopg 3, сесія на запит, помилка → rollback/close, завершення → dispose. Startup лише перевіряє Alembic head і спеціальні об'єкти. `Base.metadata.create_all`, sqlite3/PRAGMA та старі migrate_*.py залишені лише в legacy SQLite-інструментах; SQLite fallback відсутній.
+
+`migrations/versions/0001_postgresql.py` застосовує заморожені SQL-снапшоти: 48 предметних таблиць, partial UNIQUE, три EXCLUDE для включених періодів, 32 guard-тригери, Unicode/address/date функції. Metadata — поточна структура ORM; спеціальні об'єкти додатково перевіряє `database/postgresql.py`. Нові PostgreSQL-зміни потребують Alembic, явного upgrade і backup, без startup-міграцій.
+
+`locking.locked_get` використовує FOR UPDATE лише всередині PostgreSQL write unit; Person/документ/версія та медичні записи блокуються локально, з повторним читанням revision. Repository не commit. Усі пов'язані зміни лишаються в одній service-транзакції; SQLSTATE deadlock/serialization/lock timeout дає контрольовану відмову без автоматичного retry. Детальні інваріанти, карта SQLite-залежностей, Windows-конфігурація, обмеження авторизації й backup/restore — [POSTGRESQL_SETUP.md](POSTGRESQL_SETUP.md).
+
 ## Навігація за завданням
 
 Шляхи в таблицях наведено від кореня репозиторію. Для конкретного завдання достатньо відповідного рядка та пов'язаного розділу нижче.
 
 | Завдання | Основні файли |
 | --- | --- |
+| PostgreSQL, Alembic, конфігурація й засівання | `docs/POSTGRESQL_SETUP.md`, `app/database/settings.py`, `db.py`, `locking.py`, `postgresql.py`, `migrations/`, `app/services/seed_postgresql.py` |
 | Список, створення, базове редагування людини | `app/routers/persons.py`, `app/services/person_read.py`, `app/services/service_person_create.py`, `app/repositories/person_repository.py`, `app/templates/persons.html`, `app/templates/person_form.html` |
 | Стать, відмінки ПІБ, створення особи, /admin та Excel | `docs/NAME_CASES.md`, `app/name_cases.py`, `app/models/name_cases.py`, `app/services/person_registration.py`, `app/services/name_cases.py`, `app/services/name_dictionary_import.py`, `app/repositories/name_case_repository.py`, `app/routers/admin.py`, `app/routers/name_cases.py`, `app/security/admin.py` |
 | Предметні дати, фільтри та системний час | `app/date_fields.py`, `app/utils/date_utils.py`, `app/utils/date_query.py`, `app/templates/components/date_*.html`, `app/static/js/date_*.js`, `docs/DATE_SYSTEM.md`, `tests/test_date_system.py` |
@@ -36,7 +45,8 @@ flowchart LR
     Services --> Validators[app/validators та app/utils/date_utils]
     Services --> Repositories[app/repositories]
     Repositories --> ORM[SQLAlchemy-моделі та Session]
-    ORM --> SQLite[(SQLite)]
+    ORM --> PostgreSQL[(PostgreSQL)]
+    ORM -. legacy tests .-> SQLite[(SQLite)]
     Routers --> Templates[Jinja2: app/templates]
     Templates --> Browser
 ```
@@ -46,10 +56,10 @@ flowchart LR
 ## База даних і життєвий цикл сесій
 
 - [app/database/base.py](../app/database/base.py) містить спільний `Base`; [app/models/__init__.py](../app/models/__init__.py) реєструє моделі для `Base.metadata`.
-- [app/database/db.py](../app/database/db.py): SQLite `data/database/project2.db`, `engine`, `SessionLocal`, залежність FastAPI `get_db()`. Вона відкриває сесію на запит і закриває її у `finally`, без автоматичного commit.
-- `app/database/db_test.py`: окремі `engine_test`, `SessionLocal_test`, `get_test_db()` для `data/database/project2_test.db`.
-- Обидва шляхи БД відносні до робочого каталогу. Шаблони також шукаються відносно нього: `app/templates`.
-- `app/database/init_db.py` та `init_test_db.py` імпортують реєстр моделей і викликають `create_all`. CLI `init_db` створює лише новий файл; пересоздання вимагає `--recreate` з явним `--database`. `schema_check.py` перед засіванням лише перевіряє поточні таблиці/колонки, SQLite-тригери та відсутність застарілої фізичної person_positions. Автоматичних міграцій немає. Для додавання статі й словників існує явна адитивна `app/database/migrate_name_cases.py` з резервною копією та rollback; вона вимагає попередню штатну схему й не відновлює ще старіші схеми. Формат і команда — [NAME_CASES.md](NAME_CASES.md#безпечне-оновлення-існуючої-sqlite).
+- [app/database/db.py](../app/database/db.py): явний DATABASE_URL із `Settings`, `engine`, `SessionLocal`, залежність FastAPI `get_db()`. Автоматичної адреси SQLite немає. Вона відкриває сесію на запит і закриває її у `finally`, без автоматичного commit.
+- `app/database/db_test.py`: окремі `engine_test`, `SessionLocal_test`, `get_test_db()` для випадкового тимчасового SQLite-файлу; імпорт дозволений лише у testing.
+- Відносний шлях дозволений лише для явно обраного legacy SQLite URL; PostgreSQL задається URL. Шаблони також шукаються відносно нього: `app/templates`.
+- `app/database/init_db.py` та `init_test_db.py` — лише legacy SQLite: імпортують реєстр моделей і викликають `create_all`. PostgreSQL використовує Alembic. CLI `init_db` створює лише новий файл; пересоздання вимагає `--recreate` з явним `--database`. `schema_check.py` перед засіванням/стартом обирає перевірку за діалектом: PostgreSQL — Alembic та guard-об’єкти; SQLite — поточні таблиці/колонки, SQLite-тригери та відсутність застарілої фізичної person_positions. Автоматичних міграцій немає. Для додавання статі й словників існує явна адитивна `app/database/migrate_name_cases.py` з резервною копією та rollback; вона вимагає попередню штатну схему й не відновлює ще старіші схеми. Формат і команда — [NAME_CASES.md](NAME_CASES.md#безпечне-оновлення-існуючої-sqlite).
 
 ### Єдині правила транзакцій
 
@@ -59,10 +69,10 @@ flowchart LR
 | --- | --- |
 | Створення/редагування людини, ПІБ, звання | `service_transaction(db)` у `app/database/transactions.py`: одна сервісна операція, flush + commit, rollback при помилці валідації/збереження. Сесію закриває її постачальник. |
 | Спільна операція осіб/подій | Зовнішній виклик, наприклад `with factory.begin() as db`. Для сервісів особи/ПІБ/звань передати `commit=False`, для подій — `db=db`. Вони можуть flush, але не commit/rollback/close. Після будь-якої помилки зовнішній власник має відкотити всю операцію; помилку не можна приховувати й потім commit частину змін. |
-| Штатні записи, перепризначення, закриття та HTTP-імпорт | Чинний `staff_service.write_unit`: відмова за pending-змін виклику, звільнення старої read-only транзакції, SQLite `BEGIN IMMEDIATE`, повторне читання/перевірка revision, один commit або повний rollback. Його не вкладати у сторонню write-транзакцію. |
+| Штатні записи, перепризначення, закриття та HTTP-імпорт | Чинний `staff_service.write_unit`: відмова за pending-змін виклику, звільнення старої read-only транзакції, SQLite `BEGIN IMMEDIATE` або PostgreSQL row locks/EXCLUDE, повторне читання/перевірка revision, один commit або повний rollback. Його не вкладати у сторонню write-транзакцію. |
 | Нова форма особи / імпорт словників | person_registration об’єднує створення Person, PersonName, персональні форми та наявний сервіс звання в одному service_transaction, без вкладених commit. Імпорт словників використовує service_transaction(immediate=True): BEGIN IMMEDIATE, перевірка revision/квитанції, один commit або rollback. |
 | Окремий виклик сервісу подій | `session_scope` у `app/database/transactions.py`: сумісний виклик без db використовує SessionLocal або явний session_factory, сам завершує транзакцію та закриває сесію. Повернені ORM-поля залишаються завантаженими. Читання не робить commit. |
-| Засівання довідників / тестових людей | Довідники: одна CLI-операція з commit у seed_all_structure і rollback у CLI. Люди: окрема зовнішня `session_factory.begin()` на рядок. insert_prepared не робить commit, бо використовується й усередині seed-транзакції. |
+| Засівання довідників / тестових людей | PostgreSQL: seed_postgresql, одна транзакція, read-only dry-run, без людей і overwrite. Legacy SQLite: commit у seed_all_structure і rollback у CLI. Люди: окрема зовнішня `session_factory.begin()` на рядок. insert_prepared не робить commit, бо використовується й усередині seed-транзакції. |
 
 Стандартні операції осіб відмовляють за незбережених `new/dirty/deleted`, щоб не зберегти сторонні pending-зміни. Це не механізм виявлення всіх уже flush-нутих сторонніх записів: для будь-якої спільної write-транзакції обов’язкові `commit=False`/`db=db`. Самостійний режим не слід змішувати зі сторонніми записами в тій самій Session. Старі positional-аргументи сервісів та session_factory подій збережено; при одночасному db і session_factory повертається ValueError.
 
@@ -136,7 +146,7 @@ flowchart LR
 
 `app/utils/date_utils.py` розширює наявні `DateComponents` та календарний валідатор; `validate_field_date` застосовує політику, `parse_exact_date` повторно використовується наявними валідаторами. `format_partial_date` завжди повертає три складові з `_`, наприклад `15._.1995`, `_._._`. Jinja-функції підключаються через `register_date_globals`; компоненти введення `date_input.html` / `date_input.js` інтегровані у форму людини та модальні форми звання. Унікальний `id_prefix` запобігає конфліктам ID кількох форм. `date_values_from_input` читає компоненти/старий точний ввід, зберігає пропущені частини при сервісному редагуванні й відхиляє змішані формати. Уточнення дати оновлює поточний `Person` або `PersonRank`, без додавання історії лише через уточнення.
 
-`app/utils/date_query.py`: `DateFilter` перевіряє параметри пошуку, `possible_match` перевіряє існування повної календарно допустимої дати без доповнення даних у БД. `DateBinding` отримує **явно дозволені ORM-вирази** для трьох компонентів; `exact` адаптує чинний SQL `Date`. Метадані HTML не використовуються для довільного SQL. Для SQLite binding реєструє детерміновану функцію `project2_date_match` на поточному підключенні; це не зміна схеми. Для іншої СУБД потрібен окремий адаптер; великий обсяг даних може потребувати оптимізації, оскільки перевірка неповних дат виконується на рядках через Python-функцію SQLite.
+`app/utils/date_query.py`: `DateFilter` перевіряє параметри пошуку, `possible_match` перевіряє існування повної календарно допустимої дати без доповнення даних у БД. `DateBinding` отримує **явно дозволені ORM-вирази** для трьох компонентів; `exact` адаптує чинний SQL `Date`. Метадані HTML не використовуються для довільного SQL. Для SQLite binding реєструє детерміновану функцію `project2_date_match` на поточному підключенні; це не зміна схеми. Для PostgreSQL початкова Alembic-міграція встановлює PL/pgSQL project2_date_match із тією самою календарною семантикою; SQLite зберігає Python UDF. Великі діапазони неповних дат можуть потребувати подальшої оптимізації.
 
 Сортування використовує SQL-вирази: точні дати → неповні → повністю невідомі; всередині — три компоненти в обраному пріоритеті з NULL після відомих значень при обох напрямках. Текстове відображення не бере участі в порівнянні. Точні системні DateTime зберігають автоматичну UTC-логіку `HistoryModel`; SQLite повертає naive datetime, форматування явно показує UTC з часом і мікросекундами. Audit Log не реалізовано.
 

@@ -1,5 +1,7 @@
 # Версії штатів та історичні призначення
 
+PostgreSQL: схема створюється Alembic, включені періоди захищені трьома EXCLUDE, історія й межі версій — guard-тригерами; StaffService використовує row locks/revision. BEGIN IMMEDIATE та SQLite-міграції нижче стосуються legacy SQLite. Правила призначень/наказів не змінені. Див. [POSTGRESQL_SETUP.md](POSTGRESQL_SETUP.md).
+
 Реалізація `testing`. Джерело істини призначень — **PersonAssignment**; поточний стан обчислюється за фактичними датами. Структура/версія/посада не визначають власника події PersonEvent.
 
 ## Схема

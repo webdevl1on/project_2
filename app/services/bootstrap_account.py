@@ -10,13 +10,16 @@ from app.services.accounts import create_user
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--database', required=True, type=Path)
+    parser.add_argument('--database', type=Path,help='Only for explicit legacy SQLite; PostgreSQL uses DATABASE_URL')
     parser.add_argument('--username', required=True); parser.add_argument('--display-name', required=True)
     args = parser.parse_args()
-    if not args.database.is_file(): parser.error('Потрібна наявна мігрована SQLite.')
+    if args.database and not args.database.is_file():parser.error('Потрібна наявна мігрована SQLite.')
     password = getpass('Пароль (12–128 символів): ')
     if password != getpass('Повторіть пароль: '): parser.error('Паролі не збігаються.')
-    engine = create_engine('sqlite:///'+str(args.database.resolve()))
+    if args.database:engine=create_engine('sqlite:///'+str(args.database.resolve()))
+    else:
+        from app.database.settings import Settings
+        settings=Settings.read();engine=create_engine(settings.url,**settings.engine_options())
     try:
         require_current_schema(engine)
         with Session(engine) as db: create_user(db, args.username, args.display_name, password, 'admin')

@@ -15,4 +15,4 @@ class PersonPositionMirage(SystemTimestamps,Base):
     converted_assignment_id: Mapped[int|None]=mapped_column(ForeignKey('person_assignments.id'))
     __table_args__=(CheckConstraint("status IN ('waiting','converted','cancelled')"),
         CheckConstraint("status != 'converted' OR converted_assignment_id IS NOT NULL"),
-        Index('one_waiting_mirage_per_person','person_id',unique=True,sqlite_where=text("status='waiting'")))
+        Index('one_waiting_mirage_per_person','person_id',unique=True,sqlite_where=text("status='waiting'"),postgresql_where=text("status='waiting'")))

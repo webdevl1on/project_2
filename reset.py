@@ -16,6 +16,13 @@ def main(argv=None, *, confirm=input):
     parser.add_argument('--dry-run',action='store_true')
     parser.add_argument('--yes',action='store_true')
     args=parser.parse_args(argv)
+    from app.database.settings import Settings
+    try:
+        settings=Settings.read()  # Includes .env; guard before all preflight/reset work.
+    except ValueError as error:
+        parser.error(str(error))
+    if settings.environment=='production' or settings.url.drivername!='sqlite':
+        parser.error('reset.py призначений лише для legacy SQLite; PostgreSQL не очищується цим скриптом.')
     target=(args.database or ROOT_DIR/'data/database/project2.db').absolute()
     if args.yes and (args.database is None or 'test' not in target.stem.casefold() or target.resolve()==(ROOT_DIR/'data/database/project2.db').resolve()):
         parser.error('--yes дозволено лише з явним --database, назва якого містить test і не є основною БД.')

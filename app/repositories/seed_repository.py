@@ -17,7 +17,7 @@ def name_rows(db, values):
     return report
 
 
-def geo_batch(connection, rows, kind, parent_ids, sources, digest):
+def geo_batch(connection, rows, kind, parent_ids, sources, digest, *, dry_run=False, preserve=False):
     units=GeoUnit.__table__; links=GeoImportLink.__table__
     ids=[r['id'] for r in rows]
     old_links={r['external_id']:r for r in connection.execute(select(links).where(links.c.kind==kind,links.c.external_id.in_(ids))).mappings()}
@@ -29,7 +29,7 @@ def geo_batch(connection, rows, kind, parent_ids, sources, digest):
     for row in candidates:
         if row[1] in official: raise ValueError('Неоднозначний офіційний код в існуючій БД.')
         official[row[1]]=row[0]
-    next_id=connection.scalar(select(func.coalesce(func.max(units.c.id),0)))+1
+    next_id=connection.info.get('seed_preview_next_id',connection.scalar(select(func.coalesce(func.max(units.c.id),0)))+1) if dry_run else connection.scalar(select(func.coalesce(func.max(units.c.id),0)))+1
     existing_ids=set(old.values()) | set(official.values())
     current_units={r['id']:r for r in connection.execute(select(units).where(units.c.id.in_(existing_ids))).mappings()} if existing_ids else {}
     new_units=[]; new_links=[]; mapped={}; created=0
@@ -47,20 +47,22 @@ def geo_batch(connection, rows, kind, parent_ids, sources, digest):
             current=current_units[uid]
             if current['kind']!=kind: raise ValueError('Зовнішній ключ зіставлено з іншою категорією GeoUnit.')
             if any(current[k]!=v for k,v in value.items()):
+                if preserve:raise ValueError('GeoUnit має ручні/інші зміни; автоматичне перезаписування заборонено.')
                 connection.execute(update(units).where(units.c.id==uid).values(**value,revision=current['revision']+1))
         mapped[raw['id']]=uid
         details={k:raw[k] for k in ('source_row','street_type','settlement_type','region_type','external_code','source_city_district','iso_alpha3','iso_numeric') if k in raw}
         link={'kind':kind,'external_id':raw['id'],'unit_id':uid,'source_id':raw['source_id'],
               'source_version':sources[raw['source_id']]['version_date'],'package_digest':digest,'details':details}
         if raw['id'] not in old: new_links.append(link)
-        elif any(old_links[raw['id']][key]!=value for key,value in link.items()):
+        elif not dry_run and any(old_links[raw['id']][key]!=value for key,value in link.items()):
             connection.execute(update(links).where(links.c.kind==kind,links.c.external_id==raw['id']).values(**link))
-    if new_units: connection.execute(insert(units),new_units)
-    if new_links: connection.execute(insert(links),new_links)
+    if dry_run:connection.info['seed_preview_next_id']=next_id
+    if new_units and not dry_run: connection.execute(insert(units),new_units)
+    if new_links and not dry_run: connection.execute(insert(links),new_links)
     return mapped,created
 
 
-def city_batch(connection, rows, settlements, sources, digest):
+def city_batch(connection, rows, settlements, sources, digest, *, dry_run=False, preserve=False):
     table=GeoCityDistrict.__table__; count=0
     existing={r.external_id:r.id for r in connection.execute(select(table.c.external_id,table.c.id).where(table.c.external_id.in_([r['id'] for r in rows])))}
     official={r.katottg_code:r.id for r in connection.execute(select(table.c.katottg_code,table.c.id).where(table.c.katottg_code.in_([r['katottg_code'] for r in rows])))}
@@ -70,9 +72,12 @@ def city_batch(connection, rows, settlements, sources, digest):
                'settlement_id':settlements[raw['settlement_id']], 'source_id':raw['source_id'],
                'source_version':sources[raw['source_id']]['version_date'],'package_digest':digest}
         key=existing.get(raw['id']) or official.get(raw['katottg_code'])
-        if key: connection.execute(update(table).where(table.c.id==key).values(**value))
+        if key:
+            current=connection.execute(select(table).where(table.c.id==key)).mappings().one()
+            if preserve and any(current[k]!=v for k,v in value.items()):raise ValueError('City district має інші значення; оновлення потребує окремого погодження.')
+            if not dry_run and not preserve:connection.execute(update(table).where(table.c.id==key).values(**value))
         else: new.append(value); count+=1
-    if new: connection.execute(insert(table),new)
+    if new and not dry_run: connection.execute(insert(table),new)
     return count
 
 
@@ -103,17 +108,20 @@ def assignment_targets(db,row,version_id):
     return person,position,existing
 
 
-def source_rows(connection,sources):
+def source_rows(connection,sources,*,dry_run=False,preserve=False):
     table=GeoSource.__table__
     for key,value in sources.items():
-        if connection.scalar(select(table.c.id).where(table.c.id==key)):
-            connection.execute(update(table).where(table.c.id==key).values(metadata_json=value))
-        else: connection.execute(insert(table).values(id=key,metadata_json=value))
+        old=connection.scalar(select(table.c.metadata_json).where(table.c.id==key))
+        if old is not None and preserve and old!=value:raise ValueError('Джерело географії змінилося; потрібне погоджене оновлення.')
+        if not dry_run:
+            if old is not None:
+                if not preserve:connection.execute(update(table).where(table.c.id==key).values(metadata_json=value))
+            else:connection.execute(insert(table).values(id=key,metadata_json=value))
 
 
-def alias_row(connection,unit_id,name):
+def alias_row(connection,unit_id,name,*,dry_run=False):
     from app.geography import normalize
     table=GeoAlias.__table__
     if connection.scalar(select(table.c.id).where(table.c.unit_id==unit_id,table.c.name==name)): return 0
-    connection.execute(insert(table).values(unit_id=unit_id,name=name,normalized_name=normalize(name),historical=True))
+    if not dry_run:connection.execute(insert(table).values(unit_id=unit_id,name=name,normalized_name=normalize(name),historical=True))
     return 1

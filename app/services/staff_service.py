@@ -31,12 +31,13 @@ def write_unit(db):
     try:
         if db.bind.dialect.name == "sqlite":
             db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+        db.info['project2_write']=True
         yield
         db.commit()
     except (IntegrityError, OperationalError, StaleDataError) as error:
         db.rollback()
         message = str(getattr(error, "orig", error))
-        if "overlap" in message:
+        if "overlap" in message or getattr(getattr(error, "orig", None), "sqlstate", None) == "23P01":
             raise ValueError("Періоди перетинаються: перевірте історію та зайнятість.") from error
         if "outside version" in message:
             raise ValueError("Призначення виходить за період версії штату.") from error
@@ -44,6 +45,9 @@ def write_unit(db):
     except Exception:
         db.rollback()
         raise
+
+    finally:
+        db.info['project2_write']=False
 
 
 def period(start, end):

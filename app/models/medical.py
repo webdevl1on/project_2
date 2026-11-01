@@ -56,7 +56,7 @@ class Award(Owned, SystemTimestamps, Base):
     awarded_on: Mapped[date | None] = mapped_column(Date)
     order_number: Mapped[str | None] = mapped_column(String(150))
     order_on: Mapped[date | None] = mapped_column(Date)
-    __table_args__ = (CheckConstraint("status IN ('NOT_PROCESSED','SUBMITTED','WAITING','AWARDED','NOT_APPROPRIATE')"), CheckConstraint('submission_confirmed=0 OR (submission_on IS NOT NULL AND coalesce(length(trim(submission_number)),0)>0)'), CheckConstraint('refusal_confirmed=0 OR (refusal_on IS NOT NULL AND coalesce(length(trim(refusal_number)),0)>0 AND coalesce(length(trim(refusal_reason)),0)>0)'))
+    __table_args__ = (CheckConstraint("status IN ('NOT_PROCESSED','SUBMITTED','WAITING','AWARDED','NOT_APPROPRIATE')"), CheckConstraint('submission_confirmed = false OR (submission_on IS NOT NULL AND coalesce(length(trim(submission_number)),0)>0)'), CheckConstraint('refusal_confirmed = false OR (refusal_on IS NOT NULL AND coalesce(length(trim(refusal_number)),0)>0 AND coalesce(length(trim(refusal_reason)),0)>0)'))
 
 class DnaSample(Owned, SystemTimestamps, Base):
     __tablename__ = 'person_dna_samples'
@@ -76,7 +76,7 @@ class PersonnelTask(Owned, SystemTimestamps, Base):
     status: Mapped[str] = mapped_column(String(20), default='OPEN')
     manual_decision: Mapped[bool] = mapped_column(default=False)
     decision_reason: Mapped[str | None] = mapped_column(String(1000))
-    __table_args__ = (CheckConstraint("status IN ('OPEN','COMPLETED','CANCELLED')"), CheckConstraint("kind!='injury_award' OR injury_id IS NOT NULL"), Index('one_injury_award_task','injury_id',unique=True,sqlite_where=text("kind='injury_award'")), Index('one_injury_vlk_task','injury_id',unique=True,sqlite_where=text("kind='injury_vlk'")), Index('one_exam_control_task','exam_id',unique=True,sqlite_where=text("kind IN ('injury_vlk','exam_vlk') AND status!='CANCELLED' AND exam_id IS NOT NULL")))
+    __table_args__ = (CheckConstraint("status IN ('OPEN','COMPLETED','CANCELLED')"), CheckConstraint("kind!='injury_award' OR injury_id IS NOT NULL"), Index('one_injury_award_task','injury_id',unique=True,sqlite_where=text("kind='injury_award'"),postgresql_where=text("kind='injury_award'")), Index('one_injury_vlk_task','injury_id',unique=True,sqlite_where=text("kind='injury_vlk'"),postgresql_where=text("kind='injury_vlk'")), Index('one_exam_control_task','exam_id',unique=True,sqlite_where=text("kind IN ('injury_vlk','exam_vlk') AND status!='CANCELLED' AND exam_id IS NOT NULL"),postgresql_where=text("kind IN ('injury_vlk','exam_vlk') AND status!='CANCELLED' AND exam_id IS NOT NULL")))
 
 class MedicalDocumentLink(SystemTimestamps, Base):
     __tablename__ = 'medical_document_links'
@@ -86,7 +86,7 @@ class MedicalDocumentLink(SystemTimestamps, Base):
     injury_id: Mapped[int | None] = mapped_column(ForeignKey('person_injuries.id'))
     award_id: Mapped[int | None] = mapped_column(ForeignKey('person_awards.id'))
     category: Mapped[str] = mapped_column(String(50))
-    __table_args__ = (CheckConstraint('(exam_id IS NOT NULL)+(injury_id IS NOT NULL)+(award_id IS NOT NULL)=1'), UniqueConstraint('document_id','exam_id','category'), UniqueConstraint('document_id','injury_id','category'), UniqueConstraint('document_id','award_id','category'))
+    __table_args__ = (CheckConstraint('(CASE WHEN exam_id IS NOT NULL THEN 1 ELSE 0 END)+(CASE WHEN injury_id IS NOT NULL THEN 1 ELSE 0 END)+(CASE WHEN award_id IS NOT NULL THEN 1 ELSE 0 END)=1'), UniqueConstraint('document_id','exam_id','category'), UniqueConstraint('document_id','injury_id','category'), UniqueConstraint('document_id','award_id','category'))
 
 class PersonnelAudit(Base):
     __tablename__ = 'personnel_audit'

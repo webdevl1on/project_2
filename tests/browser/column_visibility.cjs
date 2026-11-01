@@ -31,6 +31,7 @@ async function main() {
     }
     const adminToken = randomBytes(32).toString("base64url");
     const privateStorage = fs.mkdtempSync(path.join(os.tmpdir(),'project2-document-browser-'));
+    Object.assign(process.env,{PROJECT2_ENV:'testing',DATABASE_URL:'sqlite:///'+path.join(privateStorage,'app.sqlite3')});
     const devEnv={PROJECT2_AUTH_ENABLED:['open_access','profile_dates','document_ui','document_workflow','additional_records'].includes(process.env.COLUMN_STAGE)?'0':'1'};
     if(process.env.COLUMN_STAGE==='dev_auth'){
         const devDatabase=path.join(privateStorage,'dev_auth_test.sqlite3');fs.writeFileSync(devDatabase,'');
@@ -38,7 +39,7 @@ async function main() {
     }
     const server = spawn(process.env.PYTHON || "python3",
         ["-m", "tests.browser.serve_column_visibility", String(port)], {
-            cwd: root, env: { ...process.env, ...devEnv, PROJECT2_BROWSER_DATABASE: path.join(privateStorage,"browser.sqlite3"), PROJECT2_ADMIN_TOKEN: adminToken, PROJECT2_ADMIN_ALLOW_HTTP: "1", PROJECT2_AUTH_ALLOW_LOCAL_HTTP: '1', PROJECT2_DOCUMENT_STORAGE: privateStorage },
+            cwd: root, env: { ...process.env, ...devEnv, PROJECT2_ENV:"testing", DATABASE_URL:"sqlite:///"+path.join(privateStorage,"app.sqlite3"), PROJECT2_BROWSER_DATABASE: path.join(privateStorage,"browser.sqlite3"), PROJECT2_ADMIN_TOKEN: adminToken, PROJECT2_ADMIN_ALLOW_HTTP: "1", PROJECT2_AUTH_ALLOW_LOCAL_HTTP: '1', PROJECT2_DOCUMENT_STORAGE: privateStorage },
         });
     let serverOutput = "";
     server.stderr.on("data", data => { serverOutput += data; });
@@ -251,7 +252,7 @@ async function main() {
             assert.ok(box.x >= 0 && box.x + box.width <= 390);
             assert.deepEqual(errors, []);
         });
-        for (const suite of suites) { await context.request.post(base+"/_column-test/reset"); await require(`./${suite}.cjs`)({ context, base, adminToken }); }
+        for (const suite of suites) { await context.clearCookies(); await context.request.post(base+"/_column-test/reset"); await require(`./${suite}.cjs`)({ context, base, adminToken }); }
     } catch (error) {
         if(serverOutput.includes("Traceback"))console.error(serverOutput);
         throw error;

@@ -1,5 +1,7 @@
 # Географія, місце народження та адреси
 
+PostgreSQL використовує Alembic-функції Unicode/address та чинні normalized поля, aliases і рекурсивну ієрархію. Новий seed_postgresql --geography читає чинний пакет, підтримує read-only dry-run і відмовляє при відмінностях замість overwrite; старий reset/seed залишається SQLite-only. Текст адреси незалежний від довідникового ID. Див. [POSTGRESQL_SETUP.md](POSTGRESQL_SETUP.md).
+
 ## Зберігання
 
 `GeoUnit` → `geo_units`: власний ID, kind (country/region/district/community/settlement/street), name, normalized_name, parent_id, необов'язкові iso_code (ISO 3166 для країни) та katottg_code. Назви й коди не є глобально унікальними. `GeoAlias` → `geo_aliases`: unit_id, оригінальна альтернативна назва, normalized_name та historical. Без засівання довідник порожній; автоматичного створення назв немає.

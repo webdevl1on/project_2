@@ -19,7 +19,7 @@ class DocumentType(SystemTimestamps, Base):
     is_primary: Mapped[bool] = mapped_column()
     schema_key: Mapped[str] = mapped_column(String(50))
     is_active: Mapped[bool] = mapped_column(default=True)
-    __table_args__ = (CheckConstraint("code NOT IN ('passport','tax_number','military','birth_certificate') OR is_primary=1"),)
+    __table_args__ = (CheckConstraint("code NOT IN ('passport','tax_number','military','birth_certificate') OR is_primary = true"),)
 
 
 class PersonDocumentState(SystemTimestamps, Base):
@@ -45,10 +45,10 @@ class PersonDocument(SystemTimestamps, Base):
     override_user_id: Mapped[int | None] = mapped_column(ForeignKey('users.id'))
     override_fingerprint: Mapped[str | None] = mapped_column(String(64))
     __table_args__ = (
-        CheckConstraint('is_current IN (0,1)'),
+        CheckConstraint('is_current IN (false,true)'),
         CheckConstraint("override_status IS NULL OR override_status IN ('NOT_FILLED','PARTIALLY_FILLED','FILLED')"),
         CheckConstraint("override_status IS NULL OR (length(trim(override_reason)) > 0 AND override_user_id IS NOT NULL)"),
-        Index('one_current_document', 'person_id', 'document_type_id', unique=True, sqlite_where=text('is_current=1')),
+        Index('one_current_document', 'person_id', 'document_type_id', unique=True, sqlite_where=text('is_current = true'),postgresql_where=text('is_current = true')),
     )
 
 
@@ -143,7 +143,7 @@ def install_guards(connection):
         connection.exec_driver_sql(f"""CREATE TRIGGER IF NOT EXISTS document_audit_no_{action.lower()}
         BEFORE {action} ON document_audit BEGIN SELECT RAISE(ABORT,'document audit is append only'); END""")
     connection.exec_driver_sql("""CREATE TRIGGER IF NOT EXISTS document_type_presence BEFORE UPDATE ON document_types
-    WHEN NEW.is_primary=1 AND EXISTS (SELECT 1 FROM person_document_states s WHERE s.document_type_id=NEW.id AND s.presence='NEVER_OBTAINED')
+    WHEN NEW.is_primary = true AND EXISTS (SELECT 1 FROM person_document_states s WHERE s.document_type_id=NEW.id AND s.presence='NEVER_OBTAINED')
     BEGIN SELECT RAISE(ABORT,'primary document cannot be never obtained'); END""")
 
 

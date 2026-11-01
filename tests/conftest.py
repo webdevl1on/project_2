@@ -1,3 +1,10 @@
+# Explicit legacy test connection, never production or a working SQLite.
+import os
+import tempfile
+from pathlib import Path
+os.environ.setdefault('PROJECT2_ENV','testing')
+os.environ.setdefault('DATABASE_URL','sqlite:///'+str(Path(tempfile.mkdtemp(prefix='project2-legacy-'))/'app.sqlite3'))
+if os.environ['PROJECT2_ENV']!='testing':raise RuntimeError('Tests require PROJECT2_ENV=testing.')
 from tests.staff_fixtures import install_legacy_staff_fixture
 install_legacy_staff_fixture()
 import pytest

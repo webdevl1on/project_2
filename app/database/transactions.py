@@ -21,14 +21,20 @@ def service_transaction(db, *, commit=True, immediate=False):
             db.rollback()
             if db.get_bind().dialect.name == "sqlite":
                 db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+        previous=db.info.get('project2_write',False)
+        db.info['project2_write']=True
         yield db
         db.flush()
         if commit:
             db.commit()
-    except Exception:
+    except Exception as error:
         if commit:
             db.rollback()
+        if getattr(getattr(error, 'orig', None), 'sqlstate', None) in {'40001', '40P01', '55P03'}:
+            raise ValueError('Конфлікт паралельних змін. Оновіть дані й повторіть операцію.') from error
         raise
+    finally:
+        db.info['project2_write']=locals().get('previous',False)
 
 
 @contextmanager

@@ -11,7 +11,7 @@ import time
 
 _KEY=os.environ.get("STAFF_SIGNING_KEY","").encode() or secrets.token_bytes(32)
 TTL=1200
-PREVIEWS=Path(tempfile.gettempdir())/"project2-staff-previews"
+PREVIEWS=Path(os.environ.get("PROJECT2_TEMP_STORAGE",tempfile.gettempdir()))/"project2-staff-previews"
 
 
 def sign(payload, purpose):
@@ -31,7 +31,7 @@ def verify(token,purpose):
 
 
 def store_preview(prepared):
-    PREVIEWS.mkdir(mode=0o700,exist_ok=True)
+    PREVIEWS.mkdir(mode=0o700,parents=True,exist_ok=True)
     for path in PREVIEWS.glob("*.json"):
         if path.stat().st_mtime<time.time()-TTL: path.unlink(missing_ok=True)
     key=secrets.token_hex(32)

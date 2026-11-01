@@ -71,7 +71,7 @@ class PositionTableRepository:
                 try:
                     number = int(value)
                     if data_type != "boolean" or number in (0, 1):
-                        converted.append(number)
+                        converted.append(bool(number) if data_type=="boolean" else number)
                 except (TypeError, ValueError):
                     pass
             regular = converted

@@ -17,6 +17,10 @@ def required_sqlite_triggers():
 def require_current_schema(engine):
     from app import models  # Register all current tables before inspection.
 
+    if engine.dialect.name=='postgresql':
+        from app.database.postgresql import require_postgresql_schema
+        require_postgresql_schema(engine)
+        return
     inspector = inspect(engine)
     tables = set(inspector.get_table_names())
     missing = []

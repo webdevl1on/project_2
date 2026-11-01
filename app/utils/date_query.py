@@ -154,9 +154,10 @@ class DateBinding:
 
     def filter(self, query, spec):
         connection = query.session.connection()
-        if connection.dialect.name != "sqlite":
-            raise ValueError("Для іншої СУБД потрібно підключити її date-query adapter.")
-        connection.connection.driver_connection.create_function("project2_date_match", 7, _sqlite_match, deterministic=True)
+        if connection.dialect.name == "sqlite":
+            connection.connection.driver_connection.create_function("project2_date_match", 7, _sqlite_match, deterministic=True)
+        elif connection.dialect.name != "postgresql":
+            raise ValueError("Непідтримувана СУБД для фільтра дат.")
         return query.filter(func.project2_date_match(self.day, self.month, self.year, spec.to_json(),
                             self.field.allow_partial, self.field.min_year, self.field.max_year) == 1)
 

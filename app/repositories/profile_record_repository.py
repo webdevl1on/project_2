@@ -1,4 +1,5 @@
 """Additional record queries only; transaction ownership belongs to the service."""
+from app.database.locking import locked_get
 from sqlalchemy import select
 from app.models import Person, PersonnelAudit
 from app.models.profile_records import MODELS
@@ -7,11 +8,11 @@ from app.models.profile_records import MODELS
 class ProfileRecordRepository:
     @staticmethod
     def person(db, person_id):
-        return db.get(Person, person_id)
+        return locked_get(db,Person,person_id)
 
     @staticmethod
     def get(db, kind, key):
-        return db.get(MODELS[kind], key)
+        return locked_get(db,MODELS[kind],key)
 
     @staticmethod
     def rows(db, kind, person_id):

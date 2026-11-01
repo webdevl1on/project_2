@@ -25,7 +25,7 @@ class TccOffice(SystemTimestamps, Base):
         UniqueConstraint('normalized_name', 'normalized_region', 'normalized_settlement', name='unique_tcc_identity'),
         CheckConstraint("type IN ('regional','city','district','united_district','department')"),
         CheckConstraint('parent_tcc_id IS NULL OR parent_tcc_id != id'),
-        CheckConstraint('is_active IN (0,1)'),
+        CheckConstraint('is_active IN (false,true)'),
         CheckConstraint('length(trim(official_name)) BETWEEN 1 AND 500'),
         CheckConstraint('region IS NULL OR length(region) <= 250'),
         CheckConstraint('settlement IS NULL OR length(settlement) <= 250'),
@@ -53,7 +53,7 @@ class PersonServiceBasis(SystemTimestamps, Base):
     __table_args__ = (
         CheckConstraint("service_type IN ('mobilization','contract')"),
         CheckConstraint("match_status IN ('matched','mismatch','unknown')"),
-        CheckConstraint('is_current IN (0,1) AND document_verified IN (0,1)'),
+        CheckConstraint('is_current IN (false,true) AND document_verified IN (false,true)'),
         CheckConstraint('document_tcc_name IS NULL OR length(document_tcc_name) <= 500'),
         CheckConstraint('region IS NULL OR length(region) <= 250'),
         CheckConstraint('settlement IS NULL OR length(settlement) <= 250'),
@@ -61,7 +61,7 @@ class PersonServiceBasis(SystemTimestamps, Base):
         CheckConstraint('contract_unit IS NULL OR length(contract_unit) <= 250'),
         CheckConstraint("service_type != 'contract' OR (mobilization_date IS NULL AND region IS NULL AND settlement IS NULL AND document_tcc_name IS NULL AND tcc_office_id IS NULL)"),
         CheckConstraint("service_type != 'mobilization' OR (contract_signed_date IS NULL AND contract_start_date IS NULL AND enlistment_order_date IS NULL AND enlistment_order_number IS NULL AND contract_unit IS NULL)"),
-        Index('one_current_service_basis', 'person_id', unique=True, sqlite_where=text('is_current = 1')),
+        Index('one_current_service_basis', 'person_id', unique=True, sqlite_where=text('is_current = true'),postgresql_where=text('is_current = true')),
     )
 
     @validates(*DATE_FIELDS)

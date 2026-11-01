@@ -14,7 +14,8 @@ class PersonRepository:
 
     @staticmethod
     def get_by_id(db, person_id):
-        return db.query(Person).filter(Person.person_id == person_id).first()
+        from app.database.locking import locked_get
+        return locked_get(db,Person,person_id)
 
     @staticmethod
     def get_by_tax_number(db, tax_number):

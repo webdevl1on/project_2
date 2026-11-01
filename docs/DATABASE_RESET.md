@@ -1,5 +1,7 @@
 # Повне тестове засівання SQLite
 
+PostgreSQL — цільова БД: створення/оновлення через Alembic, безпечне засівання довідників через python -m app.services.seed_postgresql --dry-run. reset.py відмовляє для PostgreSQL і production. Команди нижче — лише явна legacy SQLite: спочатку задайте PROJECT2_ENV=development та DATABASE_URL=sqlite:///data/database/project2.db; вони можуть замінити саме цей SQLite-файл і не призначені для збереження персональних даних. Див. [POSTGRESQL_SETUP.md](POSTGRESQL_SETUP.md).
+
 `reset.py` створює **тестовий набір**, а не мігрує чи зберігає персональні дані. Імпорт модуля не виконує reset. Перед запуском зупиніть сервер і всі SQLite-клієнти. Запускати з кореня репозиторію в підготовленому Python-середовищі.
 
 ```powershell

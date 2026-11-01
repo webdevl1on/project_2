@@ -19,7 +19,7 @@ class PersonContact(SystemTimestamps, Base):
         CheckConstraint("contact_type IN ('phone','email')"),
         CheckConstraint("length(trim(value)) > 0 AND length(normalized_value) > 0"),
         CheckConstraint('NOT is_primary OR is_active'),
-        CheckConstraint('is_primary IN (0,1) AND is_active IN (0,1)'),
-        Index('one_primary_contact','person_id','contact_type',unique=True,sqlite_where=text('is_active = 1 AND is_primary = 1')),
-        Index('unique_active_contact','person_id','contact_type','normalized_value',unique=True,sqlite_where=text('is_active = 1')),
+        CheckConstraint('is_primary IN (false,true) AND is_active IN (false,true)'),
+        Index('one_primary_contact','person_id','contact_type',unique=True,sqlite_where=text('is_active = true AND is_primary = true'),postgresql_where=text('is_active = true AND is_primary = true')),
+        Index('unique_active_contact','person_id','contact_type','normalized_value',unique=True,sqlite_where=text('is_active = true'),postgresql_where=text('is_active = true')),
     )

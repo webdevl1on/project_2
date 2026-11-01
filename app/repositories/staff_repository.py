@@ -1,4 +1,5 @@
 """Staff persistence and queries. Period decisions stay in StaffService."""
+from app.database.locking import locked_get
 from sqlalchemy import and_, or_
 from app.models import StaffStructure, StaffVersion, Position, PersonAssignment
 
@@ -11,7 +12,7 @@ def active(model, start, end, on):
 class StaffRepository:
     @staticmethod
     def get(db, model, key):
-        return db.get(model, key)
+        return locked_get(db,model,key)
 
     @staticmethod
     def add(db, record):
