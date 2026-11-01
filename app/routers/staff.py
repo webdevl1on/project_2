@@ -71,7 +71,7 @@ def import_confirm(request:Request,token:str=Form(),db:Session=Depends(get_db)):
     try:
         prepared,key=load_preview(token)
         version=import_version(db,prepared,key)
-        return RedirectResponse('/person-positions?'+urlencode({'version_id':version,'as_of':prepared['start'],'staff_message':f"Завантажено {len(prepared['positions'])} посад. Усі посади вакантні."}),303)
+        return RedirectResponse('/admin/staff?'+urlencode({'version_id':version,'message':f"Завантажено {len(prepared['positions'])} посад. Усі посади вакантні."}),303)
     except ValueError as error:
         return templates.TemplateResponse(request=request,name='staff_import_preview.html',context={'preview':{'errors':[str(error)],'warnings':[]},'token':None},status_code=409)
 
@@ -79,10 +79,8 @@ def import_confirm(request:Request,token:str=Form(),db:Session=Depends(get_db)):
 @router.get('/staff/history')
 def history(request:Request,version_id:int|None=None,db:Session=Depends(get_db)):
     context=history_context(db,version_id)
-    from app.table_fields import FIELDS
-    position_fields=[{'key':field.attribute,'label':field.label} for field in FIELDS.values() if field.source=='position']
     return templates.TemplateResponse(request=request,name='staff_history.html',context={
-        **context,'position_fields':position_fields,'message':request.query_params.get('message','')})
+        **context,'message':request.query_params.get('message','')})
 
 
 def form_failure(request,error):
@@ -113,8 +111,8 @@ def form_failure(request,error):
 @router.post('/staff/structures')
 def create_structure(request:Request,code:str=Form(),name:str=Form(),db:Session=Depends(get_db)):
     try:
-        StaffService.create_structure(db,code,name)
-        return RedirectResponse('/staff/history?'+urlencode({'message':'Структуру створено.'}),303)
+        key=StaffService.create_structure(db,code,name)
+        return RedirectResponse('/admin/staff?'+urlencode({'structure_id':key,'message':'Структуру створено.'}),303)
     except ValueError as error:return form_failure(request,error)
 
 
@@ -123,7 +121,7 @@ def close_version(request:Request,key:int,revision:int=Form(),valid_to:str=Form(
     try:
         if not confirmed:raise ValueError('Підтвердьте явне закриття версії та її призначень.')
         StaffService.close_version(db,key,revision,domain_date(valid_to))
-        return RedirectResponse('/staff/history?'+urlencode({'version_id':key,'message':'Версію та всі її відкриті призначення завершено.'}),303)
+        return RedirectResponse('/admin/staff?'+urlencode({'version_id':key,'message':'Версію та всі її відкриті призначення завершено.'}),303)
     except ValueError as error:return form_failure(request,error)
 
 
@@ -131,7 +129,7 @@ def close_version(request:Request,key:int,revision:int=Form(),valid_to:str=Form(
 def correct_version(request:Request,key:int,revision:int=Form(),name:str=Form(),valid_from:str=Form(),valid_to:str=Form(''),db:Session=Depends(get_db)):
     try:
         StaffService.correct_version(db,key,revision,name,domain_date(valid_from),domain_date(valid_to,False))
-        return RedirectResponse('/staff/history?'+urlencode({'version_id':key,'message':'Реквізити версії виправлено.'}),303)
+        return RedirectResponse('/admin/staff?'+urlencode({'version_id':key,'message':'Реквізити версії виправлено.'}),303)
     except ValueError as error:return form_failure(request,error)
 
 
@@ -158,5 +156,5 @@ async def correct_position(request:Request,key:int,db:Session=Depends(get_db)):
         form=await request.form()
         values={name:form[name] for name in POSITION_ATTRIBUTES if name in form}
         StaffService.correct_position(db,key,int(form['revision']),values)
-        return RedirectResponse('/staff/history?'+urlencode({'version_id':position_version_id(db,key),'message':'Реквізити посади виправлено.'}),303)
+        return RedirectResponse('/admin/staff?'+urlencode({'version_id':position_version_id(db,key),'message':'Реквізити посади виправлено.'}),303)
     except (ValueError,KeyError) as error:return form_failure(request,error)

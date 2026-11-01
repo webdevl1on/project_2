@@ -8,5 +8,5 @@
 {% for message in preview.warnings %}<div class="alert alert-warning">{{ message }}</div>{% endfor %}
 <p>Під час завантаження всі посади будуть вакантними. Попередні версії та призначення не змінюються.</p>
 {% if token %}<form method="post" action="/staff/import/confirm"><input type="hidden" name="token" value="{{ token }}"><button class="btn btn-primary" type="submit">Підтвердити завантаження</button></form>{% endif %}
-<a href="/person-positions" class="btn btn-outline-secondary mt-3">Повернутися</a><a href="/staff/history" class="btn btn-outline-secondary mt-3">Явно закрити попередню версію</a>
+<a href="/admin/staff{% if preview.structure_id %}?structure_id={{ preview.structure_id }}{% endif %}" class="btn btn-outline-secondary mt-3">Повернутися</a><a href="/admin/staff{% if preview.structure_id %}?structure_id={{ preview.structure_id }}{% endif %}" class="btn btn-outline-secondary mt-3">Явно закрити попередню версію</a>
 </body></html>

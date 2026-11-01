@@ -1,9 +1,5 @@
 (() => {
     'use strict';
-    document.querySelectorAll('[data-current-version]').forEach(input=>input.addEventListener('change',()=>{
-        const end=input.form.elements.valid_to;
-        if(input.checked)end.value='';end.disabled=input.checked;end.required=!input.checked;
-    }));
     const context=document.getElementById('position-filters');
     context?.elements.version_id?.addEventListener('change',()=>{
         const selected=context.elements.version_id.selectedOptions[0],on=context.elements.as_of;

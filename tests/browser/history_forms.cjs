@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-module.exports=async({context,base})=>{
+module.exports=async({context,base,adminToken})=>{
     const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
     const scenario=async(name,fn)=>{await fn();console.log(`PASS history forms: ${name}`);};
     const values=form=>form.evaluate(node=>Array.from(new FormData(node).entries()));
@@ -44,6 +44,7 @@ module.exports=async({context,base})=>{
             await edit.locator('[data-history-form-error]').filter({hasText:'змінився'}).waitFor();
             assert.deepEqual(await values(edit),draft);assert.equal(await edit.locator('..').getAttribute('open'),'');assert.equal(navigations,0);
         });
+        await context.request.post(base+'/admin/login',{form:{token:adminToken}});await page.goto(base+'/admin/staff');navigations=0;
         await scenario('position and version refusals retain drafts; successful correction updates data',async()=>{
             const version=page.locator('form[action$="/correct"]').filter({has:page.locator('[name="valid_from"]')});
             await version.locator('..').locator(':scope > summary').click();

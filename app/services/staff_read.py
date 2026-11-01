@@ -27,9 +27,11 @@ def table_context(db, version_id=None, on=None):
     return structures, versions, chosen, on
 
 
-def history_context(db, version_id=None):
+def history_context(db, version_id=None, structure_id=None):
     versions = StaffRepository.versions(db)
-    chosen = StaffRepository.get(db, StaffVersion, version_id) if version_id else (versions[0] if versions else None)
+    if structure_id is not None:
+        versions = [v for v in versions if v.staff_structure_id == structure_id]
+    chosen = next((v for v in versions if v.id == version_id), None) if version_id else (versions[0] if versions else None)
     structures = StaffRepository.structures(db)
     return {"versions": versions, "chosen": chosen,
             "positions": StaffRepository.positions(db, chosen.id) if chosen else [],

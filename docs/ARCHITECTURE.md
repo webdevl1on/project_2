@@ -376,3 +376,9 @@ MedicalDocumentLink повторно використано для докуме�
 Повторно використано `document_ui.js`, DocumentRepository, DocumentStorage, DocumentAudit і чинний current_user. `documents.update_tax_number` — вузька транзакційна операція над Person.tax_number з expected-value та revision оболонки; загальний сервіс оновлення людини не викликається. `document_files.attach` додає sort_order і квитанцію request_id в наявний аудит, `reorder` атомарно перевіряє повний набір ID/revision та змінює порядок. Медичне читання копій також упорядковане за sort_order/id. Нових систем авторизації, файлового сховища чи таблиць квитанцій немає.
 
 Єдиний верхній редактор керує чергою, частковим результатом і повторенням; галерея/Bootstrap Modal читають оригінали через захищений file_id endpoint з optional inline, не через static. Явна `migrate_document_file_order` додає лише колонку/індекс з backup/rollback і детермінованим початковим порядком. Контракти та межі — [DOCUMENTS.md](DOCUMENTS.md).
+
+## Розділення адміністрування штатів і призначень
+
+GET `/admin/staff` у `routers/admin.py` повторно використовує чинний require_admin/render і `staff_read.history_context` з необов’язковим відбором за структурою. `admin/staff.html` містить перенесені адміністративні форми й спільний `components/staff_import.html`. Чинний router staff залишається єдиним власником POST-адаптерів до StaffService/staff_import; змінено тільки адреси успішних redirect адміністративних операцій.
+
+`staff_history.html` містить лише перегляд/редагування історичних призначень, `staff_controls.html` — перехід до історії й підтвердження перепризначення. `staff_assignments.js` зберіг кадрові обробники; наявні import date controls перенесено до `staff_import.js`. Доступ/ролі, моделі, імпорт і бізнес-транзакції не перебудовані. Актуальне розміщення форм та URL — [STAFF_HISTORY.md](STAFF_HISTORY.md).

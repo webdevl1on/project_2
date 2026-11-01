@@ -158,3 +158,13 @@ async def create_dictionary(request: Request, owner: str = Depends(require_admin
 @router.post("/dictionaries/{key}/edit")
 async def update_dictionary(request: Request, key: int, owner: str = Depends(require_admin), db: Session = Depends(get_db)):
     return await save_form(request, owner, db, key)
+
+
+@router.get('/staff')
+def staff_page(request:Request,version_id:int|None=None,structure_id:str='',db:Session=Depends(get_db)):
+    owner=require_admin(request)
+    from app.services.staff_read import history_context
+    from app.table_fields import FIELDS
+    selected=int(structure_id) if structure_id.isdecimal() else None
+    context=history_context(db,version_id,selected)
+    return render(request,'admin/staff.html',owner,**context,staff_structures=context['structures'],chosen_version=context['chosen'],selected_structure_id=selected,position_fields=[{'key':f.attribute,'label':f.label} for f in FIELDS.values() if f.source=='position'],message=request.query_params.get('message',''))

@@ -2,6 +2,7 @@
 (() => {
     'use strict';
     document.querySelectorAll('form[method="post"][action^="/staff/"]').forEach((form,index) => {
+        if(new URL(form.action).pathname.startsWith('/staff/import/'))return;
         form.noValidate=true;form.classList.add('staff-history-form');
         const message=document.createElement('p');
         message.className='text-danger w-100 mt-2';message.hidden=true;
