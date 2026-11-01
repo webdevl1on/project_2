@@ -6,6 +6,8 @@ module.exports=async({context,base})=>{
   await page.goto(base+'/person_full_info/3#documents');
   const panel=page.locator('[data-document-panel]'),form=panel.locator('[data-document-form]'),editor=panel.locator('[data-document-editor]');
   await panel.locator('[data-document-content]').waitFor({state:'visible'});
+  await panel.locator('[data-document-history]').check();assert.equal(await panel.locator('[data-document-archive]').isVisible(),false);await panel.locator('[data-document-history]').uncheck();
+  assert.match((await panel.locator('[data-document-current-list] > [data-document-card] > summary').allTextContents()).slice(0,4).join('|'),/^Паспорт.*\|РНОКПП.*\|Військово-обліковий.*\|Свідоцтво про народження/);
   await panel.locator('[data-document-new]').click();
   assert.equal(await form.locator('[name=type] option').count(),8);
   await form.locator('[name=type]').selectOption('tax_number');
@@ -34,7 +36,13 @@ module.exports=async({context,base})=>{
   assert.match(await card.innerText(),/Копії завантажені/);assert.match(await card.innerText(),/Фізична наявність: Невідомо/);
   await card.getByRole('button',{name:'Замінити документ'}).click();await form.locator('[name=number]').fill('GUI-003');await form.getByRole('button',{name:'Зберегти',exact:true}).click();await editor.waitFor({state:'hidden'});
   assert.equal(await panel.locator('[data-document-card]').filter({hasText:'GUI-002'}).count(),0);await panel.locator('[data-document-history]').check();assert.equal(await panel.locator('[data-document-card]').filter({hasText:'GUI-002'}).count(),1);
-  await page.reload();await panel.locator('[data-document-content]').waitFor({state:'visible'});assert.equal(await panel.locator('[data-document-card]').filter({hasText:'GUI-003'}).count(),1);
+  const archive=panel.locator('[data-document-archive]');assert.equal(await archive.isVisible(),true);assert.equal(await archive.locator(`[data-document-card="${oldId}"]`).count(),1);assert.equal(await panel.locator('[data-document-current-list]').locator(`[data-document-card="${oldId}"]`).count(),0);
+  assert.equal(await panel.locator('[data-document-list]').evaluate(n=>n.querySelector('[data-document-current-list]').compareDocumentPosition(n.querySelector('[data-document-archive]')) & Node.DOCUMENT_POSITION_FOLLOWING),4);
+  await panel.locator('[data-document-history]').uncheck();assert.equal(await archive.isVisible(),false);await panel.locator('[data-document-history]').check();
+  const current=panel.locator('[data-document-current-list] [data-document-card]').filter({hasText:'GUI-003'});await current.evaluate(n=>n.open=true);page.once('dialog',d=>d.accept());await current.getByRole('button',{name:'Архівувати',exact:true}).click();await archive.locator('[data-document-card]').filter({hasText:'GUI-003'}).waitFor();assert.equal(await panel.locator('[data-document-current-list] [data-document-card]').filter({hasText:'GUI-003'}).count(),0);
+  const oldCard=archive.locator(`[data-document-card="${oldId}"]`);await oldCard.evaluate(n=>n.open=true);await oldCard.locator('details').evaluate(n=>n.open=true);assert.equal(await oldCard.getByRole('link',{name:'front.pdf'}).count(),1);assert.match(await oldCard.innerText(),/31.10.2026/);
+  console.log('PASS document archive: current first, separate lower block, toggle, explicit archive retains values and copies');
+  await page.reload();await panel.locator('[data-document-content]').waitFor({state:'visible'});assert.equal(await panel.locator('[data-document-current-list] [data-document-card]').filter({hasText:'GUI-003'}).count(),0);await panel.locator('[data-document-history]').check();assert.equal(await panel.locator('[data-document-archive-list] [data-document-card]').filter({hasText:'GUI-003'}).count(),1);
   assert.equal(await panel.locator('[data-document-card="empty-passport"] [name=presence] option[value=NEVER_OBTAINED]').count(),0);
   assert.deepEqual(errors,[]);console.log('PASS documents GUI: multiple protected copies, independent states, replacement/history and reload');
   await panel.locator('[data-document-new]').click();await form.locator('[name=type]').selectOption('passport');

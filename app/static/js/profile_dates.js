@@ -9,6 +9,8 @@
  function parse(value){if(!value)return '';const m=/^(\d{2})\.(\d{2})\.(\d{4})$/.exec(value);if(!m||!valid(+m[1],+m[2],+m[3]))throw Error('Введіть коректну повну дату ДД.ММ.РРРР.');return `${m[3]}-${m[2]}-${m[1]}`;}
  function format(value){if(!value)return '';const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(value);if(!m||!valid(+m[3],+m[2],+m[1]))return String(value);return `${m[3]}.${m[2]}.${m[1]}`;}
  function display(value){if(Array.isArray(value))return value.map(display);if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([k,v])=>[k,display(v)]));return typeof value==='string'?format(value):value;}
+ function mask(value){const digits=String(value).replace(/\D/g,'').slice(0,8);return digits.slice(0,2)+(digits.length>=2?'.':'')+digits.slice(2,4)+(digits.length>=4?'.':'')+digits.slice(4);}
+ function caretForDigits(value,count,skipSeparator=true){let position=0,seen=0;while(position<value.length&&seen<count){if(/\d/.test(value[position]))seen++;position++;}if(skipSeparator&&value[position]==='.')position++;return position;}
  let sequence=0;
  function enhance(scope){
   globalThis.TableDates?.initialiseDateInputs?.(scope);
@@ -17,7 +19,7 @@
    if(canonical.dataset.dateCalendar!==undefined||canonical.dataset.exactDateCanonical!==undefined)continue;
    const text=document.createElement('input'),button=document.createElement('button'),calendar=document.createElement('input'),wrapper=document.createElement('span');
    wrapper.className='profile-exact-date d-flex gap-1 align-items-center position-relative';canonical.before(wrapper);wrapper.append(canonical,text,button,calendar);
-   text.type='text';text.className=canonical.className||'form-control';text.placeholder='ДД.ММ.РРРР';text.inputMode='numeric';text.maxLength=10;text.autocomplete='off';text.dataset.exactDateFor=canonical.name;
+   text.type='text';text.className=canonical.className||'form-control';text.placeholder='ДД.ММ.РРРР';text.inputMode='numeric';text.autocomplete='off';text.dataset.exactDateFor=canonical.name;
    const id=canonical.id||`profile-date-${++sequence}`;text.id=id+'-display';
    for(const label of document.querySelectorAll('label[for]'))if(label.htmlFor===canonical.id&&canonical.id)label.htmlFor=text.id;
    const label=canonical.getAttribute('aria-label');text.setAttribute('aria-label',label||canonical.closest('label')?.textContent.trim()||'Дата ДД.ММ.РРРР');
@@ -27,8 +29,28 @@
    const descriptor=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
    const sync=()=>{text.value=format(descriptor.get.call(canonical));text.required=canonical.required;text.disabled=canonical.disabled;text.readOnly=canonical.readOnly;button.disabled=canonical.disabled||canonical.readOnly;text.setCustomValidity('');calendar.value=descriptor.get.call(canonical);calendar.min=canonical.min;calendar.max=canonical.max;};
    Object.defineProperty(canonical,'value',{configurable:true,get(){return descriptor.get.call(this);},set(value){descriptor.set.call(this,value??'');sync();}});
-   function entered(){try{const iso=parse(text.value);if(iso&&((canonical.min&&iso<canonical.min)||(canonical.max&&iso>canonical.max)))throw Error('Дата поза дозволеним діапазоном.');descriptor.set.call(canonical,iso);text.setCustomValidity('');calendar.value=iso;canonical.dispatchEvent(new Event('input',{bubbles:true}));canonical.dispatchEvent(new Event('change',{bubbles:true}));}catch(error){descriptor.set.call(canonical,'');text.setCustomValidity(error.message);}}
-   text.addEventListener('input',entered);text.addEventListener('change',entered);
+   function entered(event){
+    const digitsBefore=text.value.slice(0,text.selectionStart).replace(/\D/g,'').length;
+    text.value=mask(text.value);
+    const caret=caretForDigits(text.value,Math.min(8,digitsBefore),!event?.inputType?.startsWith('delete'));
+    try{
+     if(text.value&&text.value.replace(/\D/g,'').length<8)throw Error('Завершіть введення дати у форматі ДД.ММ.РРРР.');
+     const iso=parse(text.value);if(iso&&((canonical.min&&iso<canonical.min)||(canonical.max&&iso>canonical.max)))throw Error('Дата поза дозволеним діапазоном.');
+     descriptor.set.call(canonical,iso);text.setCustomValidity('');calendar.value=iso;
+    }catch(error){descriptor.set.call(canonical,'');calendar.value='';text.setCustomValidity(error.message);}
+    canonical.dispatchEvent(new Event('input',{bubbles:true}));canonical.dispatchEvent(new Event('change',{bubbles:true}));
+    text.setSelectionRange(caret,caret);
+   }
+   text.addEventListener('beforeinput',event=>{
+    const start=text.selectionStart,end=text.selectionEnd;if(start!==end)return;
+    // Deleting an automatic separator also deletes the adjacent digit, avoiding a stuck caret.
+    if(event.inputType==='deleteContentBackward'&&start>0&&text.value[start-1]==='.'){
+     event.preventDefault();text.setRangeText('',Math.max(0,start-2),start,'start');text.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:event.inputType}));
+    }else if(event.inputType==='deleteContentForward'&&text.value[start]==='.'){
+     event.preventDefault();text.setRangeText('',start,Math.min(text.value.length,start+2),'start');text.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:event.inputType}));
+    }
+   });
+   text.addEventListener('input',entered);
    button.addEventListener('click',()=>{calendar.value=canonical.value;if(calendar.showPicker)calendar.showPicker();else{calendar.style.cssText='';calendar.focus();}});
    calendar.addEventListener('change',()=>{canonical.value=calendar.value;canonical.dispatchEvent(new Event('input',{bubbles:true}));canonical.dispatchEvent(new Event('change',{bubbles:true}));});
    canonical.addEventListener('change',()=>{if(text.validationMessage==='')sync();});
@@ -37,5 +59,5 @@
    new MutationObserver(()=>{text.required=canonical.required;text.disabled=canonical.disabled;text.readOnly=canonical.readOnly;button.disabled=canonical.disabled||canonical.readOnly;}).observe(canonical,{attributes:true,attributeFilter:['required','disabled','readonly','min','max']});sync();
   }
  }
- return {parse,format,display,valid,enhance};
+ return {parse,format,display,valid,mask,caretForDigits,enhance};
 });

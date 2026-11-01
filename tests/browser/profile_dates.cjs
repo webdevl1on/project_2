@@ -6,6 +6,20 @@ module.exports=async({context,base})=>{
   const panel=page.locator('[data-medical-panel=dna]');await panel.locator('[data-medical-new]').click();
   const form=panel.locator('[data-medical-form]'),display=form.locator('[data-exact-date-for=collected_on]'),canonical=form.locator('[name=collected_on]');
   assert.equal(await display.getAttribute('placeholder'),'ДД.ММ.РРРР');assert.equal(await display.inputValue(),'');
+  await display.pressSequentially('10');assert.equal(await display.inputValue(),'10.');
+  await display.pressSequentially('06');assert.equal(await display.inputValue(),'10.06.');
+  await display.pressSequentially('2025');assert.equal(await display.inputValue(),'10.06.2025');assert.equal(await canonical.inputValue(),'2025-06-10');
+  await display.pressSequentially('99');assert.equal(await display.inputValue(),'10.06.2025');
+  await display.fill('');await display.pressSequentially('10.06.2025');assert.equal(await display.inputValue(),'10.06.2025');
+  await display.evaluate(n=>n.setSelectionRange(3,5));await display.pressSequentially('07');assert.equal(await display.inputValue(),'10.07.2025');assert.equal(await canonical.inputValue(),'2025-07-10');
+  await display.fill('10');await display.press('Backspace');assert.equal(await display.inputValue(),'1');assert.equal(await canonical.inputValue(),'');
+  await display.fill('10062025');await display.evaluate(n=>n.setSelectionRange(2,2));await display.press('Delete');assert.equal(await display.inputValue(),'10.62.025');
+  await display.fill('10.06.2025');await display.press('Backspace');assert.equal(await display.inputValue(),'10.06.202');assert.equal(await display.evaluate(n=>n.checkValidity()),false);
+  await display.fill('100');assert.doesNotMatch(await display.evaluate(n=>n.validationMessage),/коректну повну/);
+  await form.getByRole('button',{name:'Зберегти',exact:true}).click();assert.equal(await panel.locator('[data-medical-editor]').isVisible(),true);assert.equal(await canonical.inputValue(),'');
+  // Paste through the browser clipboard rather than a programmatic assignment.
+  await context.grantPermissions(['clipboard-read','clipboard-write']);await page.evaluate(()=>navigator.clipboard.writeText('10.06.2025'));await display.selectText();await display.press('Control+V');assert.equal(await display.inputValue(),'10.06.2025');assert.equal(await canonical.inputValue(),'2025-06-10');
+  console.log('PASS date mask: digits/dots, eight-digit limit, selection edits, Backspace/Delete, paste and incomplete-date blocking');
   await display.fill('31.10.2026');assert.equal(await canonical.inputValue(),'2026-10-31');
   await display.fill('29.02.2025');assert.equal(await display.evaluate(n=>n.checkValidity()),false);assert.equal(await display.inputValue(),'29.02.2025');
   await display.fill('29.02.2024');assert.equal(await canonical.inputValue(),'2024-02-29');

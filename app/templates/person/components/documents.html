@@ -15,6 +15,9 @@
 <div><button class="btn btn-primary">Зберегти</button> <button type="button" data-document-cancel class="btn btn-outline-secondary">Скасувати</button></div>
 </form></div>
 <label class="small my-2"><input type="checkbox" data-document-history> Показати архівні документи</label>
-<div data-document-list></div>
+<div data-document-list>
+<div data-document-current-list></div>
+<section data-document-archive hidden aria-labelledby="document-archive-title"><hr><h3 id="document-archive-title" class="h5">Архівні документи</h3><div data-document-archive-list></div></section>
+</div>
 <details class="mt-3"><summary>Журнал документів</summary><div data-document-audit></div></details>
 </div></section>
