@@ -58,7 +58,7 @@ def _migrate(database):
             if table.name == 'person_position_mirages': continue
             if table.name in new_names:
                 continue
-            required = {column.name for column in table.columns}
+            required = {column.name for column in table.columns if not (table.name=='document_files' and column.name=='sort_order')}
             required -= ADDED_COLUMNS.get(table.name,set())
             if table.name not in present or not required <= columns(connection, table.name):
                 raise ValueError(f"Схема {table.name} не відповідає попередній штатній архітектурі. Потрібна окрема міграція цієї БД.")
@@ -68,7 +68,7 @@ def _migrate(database):
         if not required_sqlite_triggers() <= installed:
             raise ValueError("Відсутні чинні тригери кадрової історії або точних дат. Потрібна окрема перевірка цієї БД.")
         for table in NEW_TABLES:
-            if table.name in present and not {column.name for column in table.columns} <= columns(connection, table.name):
+            if table.name in present and not {column.name for column in table.columns if not (table.name=='document_files' and column.name=='sort_order')} <= columns(connection, table.name):
                 raise ValueError(f"Неповна стороння таблиця {table.name}; автоматичне виправлення заборонено.")
         if 'person_contacts' in present:
             installed_indexes={row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='index'")}

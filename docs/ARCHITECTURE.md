@@ -370,3 +370,9 @@ MedicalDocumentLink повторно використано для докуме�
 `additional_records.html` + `profile_records.js` — один керований серверними метаданими редактор трьох розділів. `person_profile.js` підтримує hash вкладки й конкретного запису, очікуючи асинхронне створення картки. Явна `migrate_profile_records` з backup/rollback додає тільки три таблиці/індекси; startup вимагає її запуску вручну. Попередні міграції пропускають майбутні таблиці. Робочу БД автоматично не змінює жоден новий компонент.
 
 Маска точних дат реалізована лише в `profile_dates.js`: видимий ДД.ММ.РРРР та курсор синхронізуються з чинним ISO-полем, неповні компоненти не зачіпаються. У `documents.html` загальний список розділено на актуальні картки й нижній архів; `document_ui.js` розподіляє вже отримані записи за is_current, без нового API або зміни даних. Деталі — [DATE_SYSTEM.md](DATE_SYSTEM.md) та [DOCUMENTS.md](DOCUMENTS.md).
+
+## Документальний редактор: номер РНОКПП, порядок і перегляд
+
+Повторно використано `document_ui.js`, DocumentRepository, DocumentStorage, DocumentAudit і чинний current_user. `documents.update_tax_number` — вузька транзакційна операція над Person.tax_number з expected-value та revision оболонки; загальний сервіс оновлення людини не викликається. `document_files.attach` додає sort_order і квитанцію request_id в наявний аудит, `reorder` атомарно перевіряє повний набір ID/revision та змінює порядок. Медичне читання копій також упорядковане за sort_order/id. Нових систем авторизації, файлового сховища чи таблиць квитанцій немає.
+
+Єдиний верхній редактор керує чергою, частковим результатом і повторенням; галерея/Bootstrap Modal читають оригінали через захищений file_id endpoint з optional inline, не через static. Явна `migrate_document_file_order` додає лише колонку/індекс з backup/rollback і детермінованим початковим порядком. Контракти та межі — [DOCUMENTS.md](DOCUMENTS.md).

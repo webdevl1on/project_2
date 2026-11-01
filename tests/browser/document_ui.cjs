@@ -11,8 +11,8 @@ module.exports=async({context,base})=>{
   await panel.locator('[data-document-new]').click();
   assert.equal(await form.locator('[name=type] option').count(),8);
   await form.locator('[name=type]').selectOption('tax_number');
-  assert.equal(await form.locator('[name=number]').getAttribute('readonly'),'');
-  assert.ok(await form.getByRole('link',{name:'Редагувати облікові дані'}).count());
+  assert.equal(await form.locator('[name=number]').getAttribute('readonly'),null);
+  assert.equal(await form.getByRole('link',{name:'Редагувати облікові дані'}).count(),0);
   await form.locator('[name=type]').selectOption('other');await form.locator('[name=number]').fill('GUI-001');
   await form.locator('[data-exact-date-for=issued_date]').fill('31.10.2026');
   await form.getByRole('button',{name:'Зберегти',exact:true}).click();await editor.waitFor({state:'hidden'}).catch(async e=>{console.log('DOCUMENT DIAG',await panel.locator('[data-document-message]').textContent(),await form.evaluate(n=>({valid:n.checkValidity(),invalid:[...n.querySelectorAll(':invalid')].map(x=>[x.name,x.value,x.validationMessage])})));throw e;});
@@ -29,7 +29,7 @@ module.exports=async({context,base})=>{
   await card.locator('details').evaluate(n=>n.open=true);
   const upload=card.locator('form').filter({has:page.locator('input[type=file]')});
   for(const [name,mime,buffer,side] of [['front.pdf','application/pdf',Buffer.from('%PDF-1.7 synthetic'),'front'],['back.png','image/png',Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a0WQAAAAASUVORK5CYII=','base64'),'back'],['extra.jpg','image/jpeg',Buffer.from([255,216,255,224,0,16]),'page']]){
-   await upload.locator('[name=file]').setInputFiles({name,mimeType:mime,buffer});await upload.locator('[name=side]').selectOption(side);await upload.getByRole('button',{name:'Додати копію'}).click();
+   await upload.locator('[name=file]').setInputFiles({name,mimeType:mime,buffer});await upload.getByRole('button',{name:'Додати копію'}).click();
    await card.getByRole('link',{name}).waitFor();
   }
   assert.equal((await context.request.get(base+await card.getByRole('link',{name:'front.pdf'}).getAttribute('href'))).status(),200);
@@ -54,7 +54,7 @@ module.exports=async({context,base})=>{
   await form.getByRole('button',{name:'Зберегти',exact:true}).click();await editor.waitFor({state:'hidden'});
   const driving=panel.locator('[data-document-card]').filter({hasText:'DRIVE-001'});await driving.evaluate(n=>n.open=true);assert.match(await driving.innerText(),/Категорія B: 29.02.2024/);
   // Changing a dynamic type after invalid partial input must not retain a detached validator.
-  await panel.locator('[data-document-new]').click();await form.locator('[name=type]').selectOption('passport');await form.locator('[name=issued_day]').fill('31');await form.locator('[name=issued_month]').fill('2');await form.locator('[name=type]').selectOption('other');assert.equal(await form.evaluate(n=>n.checkValidity()),true);await panel.locator('[data-document-cancel]').click();
+  await panel.locator('[data-document-new]').click();await form.locator('[name=type]').selectOption('passport');await form.locator('[name=issued_day]').fill('31');await form.locator('[name=issued_month]').fill('2');await form.locator('[name=type]').selectOption('other');assert.equal(await form.evaluate(n=>n.checkValidity()),true);await panel.locator('[data-document-cancel]').click();if(await panel.locator('[data-document-discard-modal]').isVisible())await panel.locator('[data-discard-confirm]').click();
   await page.goto(base+'/person_full_info/3#documents-'+oldId);await page.reload();
   const archived=panel.locator(`[data-document-card="${oldId}"]`);await archived.waitFor({state:'visible'});assert.equal(await archived.evaluate(n=>n.open),true);assert.equal(await panel.locator('[data-document-history]').isChecked(),true);assert.equal(new URL(page.url()).hash,'#documents-'+oldId);
   assert.deepEqual(errors,[]);console.log('PASS documents GUI: canonical passport preserves partial date; driving category has exact date; changing dynamic schema discards old validation; archived hash opens its card');

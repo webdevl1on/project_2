@@ -17,7 +17,7 @@ def test_catalog_real_types_trusted_schema_and_canonical_fields(factory,prepared
         passport=next(t for t in catalog['types'] if t['code']=='passport')
         policies=[f for f in passport['schema']['fields'] if f['kind']=='partial_date']
         assert [f['key'] for f in policies]==['issued','expire'] and all(f['policy']['allow_partial'] for f in policies)
-        assert next(t for t in catalog['types'] if t['code']=='tax_number')['schema']['fields'][0]['kind']=='readonly'
+        assert next(t for t in catalog['types'] if t['code']=='tax_number')['schema']['fields'][0]['kind']=='text'
         assert all(f['kind']!='partial_date' for t in catalog['types'] if t['code']!='passport' for f in t['schema']['fields'])
 
 

@@ -29,14 +29,14 @@ def migrate(database):
                 from app.models.profile_records import NEW_TABLE_NAMES as PROFILE_TABLES
                 if table.name in PROFILE_TABLES: continue
                 if table.name in NEW_TABLE_NAMES:continue
-                if table.name not in present or not {c.name for c in table.columns}<=columns(connection,table.name):raise ValueError('Неповна попередня схема: '+table.name)
+                if table.name not in present or not {c.name for c in table.columns if not (table.name=='document_files' and c.name=='sort_order')}<=columns(connection,table.name):raise ValueError('Неповна попередня схема: '+table.name)
             required=required_sqlite_triggers()|DOCUMENT_GUARDS|{'exact_assignment_orders_insert','exact_assignment_orders_update','exact_service_basis_insert','exact_service_basis_update'}
             if not required<=installed:raise ValueError('Відсутні захисні тригери попередньої схеми.')
             if NEW_TABLE_NAMES & present:
                 if not NEW_TABLE_NAMES<=present:raise ValueError('Неповна медична схема; автоматичне виправлення заборонено.')
                 for name in NEW_TABLE_NAMES:
                     table=Base.metadata.tables[name]
-                    if not {c.name for c in table.columns}<=columns(connection,name) or not {i.name for i in table.indexes}<=indexes:raise ValueError('Неповна таблиця/індекси: '+name)
+                    if not {c.name for c in table.columns if not (table.name=='document_files' and c.name=='sort_order')}<=columns(connection,name) or not {i.name for i in table.indexes if i.name!='document_file_order'}<=indexes:raise ValueError('Неповна таблиця/індекси: '+name)
                 if not GUARDS<=installed:raise ValueError('Відсутні захисні тригери модуля.')
                 return None
             backup=path.with_name(path.stem+'.before-medical-'+datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')+'-'+uuid.uuid4().hex[:8]+'.sqlite3')

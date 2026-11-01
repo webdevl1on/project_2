@@ -284,7 +284,7 @@ def list_documents(db,actor_id,person_id,**filters):
                   'automatic_status':auto,'effective_status':effective,
                   'override_status':record.override_status if record else None,'override_stale':stale,
                   'override_reason':record.override_reason if record else None,'has_copies':any(not f.is_removed for f in files),
-                  'files':[{'id':f.id,'name':f.original_name,'side':f.side,'removed':f.is_removed,'revision':f.revision} for f in files],
+                  'files':[{'id':f.id,'name':f.original_name,'side':f.side,'removed':f.is_removed,'revision':f.revision,'sort_order':f.sort_order,'content_type':f.content_type} for f in files],
                   'is_current':record.is_current if record else True,'revision':record.revision if record else None,
                   'expiry':expiry(values),'values':values,
                   'category_expiry':{r['category']:expiry(r) for r in values.get('categories',[])},
@@ -309,3 +309,28 @@ def editor_catalog(db,actor_id,person_id):
     from app.document_schemas import editor_schema,PRESENCE_LABELS,STATUS_LABELS,EXPIRY_LABELS,FILE_SIDE_LABELS
     return {'types':[{'code':kind.code,'name':kind.name,'schema_key':kind.schema_key,'is_primary':kind.is_primary,'is_active':kind.is_active,'schema':editor_schema(kind.schema_key)} for kind in Repo.types(db)],
             'presence':PRESENCE_LABELS,'statuses':STATUS_LABELS,'expiry':EXPIRY_LABELS,'sides':FILE_SIDE_LABELS,'driving_categories':sorted(DRIVING_CATEGORIES)}
+
+
+def update_tax_number(db,actor_id,person_id,value,expected,*,key=None,revision=None):
+    """Only the canonical number changes; no name writes or implicit document creation."""
+    with document_transaction(db):
+        authorize(db,actor_id,WRITE_ROLES)
+        person=Repo.person(db,person_id)
+        if person is None:raise ValueError('Особу не знайдено.')
+        kind=_type(db,'tax_number')
+        current=next((r for r in Repo.records(db,person_id) if r.document_type_id==kind.id and r.is_current),None)
+        if (current.id if current else None)!=key:raise ValueError('Поточний документ змінено; оновіть список.')
+        if current and (revision is None or str(revision)!=str(current.revision)):raise ValueError('Документ змінено після відкриття форми.')
+        if expected!=person.tax_number:raise ValueError('РНОКПП вже змінено; введену чернетку збережено.')
+        if value is not None and (not isinstance(value,str) or len(value)!=10 or not value.isascii() or not value.isdigit()):raise ValueError('РНОКПП має містити рівно 10 цифр або бути порожнім.')
+        from app.repositories.person_repository import PersonRepository
+        other=PersonRepository.get_by_tax_number(db,value) if value else None
+        if other and other.person_id!=person_id:raise ValueError('Такий РНОКПП вже належить іншій особі.')
+        old=person.tax_number;person.tax_number=value
+        if current:
+            from datetime import datetime, UTC
+            current.updated_at=datetime.now(UTC);_clear_override(current)
+        db.flush()
+        audit(db,actor_id,current,'tax_number',{'number':{'old':old,'new':value}},person_id=person_id,type_id=kind.id)
+        result={'id':current.id if current else None,'revision':current.revision if current else None,'number':value}
+    return result

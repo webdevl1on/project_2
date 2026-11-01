@@ -70,7 +70,7 @@ def test_presence_contents_and_copies_are_independent(factory,prepared,tmp_path)
         assert before['automatic_status']=='PARTIALLY_FILLED' and before['presence']=='PRESENT'
         storage=DocumentStorage(tmp_path/'private')
         files.attach(db,editor,pid,key,before['revision'],b'%PDF-1.7 test','front.pdf','front',storage=storage)
-        files.attach(db,editor,pid,key,before['revision'],b'%PDF-1.7 second','back.pdf','back',storage=storage)
+        files.attach(db,editor,pid,key,row(db,pid,key)['revision'],b'%PDF-1.7 second','back.pdf','back',storage=storage)
         after=row(db,pid,key)
         assert after['has_copies'] and len(after['files'])==2 and after['automatic_status']==before['automatic_status']
         docs.set_presence(db,editor,pid,'driving_license','NEVER_OBTAINED',revision=after['presence_revision'])

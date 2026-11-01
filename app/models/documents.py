@@ -94,8 +94,9 @@ class DocumentFile(SystemTimestamps, Base):
     size: Mapped[int] = mapped_column(Integer)
     sha256: Mapped[str] = mapped_column(String(64))
     side: Mapped[str] = mapped_column(String(20))
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default='0', nullable=False)
     is_removed: Mapped[bool] = mapped_column(default=False)
-    __table_args__ = (CheckConstraint("side IN ('front','back','page','other')"), CheckConstraint('size > 0'))
+    __table_args__ = (CheckConstraint("side IN ('front','back','page','other')"), CheckConstraint('size > 0'), CheckConstraint('sort_order >= 0'), Index('document_file_order','document_id','sort_order','id'))
 
 
 class DocumentAudit(Base):

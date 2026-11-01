@@ -6,12 +6,14 @@
 <div data-document-content hidden>
 <button type="button" data-document-new class="btn btn-sm btn-primary">+ Новий запис</button>
 <div data-document-editor hidden class="border rounded p-3 my-2">
+<h3 class="h5" data-document-editor-title>Новий документ</h3>
 <form data-document-form class="row g-2">
 <div class="col-12"><label class="w-100">Тип документа<select name="type" class="form-select" data-document-type></select></label></div>
 <p class="small text-secondary">Незаповнені реквізити можна зберегти для подальшого уточнення. Комплектність обчислюється окремо від наявності й копій.</p>
 <p data-document-replacement class="alert alert-info" hidden></p>
 <div data-document-fields class="row g-2"></div>
 <div data-document-categories hidden><h3 class="h6">Категорії транспортних засобів</h3><div data-driving-rows></div><button type="button" data-driving-add class="btn btn-sm btn-outline-secondary">Додати категорію</button></div>
+<fieldset><legend class="h6">Копії документа</legend><input type="file" multiple accept=".jpg,.jpeg,.png,.pdf" data-document-draft-files aria-label="Копії нового документа" class="form-control"><div data-document-queue></div></fieldset>
 <div><button class="btn btn-primary">Зберегти</button> <button type="button" data-document-cancel class="btn btn-outline-secondary">Скасувати</button></div>
 </form></div>
 <label class="small my-2"><input type="checkbox" data-document-history> Показати архівні документи</label>
@@ -20,4 +22,9 @@
 <section data-document-archive hidden aria-labelledby="document-archive-title"><hr><h3 id="document-archive-title" class="h5">Архівні документи</h3><div data-document-archive-list></div></section>
 </div>
 <details class="mt-3"><summary>Журнал документів</summary><div data-document-audit></div></details>
-</div></section>
+</div>
+
+<div class="modal fade" data-document-discard-modal tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-body">Є незбережені реквізити або вибрані файли.</div><div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Продовжити редагування</button><button class="btn btn-danger" data-discard-confirm>Відхилити зміни</button></div></div></div></div>
+<div class="modal fade" data-document-viewer tabindex="-1" aria-label="Перегляд документа"><div class="modal-dialog modal-xl"><div class="modal-content"><div class="modal-header"><h3 class="h6" data-view-title></h3><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button></div><div class="modal-body" style="max-height:75vh;overflow:auto"><img alt="Копія документа" style="width:100%;height:auto"></div><div class="modal-footer"><button class="btn btn-secondary" data-view-prev>Попередня фотографія</button><button class="btn btn-secondary" data-view-next>Наступна фотографія</button><button class="btn btn-secondary" data-view-zoom>Збільшити / зменшити</button></div></div></div></div>
+
+</section>

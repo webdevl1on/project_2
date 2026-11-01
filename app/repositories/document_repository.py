@@ -33,7 +33,12 @@ class DocumentRepository:
     def categories(db, key): return list(db.scalars(select(DrivingCategory).where(DrivingCategory.document_id==key).order_by(DrivingCategory.id)))
 
     @staticmethod
-    def files(db, key): return list(db.scalars(select(DocumentFile).where(DocumentFile.document_id==key).order_by(DocumentFile.id)))
+    def files(db, key): return list(db.scalars(select(DocumentFile).where(DocumentFile.document_id==key).order_by(DocumentFile.sort_order,DocumentFile.id)))
+
+    @staticmethod
+    def upload_receipt(db, key, token):
+        rows=db.scalars(select(DocumentAudit).where(DocumentAudit.document_id==key,DocumentAudit.operation=='file_add'))
+        return next((row for row in rows if row.changes.get('request_id')==token),None)
 
     @staticmethod
     def file(db, key): return db.get(DocumentFile, key)

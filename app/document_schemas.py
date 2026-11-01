@@ -32,7 +32,7 @@ def editor_schema(key):
     """Serializable UI contract backed by existing validation/storage policies."""
     if key not in SCHEMAS:return None
     if key=='tax_number':
-        return {'fields':[{'key':'number','label':'РНОКПП','kind':'readonly','max_length':10}], 'required_for_filled':list(SCHEMAS[key][2]),'categories':False}
+        return {'fields':[{'key':'number','label':'РНОКПП','kind':'text','max_length':10}], 'required_for_filled':list(SCHEMAS[key][2]),'categories':False}
     fields=[]
     if key=='passport':
         fields.append({'key':'subtype','label':'Тип паспорта','kind':'select','choices':{'book':'Книжечка','id':'ID-картка'}})

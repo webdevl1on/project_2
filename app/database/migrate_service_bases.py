@@ -39,9 +39,9 @@ def migrate(database):
                 if table.name not in present:
                     if table.name in NEW_TABLE_NAMES: continue
                     raise ValueError(f'Немає {table.name}; спочатку виконайте попередні міграції.')
-                if not {c.name for c in table.columns} <= columns(connection, table.name):
+                if not {c.name for c in table.columns if not (table.name=='document_files' and c.name=='sort_order')} <= columns(connection, table.name):
                     raise ValueError(f'Неповна структура {table.name}; автоматичне виправлення заборонено.')
-                if table.name in NEW_TABLE_NAMES and not {i.name for i in table.indexes} <= indexes:
+                if table.name in NEW_TABLE_NAMES and not {i.name for i in table.indexes if i.name!='document_file_order'} <= indexes:
                     raise ValueError(f'Відсутні необхідні індекси {table.name}; потрібна окрема перевірка.')
             required = required_sqlite_triggers() | {'exact_assignment_orders_insert', 'exact_assignment_orders_update'}
             if not required <= installed or 'person_positions' in present:

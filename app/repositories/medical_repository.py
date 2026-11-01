@@ -31,6 +31,6 @@ class MedicalRepository:
         from app.models import PersonDocument
         return list(db.scalars(select(MedicalDocumentLink).join(PersonDocument,PersonDocument.id==MedicalDocumentLink.document_id).where(PersonDocument.person_id==pid).order_by(MedicalDocumentLink.id)))
     @staticmethod
-    def files(db,document_id):return list(db.scalars(select(DocumentFile).where(DocumentFile.document_id==document_id,DocumentFile.is_removed.is_(False))))
+    def files(db,document_id):return list(db.scalars(select(DocumentFile).where(DocumentFile.document_id==document_id,DocumentFile.is_removed.is_(False)).order_by(DocumentFile.sort_order,DocumentFile.id)))
     @staticmethod
     def audits(db,pid):return list(db.scalars(select(PersonnelAudit).where(PersonnelAudit.person_id==pid).order_by(PersonnelAudit.id.desc())))

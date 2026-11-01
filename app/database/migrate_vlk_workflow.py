@@ -31,7 +31,7 @@ def upgrade(db):
     db.execute('ALTER TABLE _vlk_exams_new RENAME TO person_medical_exams')
     for index in table.indexes:db.execute(str(CreateIndex(index).compile(dialect=sqlite.dialect())))
     for name,sql in original_indexes:
-        if name not in {i.name for i in table.indexes}:db.execute(sql)
+        if name not in {i.name for i in table.indexes if i.name!='document_file_order'}:db.execute(sql)
     db.execute('ALTER TABLE personnel_tasks ADD COLUMN exam_id INTEGER REFERENCES person_medical_exams(id)')
     for index in Base.metadata.tables['personnel_tasks'].indexes:
         if not db.execute("SELECT 1 FROM sqlite_master WHERE type='index' AND name=?",(index.name,)).fetchone():db.execute(str(CreateIndex(index).compile(dialect=sqlite.dialect())))
@@ -54,7 +54,7 @@ def migrate(database):
             for table in Base.metadata.sorted_tables:
                 from app.models.profile_records import NEW_TABLE_NAMES as PROFILE_TABLES
                 if table.name in PROFILE_TABLES: continue
-                if table.name not in present or not {c.name for c in table.columns}-ADDED.get(table.name,set()) <= columns(db,table.name):raise ValueError('Неповна попередня схема: '+table.name)
+                if table.name not in present or not {c.name for c in table.columns if not (table.name=='document_files' and c.name=='sort_order')}-ADDED.get(table.name,set()) <= columns(db,table.name):raise ValueError('Неповна попередня схема: '+table.name)
             found={t:columns(db,t)&added for t,added in ADDED.items()}
             for t,added in ADDED.items():
                 allowed={c.name for c in Base.metadata.tables[t].columns}

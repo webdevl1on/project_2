@@ -45,14 +45,14 @@ def migrate(database):
             for table in Base.metadata.sorted_tables:
                 if table.name in NEW_TABLE_NAMES:
                     continue
-                if table.name not in present or not {c.name for c in table.columns} <= columns(db,table.name):
+                if table.name not in present or not {c.name for c in table.columns if not (table.name=='document_files' and c.name=='sort_order')} <= columns(db,table.name):
                     raise ValueError('Неповна попередня схема: '+table.name)
             installed={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='trigger'")}
             required=required_sqlite_triggers() | GUARD_NAMES | GUARDS | {'exact_assignment_orders_insert','exact_assignment_orders_update','exact_service_basis_insert','exact_service_basis_update'}
             if not required <= installed:
                 raise ValueError('Відсутні захисні тригери попередньої схеми.')
             indexes={r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='index'")}
-            required_indexes={i.name for t in Base.metadata.sorted_tables if t.name not in NEW_TABLE_NAMES for i in t.indexes}
+            required_indexes={i.name for t in Base.metadata.sorted_tables if t.name not in NEW_TABLE_NAMES for i in t.indexes if i.name!='document_file_order'}
             if not required_indexes <= indexes:
                 raise ValueError('Відсутні індекси попередньої схеми.')
             if present & NEW_TABLE_NAMES:

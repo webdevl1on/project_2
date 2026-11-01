@@ -84,19 +84,19 @@ async def archive(request:Request,person_id:int,key:int,user=Depends(current_use
 
 
 @router.post('/{key:int}/files')
-async def upload(person_id:int,key:int,file:UploadFile=File(),revision:int=Form(),side:str=Form('other'),user=Depends(current_user),db:Session=Depends(get_db)):
+async def upload(person_id:int,key:int,file:UploadFile=File(),revision:int=Form(),side:str=Form('other'),request_id:str|None=Form(None),user=Depends(current_user),db:Session=Depends(get_db)):
     try:
-        file_id=document_files.attach(db,user.id,person_id,key,revision,await file.read(MAX_FILE_SIZE+1),file.filename,side)
+        file_id=document_files.attach(db,user.id,person_id,key,revision,await file.read(MAX_FILE_SIZE+1),file.filename,side,request_id=request_id)
         return {'ok':True,'id':file_id}
     except (ValueError,PermissionError,OSError) as error:return failure(error)
     finally:await file.close()
 
 
 @router.get('/files/{file_id:int}')
-def download(person_id:int,file_id:int,history:bool=False,user=Depends(current_user),db:Session=Depends(get_db)):
+def download(person_id:int,file_id:int,history:bool=False,inline:bool=False,user=Depends(current_user),db:Session=Depends(get_db)):
     try:
         row,path=document_files.download(db,user.id,person_id,file_id,history=history)
-        return FileResponse(path,media_type=row.content_type,filename=row.original_name,
+        return FileResponse(path,media_type=row.content_type,filename=row.original_name,content_disposition_type='inline' if inline and row.content_type in ('image/jpeg','image/png','application/pdf') else 'attachment',
             headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox"})
     except (ValueError,PermissionError) as error:return failure(error)
 
@@ -106,4 +106,21 @@ async def remove(request:Request,person_id:int,file_id:int,user=Depends(current_
     data=await payload(request)
     try:
         document_files.remove(db,user.id,person_id,file_id,data.get('revision'),data.get('reason'));return {'ok':True}
+    except (ValueError,PermissionError) as error:return failure(error)
+
+
+@router.post('/tax-number')
+async def tax_number(request:Request,person_id:int,user=Depends(current_user),db:Session=Depends(get_db)):
+    data=await payload(request)
+    try:
+        if 'expected' not in data:raise ValueError('Потрібне попереднє значення РНОКПП.')
+        return {'ok':True,**service.update_tax_number(db,user.id,person_id,data.get('number'),data['expected'],key=data.get('id'),revision=data.get('revision'))}
+    except (ValueError,PermissionError) as error:return failure(error)
+
+
+@router.post('/{key:int}/files/order')
+async def file_order(request:Request,person_id:int,key:int,user=Depends(current_user),db:Session=Depends(get_db)):
+    data=await payload(request)
+    try:
+        document_files.reorder(db,user.id,person_id,key,data.get('ids'),data.get('revision'));return {'ok':True}
     except (ValueError,PermissionError) as error:return failure(error)

@@ -31,7 +31,7 @@ def migrate(database):
                 if table.name in DOCUMENT_TABLES: continue
                 if table.name in NEW_TABLE_NAMES: continue
                 if table.name=='person_position_mirages':continue
-                required={c.name for c in table.columns}-ADDED_COLUMNS.get(table.name,set())
+                required={c.name for c in table.columns if not (table.name=='document_files' and c.name=='sort_order')}-ADDED_COLUMNS.get(table.name,set())
                 if table.name not in tables or not required<=columns(connection,table.name):raise ValueError(f'Попередня схема {table.name} неповна; спочатку виконайте попередні міграції.')
             triggers={r[0] for r in connection.execute("SELECT name FROM sqlite_master WHERE type='trigger'")}
             if not required_sqlite_triggers()<=triggers:raise ValueError('Немає чинних кадрових/точних тригерів.')

@@ -28,7 +28,7 @@ def migrate(database):
             for table in Base.metadata.sorted_tables:
                 from app.models.profile_records import NEW_TABLE_NAMES as PROFILE_TABLES
                 if table.name in PROFILE_TABLES: continue
-                if not {c.name for c in table.columns}<=columns(db,table.name):raise ValueError('Попередня схема неповна: '+table.name)
+                if not {c.name for c in table.columns if not (table.name=='document_files' and c.name=='sort_order')}<=columns(db,table.name):raise ValueError('Попередня схема неповна: '+table.name)
             from app.models.medical import GUARDS
             from app.models.documents import GUARD_NAMES
             from app.database.schema_check import required_sqlite_triggers

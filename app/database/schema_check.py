@@ -41,7 +41,11 @@ def require_current_schema(engine):
     if 'personnel_tasks' in tables and 'one_injury_vlk_task' not in {i['name'] for i in inspector.get_indexes('personnel_tasks')}:
         missing.append('index:one_injury_vlk_task')
     if 'personnel_tasks' in tables and 'exam_id' in {c['name'] for c in inspector.get_columns('personnel_tasks')} and 'one_exam_control_task' not in {i['name'] for i in inspector.get_indexes('personnel_tasks')}:missing.append('index:one_exam_control_task')
+    if 'document_files' in tables and 'document_file_order' not in {i['name'] for i in inspector.get_indexes('document_files')}:
+        missing.append('index:document_file_order')
     if missing:
+        if set(missing)<={'document_files.sort_order','index:document_file_order'}:
+            raise ValueError('Потрібна міграція: python -m app.database.migrate_document_file_order --database PATH. Автоматично БД не змінено.')
         from app.models.profile_records import NEW_TABLE_NAMES as PROFILE_TABLES
         if set(missing) <= PROFILE_TABLES:
             raise ValueError('Потрібна безпечна міграція: python -m app.database.migrate_profile_records --database PATH. Автоматично БД не змінено.')

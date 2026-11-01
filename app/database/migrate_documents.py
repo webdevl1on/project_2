@@ -56,7 +56,7 @@ def migrate(database):
                 if table.name in PROFILE_TABLES: continue
                 if table.name in MEDICAL_TABLES: continue
                 if table.name in NEW_TABLE_NAMES:continue
-                if table.name not in present or not {c.name for c in table.columns}<=columns(connection,table.name):
+                if table.name not in present or not {c.name for c in table.columns if not (table.name=='document_files' and c.name=='sort_order')}<=columns(connection,table.name):
                     raise ValueError(f'Попередня схема {table.name} неповна; спочатку виконайте попередні міграції.')
             required=required_sqlite_triggers()|{'exact_assignment_orders_insert','exact_assignment_orders_update','exact_service_basis_insert','exact_service_basis_update'}
             if not required<=installed or 'person_positions' in present:raise ValueError('Немає актуальних кадрових/календарних тригерів.')
@@ -65,7 +65,7 @@ def migrate(database):
                 indexes={r[0] for r in connection.execute("SELECT name FROM sqlite_master WHERE type='index'")}
                 for name in NEW_TABLE_NAMES:
                     table=Base.metadata.tables[name]
-                    if not {c.name for c in table.columns}<=columns(connection,name) or not {i.name for i in table.indexes}<=indexes:
+                    if not {c.name for c in table.columns if not (table.name=='document_files' and c.name=='sort_order')}<=columns(connection,name) or not {i.name for i in table.indexes if i.name!='document_file_order'}<=indexes:
                         raise ValueError(f'Неповна таблиця/індекси {name}.')
                 if not GUARDS<=installed:raise ValueError('Немає захисних тригерів документів.')
                 if not set(SCHEMAS)<=set(r[0] for r in connection.execute('SELECT code FROM document_types')):raise ValueError('Неповний довідник типів документів.')
