@@ -16,6 +16,7 @@ PostgreSQL — цільова БД; `Settings` вимагає явні PROJECT2_
 
 | Завдання | Основні файли |
 | --- | --- |
+| Події зі штатки | `docs/PERSON_EVENTS.md`, `app/routers/person_events.py`, `app/services/person_events.py`, `app/services/service_for_person_event.py`, `app/repositories/event_repository.py`, `app/templates/components/person_events.html`, `app/static/js/person_events.js` |
 | PostgreSQL, Alembic, конфігурація й засівання | `docs/POSTGRESQL_SETUP.md`, `app/database/settings.py`, `db.py`, `locking.py`, `postgresql.py`, `migrations/`, `app/services/seed_postgresql.py` |
 | Список, створення, базове редагування людини | `app/routers/persons.py`, `app/services/person_read.py`, `app/services/service_person_create.py`, `app/repositories/person_repository.py`, `app/templates/persons.html`, `app/templates/person_form.html` |
 | Стать, відмінки ПІБ, створення особи, /admin та Excel | `docs/NAME_CASES.md`, `app/name_cases.py`, `app/models/name_cases.py`, `app/services/person_registration.py`, `app/services/name_cases.py`, `app/services/name_dictionary_import.py`, `app/repositories/name_case_repository.py`, `app/routers/admin.py`, `app/routers/name_cases.py`, `app/security/admin.py` |
@@ -84,7 +85,7 @@ flowchart LR
 | `staff_repository.py` | Структури, версії, посади, призначення, вибірки на дату/період і пошук перетинів. Рішення про допустимість/виправлення/закриття залишаються у StaffService; чинні обмеження ORM/SQLite не змінені. |
 | `position_table_repository.py` | Join таблиці посад, allowlist ORM-полів, SQL фільтрів/дат/зайнятості та однорівневе сортування. Не виконує кадрових записів. |
 | `name_case_repository.py` | Словники за типом/статтю/ключем, персональні форми person_name_id та квитанції імпорту. Без commit/rollback або автоматичного відмінювання. |
-| `event_repository.py` | Події, типи/підтипи, вибірки/конфлікти та add/delete. Перевірка людини, підтипу й календаря та обчислення тривалості — у сервісах. Чинні строгі межі finite-overlap сервісу подій збережено; їх не прирівняно до включних меж штатних періодів. |
+| `event_repository.py` | Події, типи/підтипи, вибірки/конфлікти та add/delete. Перевірка людини, підтипу й календаря та обчислення тривалості — у сервісах. Перетини календарних подій включають обидві межі, зокрема одноденні запити. Незакриті події необмежені зверху. |
 
 `person_read.py` готує дані списку/карток; `staff_read.py` — версії та дату перегляду, історію й дані підтвердження. `service_person_positions.py` координує читання та обчислює значення/попередження/варіанти фільтрів; SQL виконує PositionTableRepository. ORM-записи залишаються доступними Jinja2, включно з наявними lazy-колекціями картки людини; повне переведення шаблонів на DTO не виконувалося.
 
@@ -124,7 +125,7 @@ flowchart LR
 | `service_person_rank.py` / `ServicePersonRankFunc` | Звання обирається з `Rank`. Перше стає активним, наступне додається неактивним; активність перемикається окремо. Додавання перевіряє повтор того самого звання в історії. Є редагування та видалення неактивного запису з `DELETE`. |
 | `service_person_positions.py` / `ServicePersonPositionFunc` | Координація PositionTableRepository, значення/попередження рядків і варіанти фільтрів; кадрові записи делеговано StaffService. |
 | `service_common_event_func.py` / `CommonEventFunc` | Пошук подій, типів і підтипів; перевірка належності підтипу до типу. Читання подій за person_id, незалежно від посад. |
-| `service_for_person_event.py` / `PersonEventService` | Підготовка, створення, зміна, видалення події, пошук за датами та конфліктами. У вебмаршрутах не використовується; підтримує backdated створення/редагування точних дат; історичні посади читає assignment_events.py. |
+| `service_for_person_event.py` / `PersonEventService` | Підготовка, створення, зміна, видалення події, пошук за датами та конфліктами. Використовується вебредактором через person_events.py; підтримує backdated створення/редагування точних дат і атомарне завершення однієї попередньої відкритої події; історичні посади читає assignment_events.py. |
 | `service_common_person_func.py` / `CommonPersonFunc` | Перевірена фабрика `add_pasport` без запису в БД. Невикористаний зламаний update_person видалено після пошуку викликів. |
 | `check_events.py`, `check_person_events.py` | Явні CLI-діагностики через session_scope/EventRepository; імпорт більше не відкриває БД. |
 
@@ -392,3 +393,10 @@ MedicalDocumentLink повторно використано для докуме�
 GET `/admin/staff` у `routers/admin.py` повторно використовує чинний require_admin/render і `staff_read.history_context` з необов’язковим відбором за структурою. `admin/staff.html` містить перенесені адміністративні форми й спільний `components/staff_import.html`. Чинний router staff залишається єдиним власником POST-адаптерів до StaffService/staff_import; змінено тільки адреси успішних redirect адміністративних операцій.
 
 `staff_history.html` містить лише перегляд/редагування історичних призначень, `staff_controls.html` — перехід до історії й підтвердження перепризначення. `staff_assignments.js` зберіг кадрові обробники; наявні import date controls перенесено до `staff_import.js`. Доступ/ролі, моделі, імпорт і бізнес-транзакції не перебудовані. Актуальне розміщення форм та URL — [STAFF_HISTORY.md](STAFF_HISTORY.md).
+
+
+## Події зі штатної таблиці
+
+`routers/person_events.py → services/person_events.py → PersonEventService → EventRepository` обслуговує один Bootstrap Modal зі списком, створенням і редагуванням за справжнім person_id офіційної людини. Події не належать посаді/версії, не множать рядки штатки й не переносяться під час перепризначення. Каталог колонок, URL-фільтри, копіювання та Undo/Redo не змінені.
+
+Нова подія може атомарно завершити лише одну ранішу відкриту, днем перед своїм початком; duration перераховується. Усі інші включні перетини, неоднозначна відкрита історія, неправильний підтип і неповні дати відхиляються. Редагування зберігає event_id і не завершує інші події. Транзакція блокує Person у PostgreSQL до перевірки, далі за потреби сам PersonEvent; без глобального DB-lock. UI перевіряє відбиток початкових полів, зберігає форму при відмові та показує всі конфлікти. Схема/міграції не змінені. Контракти, межі доступу та тести — [PERSON_EVENTS.md](PERSON_EVENTS.md).

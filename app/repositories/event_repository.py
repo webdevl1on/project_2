@@ -1,21 +1,24 @@
-"""Event access, preserving the existing overlap boundary semantics."""
+"""Event persistence and inclusive calendar-period queries; no commits."""
 from sqlalchemy import select, and_, or_
 from app.models import PersonEvent, EventType, EventSubtype
+from app.database.locking import locked_get
 
 
 def overlap_conditions(start, end):
-    # Keep strict finite boundaries used by the existing event service.
-    if end is None:
-        return or_(PersonEvent.date_end.is_(None), PersonEvent.date_end > start)
-    return or_(and_(PersonEvent.date_end.is_not(None), PersonEvent.date_start < end,
-                    PersonEvent.date_end > start),
-               and_(PersonEvent.date_end.is_(None), PersonEvent.date_start < end))
+    conditions = [or_(PersonEvent.date_end.is_(None), PersonEvent.date_end >= start)]
+    if end is not None:
+        conditions.append(PersonEvent.date_start <= end)
+    return and_(*conditions)
 
 
 class EventRepository:
     @staticmethod
     def get(db, key):
-        return db.get(PersonEvent, key)
+        return locked_get(db, PersonEvent, key)
+
+    @staticmethod
+    def owner_id(db, key):
+        return db.scalar(select(PersonEvent.person_id).where(PersonEvent.event_id == key))
 
     @staticmethod
     def get_type(db, key):
@@ -27,7 +30,11 @@ class EventRepository:
 
     @staticmethod
     def types(db):
-        return db.scalars(select(EventType)).all()
+        return db.scalars(select(EventType).order_by(EventType.event_type_id)).all()
+
+    @staticmethod
+    def subtypes(db):
+        return db.scalars(select(EventSubtype).order_by(EventSubtype.event_subtype_id)).all()
 
     @staticmethod
     def all(db):
@@ -36,14 +43,15 @@ class EventRepository:
     @staticmethod
     def for_person(db, person_id):
         return db.scalars(select(PersonEvent).where(PersonEvent.person_id == person_id)
-                          .order_by(PersonEvent.date_start.asc())).all()
+                          .order_by(PersonEvent.date_start, PersonEvent.event_id)).all()
 
     @staticmethod
     def conflicts(db, person_id, start, end, exclude=None):
         stmt = select(PersonEvent).where(PersonEvent.person_id == person_id, overlap_conditions(start, end))
         if exclude is not None:
             stmt = stmt.where(PersonEvent.event_id != exclude)
-        return db.scalars(stmt.order_by(PersonEvent.date_start.asc())).all()
+        return db.scalars(stmt.order_by(PersonEvent.date_start, PersonEvent.event_id)
+                          .execution_options(populate_existing=True)).all()
 
     @staticmethod
     def by_date(db, person_id, start, end):

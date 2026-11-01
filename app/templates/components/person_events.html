@@ -1,0 +1,31 @@
+<div class="modal fade" id="person-events-modal" tabindex="-1" aria-labelledby="person-events-title" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
+    <div class="modal-header"><h2 class="modal-title h5" id="person-events-title">Події військовослужбовця</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button></div>
+    <div class="modal-body">
+      <p data-events-person class="fw-semibold"></p>
+      <div data-events-message role="status" aria-live="polite"></div>
+      <ul data-events-conflicts class="text-danger" hidden></ul>
+      <div class="d-flex gap-2 mb-3"><button type="button" class="btn btn-primary" data-event-new disabled>Додати подію</button><button type="button" class="btn btn-outline-secondary" data-events-reload>Оновити список</button></div>
+      <section data-event-editor hidden class="border rounded p-3 mb-3" aria-labelledby="event-editor-title">
+        <h3 id="event-editor-title" class="h6" data-event-editor-title>Нова подія</h3>
+        <form data-event-form class="row g-2">
+          <input type="hidden" name="expected_state">
+          <div class="col-md-6"><label class="w-100">Тип події<select name="event_type_id" class="form-select" required></select></label></div>
+          <div class="col-md-6"><label class="w-100">Підтип події<select name="event_subtype_id" class="form-select"></select></label></div>
+          <div class="col-md-4"><label class="w-100">Початок<input type="date" name="date_start" class="form-control" required></label></div>
+          <div class="col-md-4"><label class="w-100">Завершення<input type="date" name="date_end" class="form-control"></label></div>
+          <div class="col-md-4"><label class="w-100">Тривалість, днів<input type="number" name="duration" class="form-control" min="1" step="1"></label></div>
+          <p class="small text-secondary mb-1">Без завершення й тривалості подія залишається відкритою — «по сьогодні». Для завершеної події обидва граничні дні включаються до тривалості. Якщо є лише одна попередня незакрита подія й немає інших конфліктів, вона завершиться днем перед новою.</p>
+          <div class="col-md-6"><label class="w-100">Дата наказу<input type="date" name="order_date" class="form-control"></label></div>
+          <div class="col-md-6"><label class="w-100">Номер наказу<input name="order_number" class="form-control"></label></div>
+          <div class="col-md-6"><label class="w-100">Мета<input name="purpose" class="form-control"></label></div>
+          <div class="col-md-6"><label class="w-100">Місце<input name="location" class="form-control" maxlength="255"></label></div>
+          <div class="col-12"><label class="w-100">Примітка<textarea name="note" class="form-control" maxlength="1000" rows="2"></textarea></label></div>
+          <div class="col-12"><label class="w-100">Статус<input name="event_status" class="form-control"></label></div>
+          <div class="col-12 d-flex gap-2"><button type="submit" class="btn btn-primary">Зберегти подію</button><button type="button" class="btn btn-outline-secondary" data-event-cancel>Скасувати</button></div>
+        </form>
+      </section>
+      <section aria-label="Історія подій"><div data-events-list></div></section>
+    </div>
+  </div></div>
+</div>

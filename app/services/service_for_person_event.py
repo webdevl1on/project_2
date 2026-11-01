@@ -7,11 +7,32 @@ from app.services.service_common_event_func import CommonEventFunc
 from app.validators.event_validatotor import EventValidator
 
 
+class EventValidationError(ValueError):
+    def __init__(self, message, field):
+        super().__init__(message)
+        self.field = field
+
+
+def exact_date(value, field, *, required=False):
+    try:
+        return EventValidator.validate_event_date(value, required=required)
+    except ValueError as error:
+        raise EventValidationError(str(error), field) from error
+
+
+def duration_days(value):
+    try:
+        return EventValidator.validate_event_duration(value)
+    except (ValueError, TypeError, OverflowError) as error:
+        raise EventValidationError('Тривалість має бути додатним цілим числом днів.', 'duration') from error
+
+
 class PersonEventService:
     """Event rules; db= joins the caller's transaction without committing it.
 
     Standalone calls retain the session_factory API. A conflicting create/edit
-    still returns the existing event list instead of saving a new state.
+    returns the complete conflict list without saving a partial state. Only a
+    single previous open conflict may be closed atomically during creation.
     """
 
     @staticmethod
@@ -21,12 +42,29 @@ class PersonEventService:
     @staticmethod
     def compare_date_end_and_duration(person_event):
         if person_event.date_end is not None and person_event.date_end < person_event.date_start:
-            raise ValueError("Дата завершення не може передувати початку.")
+            raise EventValidationError("Дата завершення не може бути раніше дати початку.", "date_end")
         if person_event.duration is not None and person_event.date_end is not None:
             if (person_event.date_end - person_event.date_start).days+1 != person_event.duration:
-                raise ValueError("Incorrect duration and end date")
+                raise EventValidationError("Тривалість не відповідає датам початку та завершення (обидві дати включні).", "duration")
         elif person_event.duration is not None and person_event.date_end is None:
-            person_event.date_end = person_event.date_start + timedelta(days=person_event.duration-1)
+            try:
+                person_event.date_end = person_event.date_start + timedelta(days=person_event.duration-1)
+            except (OverflowError, ValueError) as error:
+                raise EventValidationError("Тривалість виходить за допустимий календарний період.", "duration") from error
+        if person_event.date_end is not None:
+            person_event.duration = (person_event.date_end - person_event.date_start).days + 1
+
+    @staticmethod
+    def validate_catalog(event_type, event_subtype, previous=None):
+        if not event_type.event_is_active and (previous is None or previous.event_type_id != event_type.event_type_id):
+            raise EventValidationError("Цей тип події неактивний. Оберіть активний тип.", "event_type_id")
+        try:
+            CommonEventFunc.validate_event_subtype_belongs_to_type(event_type, event_subtype)
+        except ValueError as error:
+            # Retain the established diagnostic for non-HTTP service callers.
+            raise EventValidationError("Підтип не належить обраному типу події (does not belong).", "event_subtype_id") from error
+        if event_subtype and not event_subtype.event_subtype_is_active and (previous is None or previous.event_subtype_id != event_subtype.event_subtype_id):
+            raise EventValidationError("Цей підтип неактивний. Оберіть активний підтип.", "event_subtype_id")
 
     @staticmethod
     def prepare_new_person_event(
@@ -45,18 +83,10 @@ class PersonEventService:
         person_event = models.PersonEvent(
             event_type_id=event_type.event_type_id,
             event_subtype_id=event_subtype.event_subtype_id if event_subtype else None,
-            date_start=EventValidator.validate_event_date(
-                date_start, required=True
-            ),
-            duration=EventValidator.validate_event_duration(
-                duration
-            ),
-            date_end=EventValidator.validate_event_date(
-                date_end
-            ),
-            order_date=EventValidator.validate_event_date(
-                order_date
-            ),
+            date_start=exact_date(date_start, "date_start", required=True),
+            duration=duration_days(duration),
+            date_end=exact_date(date_end, "date_end"),
+            order_date=exact_date(order_date, "order_date"),
             order_number=order_number.strip() if order_number else None,
             purpose=purpose.strip() if purpose else None,
             location=EventValidator.validate_event_location(
@@ -89,9 +119,7 @@ class PersonEventService:
             person = ServicePersonCheck.get_person_or_raise(person_id,db)
             event_type = CommonEventFunc.get_event_type_or_raise(event_type_id,db)
             event_subtype = CommonEventFunc.get_event_subtype_or_raise(event_subtype_id,db) if event_subtype_id else None
-            CommonEventFunc.validate_event_subtype_belongs_to_type(
-                event_type,
-                event_subtype)
+            PersonEventService.validate_catalog(event_type, event_subtype)
             person_event = PersonEventService.prepare_new_person_event(
                     event_type,
                     event_subtype,
@@ -108,7 +136,18 @@ class PersonEventService:
             PersonEventService.compare_date_end_and_duration(person_event)
             conflicts = PersonEventService.get_conflicting_events(person_id, person_event.date_start, person_event.date_end, db)
             if conflicts:
-                return conflicts
+                # Inspect ALL conflicts before changing the previous record.
+                # Finite conflicts, equal/later starts or ambiguous open history
+                # must never be silently rewritten.
+                if len(conflicts) != 1 or conflicts[0].date_end is not None or conflicts[0].date_start >= person_event.date_start:
+                    return conflicts
+                previous = conflicts[0]
+                previous_end = person_event.date_start - timedelta(days=1)
+                historical_conflicts = EventRepository.conflicts(db, person.person_id, previous.date_start, previous_end, previous.event_id)
+                if historical_conflicts:
+                    return [previous, *historical_conflicts]
+                previous.date_end = previous_end
+                previous.duration = (previous.date_end - previous.date_start).days + 1
             EventRepository.add(db, person_event)
             db.flush()
             db.refresh(person_event)
@@ -131,13 +170,15 @@ class PersonEventService:
         *, db=None, session_factory=None
     ):
         with session_scope(db, session_factory=session_factory, write=True) as db:
+            owner = EventRepository.owner_id(db, event_id)
+            if owner is None:
+                raise ValueError("Подію не знайдено.")
+            # Always lock Person before an event, matching creation lock order.
+            ServicePersonCheck.get_person_or_raise(owner, db)
             person_event_old = CommonEventFunc.get_event_or_raise(event_id, db)
             event_type = CommonEventFunc.get_event_type_or_raise(event_type_id,db)
             event_subtype = CommonEventFunc.get_event_subtype_or_raise(event_subtype_id,db) if event_subtype_id else None
-            CommonEventFunc.validate_event_subtype_belongs_to_type(
-                event_type,
-                event_subtype
-            )
+            PersonEventService.validate_catalog(event_type, event_subtype, person_event_old)
             person_event_new = PersonEventService.prepare_new_person_event(
                 event_type,
                 event_subtype,

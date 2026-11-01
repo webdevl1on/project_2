@@ -265,7 +265,8 @@
                         <td data-column-key="{{ column.key }}" {% if not column.default_visible %} hidden{% endif %}>
                             {% if column.key == "assignment" %}
                             <div class="assignment-summary">
-                                <button type="button" class="assignment-toggle" data-assignment-toggle aria-expanded="false" aria-controls="assignment-editor-{{ item.position.position_id }}" title="Офіційно: {{ people_labels.get(item.assignment.person_id,'Без ПІБ') if item.assignment else 'Вакантна' }} — редагувати призначення">Офіційно: {{ people_labels.get(item.assignment.person_id,'Без ПІБ') if item.assignment else 'Вакантна' }}</button>
+                                <div class="d-flex align-items-center gap-1"><button type="button" class="assignment-toggle flex-grow-1" style="min-width:0" data-assignment-toggle aria-expanded="false" aria-controls="assignment-editor-{{ item.position.position_id }}" title="Офіційно: {{ people_labels.get(item.assignment.person_id,'Без ПІБ') if item.assignment else 'Вакантна' }} — редагувати призначення">Офіційно: {{ people_labels.get(item.assignment.person_id,'Без ПІБ') if item.assignment else 'Вакантна' }}</button>
+                                {% if item.assignment %}<button type="button" class="btn btn-sm btn-outline-secondary py-0 flex-shrink-0" data-events-open data-person-id="{{ item.assignment.person_id }}" data-events-person-label="{{ people_labels.get(item.assignment.person_id,'Без ПІБ') }}" title="Події військовослужбовця">Події</button>{% endif %}</div>
                                 <span class="small text-warning" data-assignment-draft hidden>Чернетка</span>
                                 {% for mirage in (mirages_by_position|default({})).get(item.position.position_id,[]) %}<div class="assignment-mirage" title="{{ people_labels.get(mirage.person_id,'Без ПІБ') }} · Міраж — не офіційне призначення"><a href="/person_full_info/{{ mirage.person_id }}">{{ people_labels.get(mirage.person_id,'Без ПІБ') }}</a> · Міраж</div>{% endfor %}
                             </div>
@@ -315,7 +316,9 @@
         </div>
     </div>
 
+    {% include 'components/person_events.html' %}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/person_events.js"></script>
     <script src="/static/js/table_state.js"></script>
     <script src="/static/js/column_tree.js"></script>
     <script src="/static/js/column_presets.js"></script>
