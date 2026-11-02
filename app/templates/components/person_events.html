@@ -28,6 +28,14 @@
           <div class="col-12 d-flex gap-2"><button type="submit" class="btn btn-primary">Зберегти подію</button><button type="button" class="btn btn-outline-secondary" data-event-cancel>Скасувати</button></div>
         </form>
       </section>
+      <section class="alert alert-warning" data-event-type-confirm role="alertdialog" aria-label="Зміна типу події" tabindex="-1" hidden>
+        <p data-event-type-confirm-text></p><button type="button" class="btn btn-primary" data-event-type-yes>Підтвердити зміну</button><button type="button" class="btn btn-outline-secondary" data-event-type-no>Скасувати</button>
+      </section>
+      <section class="border border-warning rounded p-3 mb-3" data-event-annul-confirm hidden>
+        <h3 class="h6">Анулювати подію</h3><p data-event-annul-description></p>
+        <form data-event-annul-form><label class="w-100">Причина анулювання<textarea name="reason" class="form-control" required maxlength="2000"></textarea></label>
+        <div data-event-annul-error role="alert" class="text-danger"></div><div class="d-flex gap-2 mt-2"><button type="submit" class="btn btn-danger">Підтвердити анулювання</button><button type="button" class="btn btn-outline-secondary" data-event-annul-no>Скасувати</button></div></form>
+      </section>
       <section aria-label="Історія подій"><div data-events-list></div></section>
     </div>
   </div></div>

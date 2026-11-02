@@ -9,7 +9,9 @@
     const conflictList = modal.querySelector('[data-events-conflicts]');
     const list = modal.querySelector('[data-events-list]');
     const newButton = modal.querySelector('[data-event-new]');
-    let personId = null, model = null, editing = null, saving = false, baseline = '';
+    let personId = null, model = null, editing = null, saving = false, baseline = '', confirmedType = null, annulling = null;
+    const typeConfirm=modal.querySelector('[data-event-type-confirm]'),annulConfirm=modal.querySelector('[data-event-annul-confirm]'),annulForm=modal.querySelector('[data-event-annul-form]');
+    const typeIntent=()=>editing?`${editing.event_id}:${editing.event_type_id}:${field('event_type_id').value}`:null;
     const values = () => JSON.stringify([...new FormData(form)]);
     const dirty = () => !editor.hidden && values() !== baseline;
     const endpoint = () => `/persons/${personId}/events`;
@@ -52,6 +54,8 @@
     }
     function openEditor(record = null) {
         if (saving || (dirty() && !window.confirm('Відхилити незбережені зміни події?'))) return;
+        if(record?.annulled_at)return;
+        confirmedType=null;typeConfirm.hidden=true;
         editing = record; form.reset(); clearErrors(); notice('');
         typeOptions(record?.event_type_id); subtypes(record?.event_subtype_id || '');
         for (const input of form.elements) if (input.name && !input.name.endsWith('_id')) { if(input.type==='checkbox')input.checked=Boolean(record?.[input.name]); else input.value = record?.[input.name] ?? ''; }
@@ -59,9 +63,32 @@
         editor.hidden = false; baseline = values(); field('event_type_id').focus();
     }
     const displayDate = value => value ? value.split('-').reverse().join('.') : '';
+    const timestamp = value => value ? new Intl.DateTimeFormat('uk-UA',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'UTC'}).format(new Date(value))+' UTC' : '';
+    const make = (tag,text) => {const el=document.createElement(tag);if(text!=null)el.textContent=text;return el;};
+    function correctionHistory(record){
+        const history=make('details');history.className='small mt-2';history.append(make('summary',`Історія виправлень (${record.corrections.length})`));
+        for(const row of record.corrections){const line=make('p');line.className='mb-1';line.textContent=(row.operation==='type_change'?`Тип: «${row.before.type_name}» → «${row.after.type_name}»`:'Анулювання')+' · '+timestamp(row.occurred_at)+' · '+(row.actor_name || (row.actor_id?'Користувач №'+row.actor_id:'Автор невідомий'));history.append(line);}
+        return history;
+    }
+    function renderArchive(records,container,view=null){
+        if(!records?.length)return;
+        const archive=make('details');archive.dataset.eventAnnulledArchive='';archive.className='event-annulled-archive mt-3';archive.append(make('summary',`Архів анульованих подій (${records.length})`));
+        for(const record of records){const card=make('article');card.dataset.annulledEventId=record.event_id;card.className='border rounded p-2 mt-2 bg-light text-secondary';
+            card.append(make('strong','Анульовано · '+record.type_name+(record.subtype_name?' · '+record.subtype_name:'')),make('p',record.period),make('p','Причина: '+record.annulment_reason),make('p',timestamp(record.annulled_at)+' · '+(record.annulled_by?'Користувач №'+record.annulled_by:'Автор невідомий')));
+            if(record.corrections?.length)card.append(correctionHistory(record));
+            if(view){const button=make('button','Історія виправлень');button.type='button';button.className='btn btn-sm btn-outline-secondary';button.addEventListener('click',()=>view(record));card.append(button);}
+            archive.append(card);
+        }
+        container.append(archive);
+    }
+    function requestAnnul(record){
+        if(saving||record.annulled_at)return;annulling=record;annulForm.reset();annulForm.querySelector('[data-event-annul-error]').textContent='';
+        modal.querySelector('[data-event-annul-description]').textContent=record.type_name+' · '+record.period+'. Анулюється збережений запис; чернетка не записується.';
+        annulConfirm.hidden=false;annulForm.elements.reason.focus();
+    }
     function render() {
         list.replaceChildren();
-        if (!model.events.length) { const empty = document.createElement('p'); empty.textContent = 'Подій ще немає.'; list.append(empty); }
+        if (!model.events.length) { const empty = document.createElement('p'); empty.textContent = 'Активних або завершених подій немає.'; list.append(empty); }
         for (const record of model.events) {
             const card = document.createElement('article'); card.className = 'border rounded p-2 mb-2'; card.dataset.eventId = record.event_id;
             const title = document.createElement('strong'); title.textContent = record.type_name + (record.subtype_name ? ' · ' + record.subtype_name : '');
@@ -80,8 +107,11 @@
             edit.textContent = 'Редагувати'; edit.dataset.eventEdit = record.event_id; edit.disabled = saving;
             edit.addEventListener('click', () => openEditor(record)); card.append(title, period, detail, edit);
             if (!record.completion_confirmed && !record.mirage) { const confirm=document.createElement('button');confirm.type='button';confirm.className='btn btn-sm btn-outline-success ms-2';confirm.dataset.eventConfirm=record.event_id;confirm.textContent='Підтвердити завершення / повернення';confirm.addEventListener('click',()=>{openEditor(record);field('completion_confirmed').checked=true;field('duration').value='';field('date_end').value=record.planned_end && record.planned_end<=model.today ? record.planned_end : '';field('date_end').focus();});card.append(confirm); }
+            const annul=make('button','Анулювати');annul.type='button';annul.className='btn btn-sm btn-outline-danger ms-2';annul.dataset.eventAnnul=record.event_id;annul.disabled=saving;annul.addEventListener('click',()=>requestAnnul(record));card.append(annul);
+            if(record.corrections?.length)card.append(correctionHistory(record));
             list.append(card);
         }
+        renderArchive(model.annulled,list);
     }
     async function load() {
         const pid = personId;
@@ -94,25 +124,30 @@
         const nextId = String(id);
         if (saving || (personId !== nextId && dirty() && !window.confirm('Відхилити незбережені зміни події?'))) return;
         if (personId !== nextId) {
-            personId = nextId; model = null; editing = null; editor.hidden = true; form.reset(); clearErrors(); list.replaceChildren();
+            personId = nextId; model = null; editing = null;annulling=null;annulConfirm.hidden=true;typeConfirm.hidden=true; editor.hidden = true; form.reset(); clearErrors(); list.replaceChildren();
         }
         modal.querySelector('[data-events-person]').textContent = label || 'Військовослужбовець';
         newButton.disabled = true; notice('Завантаження…'); bootstrap.Modal.getOrCreateInstance(modal).show();
         try {
             await load(); if (personId !== nextId) return; notice('');
-            if (options.eventId) {
+            if(options.annulId){const record=model.events.find(r=>r.event_id===Number(options.annulId));if(record)requestAnnul(record);}
+            else if(options.archiveId){const archive=list.querySelector('[data-event-annulled-archive]');if(archive){archive.open=true;archive.querySelector(`[data-annulled-event-id="${Number(options.archiveId)}"]`)?.scrollIntoView({block:'nearest'});}}
+            else if (options.eventId) {
                 const record = model.events.find(row => row.event_id === Number(options.eventId));
                 if (record) openEditor(record); else notice('Подію не знайдено в актуальній історії.', true);
             } else if (options.create) openEditor();
         } catch (error) { notice(error.message, true); }
     }
-    globalThis.PersonEvents = {open};
+    globalThis.PersonEvents = {open,renderArchive};
     document.addEventListener('click', event => {
         const button = event.target.closest('[data-events-open]'); if (!button) return;
         event.preventDefault(); event.stopPropagation();
         open(button.dataset.personId, button.dataset.eventsPersonLabel, {eventId:button.dataset.eventsEventId});
     });
-    field('event_type_id').addEventListener('change', () => subtypes(field('event_subtype_id').value));
+    field('event_type_id').addEventListener('change', () => {confirmedType=null;typeConfirm.hidden=true;subtypes(field('event_subtype_id').value);});
+    modal.querySelector('[data-event-type-no]').addEventListener('click',()=>{typeConfirm.hidden=true;confirmedType=null;field('event_type_id').focus();});
+    modal.querySelector('[data-event-type-yes]').addEventListener('click',()=>{confirmedType=typeIntent();typeConfirm.hidden=true;form.requestSubmit();});
+    modal.querySelector('[data-event-annul-no]').addEventListener('click',()=>{if(!saving){annulConfirm.hidden=true;annulling=null;}});
     form.addEventListener('input', event => { event.target.classList.remove('is-invalid'); event.target.removeAttribute('aria-invalid'); });
     newButton.addEventListener('click', () => model && openEditor());
     modal.querySelector('[data-event-cancel]').addEventListener('click', () => {
@@ -122,7 +157,19 @@
     modal.querySelector('[data-events-reload]').addEventListener('click', async () => {
         try { await load(); notice('Список оновлено. Введені поля збережено.'); } catch (error) { notice(error.message, true); }
     });
-    function submission(){const data=new FormData(form);data.set('completion_confirmed',field('completion_confirmed').checked?'1':'0');return data;}
+    function submission(){const data=new FormData(form);data.set('completion_confirmed',field('completion_confirmed').checked?'1':'0');data.set('confirm_type_change',confirmedType===typeIntent()?'1':'0');return data;}
+    annulForm.addEventListener('submit',async event=>{
+        event.preventDefault();if(saving||!annulling||!annulForm.reportValidity())return;
+        const target=annulling,button=annulForm.querySelector('[type=submit]'),error=annulForm.querySelector('[data-event-annul-error]');
+        error.textContent='';if(!annulForm.elements.reason.value.trim()){error.textContent='Укажіть причину анулювання.';annulForm.elements.reason.focus();return;}
+        saving=true;button.disabled=true;
+        try{const data=new FormData(annulForm);data.set('expected_state',target.expected_state);const response=await fetch(endpoint()+`/${target.event_id}/annul`,{method:'POST',body:data,headers:{Accept:'application/json'}});const result=await response.json();if(!response.ok){error.textContent=result.detail;annulForm.elements.reason.focus();return;}
+            annulConfirm.hidden=true;annulling=null;if(editing?.event_id===target.event_id){editor.hidden=true;editing=null;typeConfirm.hidden=true;}
+            try{await load();notice(result.message);}catch{notice('Подію анульовано. Оновіть список.');}
+            document.dispatchEvent(new CustomEvent('person-events:saved',{detail:{personId:Number(personId),eventId:target.event_id}}));
+        }catch{error.textContent='Не вдалося отримати відповідь сервера. Причину збережено; перевірте історію перед повтором.';}
+        finally{saving=false;button.disabled=false;render();}
+    });
     form.addEventListener('submit', async event => {
         event.preventDefault(); if (saving) return; clearErrors(); notice('');
         if (!form.reportValidity()) return;
@@ -131,6 +178,10 @@
         }
         if(field('planned_end').value && field('planned_end').value<field('date_start').value){showError({detail:'Орієнтовне завершення не може бути раніше початку.',field:'planned_end'});return;}
         if((field('date_end').value || field('duration').value) && !field('completion_confirmed').checked){showError({detail:'Підтвердьте фактичне завершення або внесіть строк як орієнтовний.',field:'completion_confirmed'});return;}
+        if(editing && String(editing.event_type_id)!==field('event_type_id').value && confirmedType!==typeIntent()){
+            modal.querySelector('[data-event-type-confirm-text]').textContent=`Підтверджуєте зміну типу події з «${editing.type_name}» на «${field('event_type_id').selectedOptions[0]?.textContent}»?`;
+            typeConfirm.hidden=false;typeConfirm.focus();return;
+        }
         saving = true; newButton.disabled = true; const submit = form.querySelector('[type=submit]'); submit.disabled = true;
         try {
             const response = await fetch(endpoint() + (editing ? `/${editing.event_id}` : ''), { method: 'POST', body: submission(), headers: { Accept: 'application/json' } });

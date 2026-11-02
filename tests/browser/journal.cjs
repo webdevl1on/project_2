@@ -90,7 +90,7 @@ module.exports = async ({context, base}) => {
             const modal=page.locator('#person-events-modal'); await modal.locator('[data-event-edit]').last().click();
             await modal.locator('[name=event_type_id]').selectOption(String(service));
             const response=page.waitForResponse(r=>r.url().includes('/persons/1/events/')&&r.request().method()==='POST');
-            await modal.getByRole('button',{name:'Зберегти подію',exact:true}).click(); assert.equal((await response).status(),200);
+            await modal.getByRole('button',{name:'Зберегти подію',exact:true}).click();await modal.locator('[data-event-type-yes]').click(); assert.equal((await response).status(),200);
             await page.locator('[data-event-presence-person="1"] .event-tone-service').waitFor();
             await modal.getByRole('button',{name:'Закрити',exact:true}).click(); await modal.waitFor({state:'hidden'});
             await page.locator('[data-column-toggle]').click();

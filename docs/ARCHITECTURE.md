@@ -6,7 +6,7 @@
 
 PostgreSQL — цільова БД; `Settings` вимагає явні PROJECT2_ENV/DATABASE_URL і розділяє project2_prod/dev/ci та файлові каталоги. Sync psycopg 3, сесія на запит, помилка → rollback/close, завершення → dispose. Startup лише перевіряє Alembic head і спеціальні об'єкти. `Base.metadata.create_all`, sqlite3/PRAGMA та старі migrate_*.py залишені лише в legacy SQLite-інструментах; SQLite fallback відсутній.
 
-`migrations/versions/0001_postgresql.py` застосовує заморожені SQL-снапшоти: 48 предметних таблиць, partial UNIQUE, три EXCLUDE для включених періодів, 32 guard-тригери, Unicode/address/date функції. Metadata — поточна структура ORM; спеціальні об'єкти додатково перевіряє `database/postgresql.py`. Поточний head 0002_event_completion додає planned_end/completion_confirmed та SERVICE-підтипи; заморожений 0001 не змінено. Нові PostgreSQL-зміни потребують Alembic, явного upgrade і backup, без startup-міграцій.
+`migrations/versions/0001_postgresql.py` застосовує заморожені SQL-снапшоти: 48 предметних таблиць, partial UNIQUE, три EXCLUDE для включених періодів, 32 guard-тригери, Unicode/address/date функції. Metadata — поточна структура ORM; спеціальні об'єкти додатково перевіряє `database/postgresql.py`. Ревізія 0002_event_completion додала planned_end/completion_confirmed та SERVICE-підтипи; поточний head 0003_event_corrections додає анулювання й історію виправлень. Заморожені 0001/0002 не змінено. Нові PostgreSQL-зміни потребують Alembic, явного upgrade і backup, без startup-міграцій.
 
 `locking.locked_get` використовує FOR UPDATE лише всередині PostgreSQL write unit; Person/документ/версія та медичні записи блокуються локально, з повторним читанням revision. Repository не commit. Усі пов'язані зміни лишаються в одній service-транзакції; SQLSTATE deadlock/serialization/lock timeout дає контрольовану відмову без автоматичного retry. Детальні інваріанти, карта SQLite-залежностей, Windows-конфігурація, обмеження авторизації й backup/restore — [POSTGRESQL_SETUP.md](POSTGRESQL_SETUP.md).
 
@@ -16,7 +16,7 @@ PostgreSQL — цільова БД; `Settings` вимагає явні PROJECT2_
 
 | Завдання | Основні файли |
 | --- | --- |
-| Журнал і стан події на дату | `docs/EVENT_CONTROL.md`, `app/services/event_rules.py`, `app/static/js/journal_controls.js`, `docs/EVENT_VIEWS.md`, `app/event_display.py`, `app/services/event_views.py`, `app/routers/event_journal.py`, `app/templates/event_journal.html`, `app/static/js/event_journal.js`, `app/static/css/event_views.css` |
+| Журнал і стан події на дату | `docs/EVENT_CORRECTIONS.md`, `app/models/event_correction.py`, `app/services/event_corrections.py`, `docs/EVENT_CONTROL.md`, `app/services/event_rules.py`, `app/static/js/journal_controls.js`, `docs/EVENT_VIEWS.md`, `app/event_display.py`, `app/services/event_views.py`, `app/routers/event_journal.py`, `app/templates/event_journal.html`, `app/static/js/event_journal.js`, `app/static/css/event_views.css` |
 | Події зі штатки | `docs/PERSON_EVENTS.md`, `app/routers/person_events.py`, `app/services/person_events.py`, `app/services/service_for_person_event.py`, `app/repositories/event_repository.py`, `app/templates/components/person_events.html`, `app/static/js/person_events.js` |
 | PostgreSQL, Alembic, конфігурація й засівання | `docs/POSTGRESQL_SETUP.md`, `app/database/settings.py`, `db.py`, `locking.py`, `postgresql.py`, `migrations/`, `app/services/seed_postgresql.py` |
 | Список, створення, базове редагування людини | `app/routers/persons.py`, `app/services/person_read.py`, `app/services/service_person_create.py`, `app/repositories/person_repository.py`, `app/templates/persons.html`, `app/templates/person_form.html` |
@@ -109,7 +109,7 @@ flowchart LR
 | `name_cases.py` / `NameDictionaryImport` | `name_dictionary_imports` | Квитанція підтвердження імпорту, стабільний унікальний ID, digest/режим/UTC, захист повторного POST. |
 | `event_type.py` / `EventType` | `event_types` | Код і назва типу події, колір, ознаки активності та виключності. |
 | `event_subtype.py` / `EventSubtype` | `event_subtypes` | Код, назва, активність; FK на `EventType`. |
-| `person_event.py` / `PersonEvent` | `person_events` | FK на `Person`, `EventType`, необов'язковий `EventSubtype`; початок, тривалість, кінець, наказ, мета, місце, примітка, статус. ORM-колекцію `Person.events` не оголошено. |
+| `person_event.py` / `PersonEvent` | `person_events` | FK на `Person`, `EventType`, необов'язковий `EventSubtype`; початок, плановий/фактичний кінець, підтвердження, тривалість, наказ, мета, місце, примітка, статус та метадані анулювання. ORM-колекцію `Person.events` не оголошено. |
 
 Файли моделей у таблиці розташовані в `app/models/`. `HistoryModel` у `person_history_model.py` — абстрактний базовий клас для `PersonName`, `Passport`, `PersonRank`, `PersonServiceHistory`: додає `created_at`, `updated_at`, `is_active`. Він **не** додає `date_from` / `date_to` й не є журналом усіх змін. Нові StaffStructure/StaffVersion/PersonAssignment та Position використовують SystemTimestamps із тією самою точною UTC-політикою, без is_active. Базові Person і PersonEvent від HistoryModel не успадковуються.
 
@@ -126,7 +126,7 @@ flowchart LR
 | `service_person_rank.py` / `ServicePersonRankFunc` | Звання обирається з `Rank`. Перше стає активним, наступне додається неактивним; активність перемикається окремо. Додавання перевіряє повтор того самого звання в історії. Є редагування та видалення неактивного запису з `DELETE`. |
 | `service_person_positions.py` / `ServicePersonPositionFunc` | Координація PositionTableRepository, значення/попередження рядків і варіанти фільтрів; кадрові записи делеговано StaffService. |
 | `service_common_event_func.py` / `CommonEventFunc` | Пошук подій, типів і підтипів; перевірка належності підтипу до типу. Читання подій за person_id, незалежно від посад. |
-| `service_for_person_event.py` / `PersonEventService` | Підготовка, створення, зміна, видалення події, пошук за датами та конфліктами. Використовується вебредактором через person_events.py; підтримує backdated створення/редагування точних дат і атомарне завершення однієї попередньої відкритої події; історичні посади читає assignment_events.py. |
+| `service_for_person_event.py` / `PersonEventService` | Підготовка, створення, зміна та пошук подій за датами/конфліктами; фізичний DELETE заборонений, анулювання виконує person_events.py. Використовується вебредактором через person_events.py; підтримує backdated створення/редагування точних дат і атомарне завершення однієї попередньої відкритої події; історичні посади читає assignment_events.py. |
 | `service_common_person_func.py` / `CommonPersonFunc` | Перевірена фабрика `add_pasport` без запису в БД. Невикористаний зламаний update_person видалено після пошуку викликів. |
 | `check_events.py`, `check_person_events.py` | Явні CLI-діагностики через session_scope/EventRepository; імпорт більше не відкриває БД. |
 
@@ -405,10 +405,14 @@ GET `/admin/staff` у `routers/admin.py` повторно використову
 
 ## Журнал подій і проєкція на дату
 
-`event_journal.py → event_views.py → EventRepository/PersonRepository` читає матрицю за період без зміни подій. Один selector визначає невідомий день, одну подію або конфлікт; підсумки рахуються за днями незалежно від масштабу. Тип/підрозділ/ПІБ відбирають людей, події лишаються прив'язаними до Person. Додавання/редагування відкриває той самий PersonEvents Modal і чинний write API.
+`event_journal.py → event_views.py → EventRepository/PersonRepository` читає матрицю за період без зміни подій. Один selector визначає розрахункову службу, подію, непідтверджене завершення або конфлікт; підсумки рахуються за днями незалежно від масштабу. Тип/підрозділ/ПІБ відбирають людей, події лишаються прив'язаними до Person. Додавання/редагування відкриває той самий PersonEvents Modal і чинний write API.
 
 Штатка має один computed ключ `event_on_date`, заповнений bulk-вибіркою на as_of після головного запиту. Це не SQL-колонка: спеціального SQL-фільтра/сортування немає, а видимість/порядок/ширина/пресети/копіювання використовують чинний менеджер. Поточні rows/призначення не множаться. Палітра й SVG спільні з журналом, нових моделей/міграцій немає. Детальна карта та правила — [EVENT_VIEWS.md](EVENT_VIEWS.md).
 
 ## Планування й проблеми подій
 
 PersonEvent має незалежні плановий строк і підтвердження фактичного завершення. event_rules містить правила майбутніх планів/автозавершення та чистий розрахунок проблем; event_views — спільну проєкцію на дату, агрегацію календаря й підготовку `/events/problems`. EventRepository читає власні події без запитів до медичних завдань. Ручні кадрові зміни зберігаються в PersonEvent в одній попередній service-транзакції з Person FOR UPDATE та expected_state. Медичні моделі/PersonnelTask і штатний PersonPositionMirage не змінено. Деталі, обмеження, поля та міграція — [EVENT_CONTROL.md](EVENT_CONTROL.md).
+
+## Виправлення й анулювання подій
+
+PersonEventCorrection — окремий append-only журнал операцій зміни типу/анулювання з before/after, точним UTC та необов’язковим реальним User. PersonEvent має метадані анулювання, не видаляється фізично. Один service write unit з Person → Event locks та expected_state охоплює подію й аудит. Активні проєкції/перетини не враховують анульованих, архів читається окремо без підміни звичайних завершених подій. Head 0003_event_corrections встановлює nullable-поля/нову таблицю/guards; frozen 0001/0002 не змінено. Журнал повторно використовує ColumnModel/ColumnInteractions для DnD і серверне однорівневе сортування. Повні контракти — [EVENT_CORRECTIONS.md](EVENT_CORRECTIONS.md).

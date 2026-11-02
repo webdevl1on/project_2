@@ -131,3 +131,11 @@
 .event-month-menu {position:relative;min-width:190px;}.event-month-menu summary {cursor:pointer;text-align:center;font-weight:650;list-style:none;}
 .event-month-menu>div {position:absolute;z-index:10;top:30px;left:0;background:white;border:1px solid #d3dae5;border-radius:6px;padding:12px;box-shadow:0 3px 12px #263f5c33;display:grid;gap:8px;}
 .event-month-menu label {display:grid;gap:4px;}.event-month-menu input {max-width:160px;}
+/* Shared column interactions are adapted to this journal's existing sticky grid. */
+.event-timeline[data-column-sizing] thead th[data-column-key] {position:sticky;top:0;}
+.event-timeline[data-column-sizing] thead .event-person-heading {z-index:5;}
+.event-summary-period {font-weight:650;font-size:12px;margin:5px 0 10px;}
+.event-card-actions {display:flex;flex-direction:column;gap:6px;}
+.event-card-actions button {font-size:10px;}
+.event-annulled-archive {color:#616973;font-size:12px;}
+.event-annulled-archive p {margin:5px 0;overflow-wrap:anywhere;white-space:pre-wrap;}

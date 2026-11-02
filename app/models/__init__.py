@@ -49,3 +49,6 @@ from app.models.medical import MedicalExam, Injury, Award, DnaSample, PersonnelT
 __all__ += ['MedicalExam','Injury','Award','DnaSample','PersonnelTask','MedicalSelection','MedicalDocumentLink','PersonnelAudit']
 from app.models.profile_records import PersonEducation, PersonFamilyMember, PersonDirective
 __all__ += ['PersonEducation', 'PersonFamilyMember', 'PersonDirective']
+
+from app.models.event_correction import PersonEventCorrection
+__all__ += ['PersonEventCorrection']

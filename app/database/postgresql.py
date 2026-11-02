@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 from sqlalchemy import inspect,text
 
-REVISION='0002_event_completion'
+REVISION='0003_event_corrections'
 
 
 def require_postgresql_schema(engine):
@@ -19,7 +19,7 @@ def require_postgresql_schema(engine):
         missing.extend(table.name+'.'+c.name for c in table.columns if c.name not in actual)
     root=Path(__file__).resolve().parents[2]/'migrations/sql'
     guard_sql=(root/'initial_guards.sql').read_text()
-    expected_triggers=set(re.findall(r'CREATE TRIGGER (\w+)',guard_sql))
+    expected_triggers=set(re.findall(r'CREATE TRIGGER (\w+)',guard_sql)) | {'event_correction_no_update','event_correction_no_delete','person_event_no_delete','person_event_annulled_immutable'}
     expected_constraints=set(re.findall(r'ALTER TABLE (\w+) ADD CONSTRAINT (\w+)',guard_sql))
     with engine.connect() as db:
         if set(db.scalars(text('SELECT version_num FROM alembic_version')))!={REVISION}:missing.append('Alembic revision')

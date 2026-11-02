@@ -210,8 +210,9 @@ def test_event_standalone_create_edit_query_conflict_delete_contract(factory):
                                         note="Виправлено", session_factory=factory)
     assert changed.event_id == created.event_id and changed.date_end.day == 4
     assert [row.event_id for row in Events.get_person_event_by_date(person_id, "03.02.2025", session_factory=factory)] == [created.event_id]
-    assert Events.delete_person_event(created.event_id, session_factory=factory)
-    assert not Events.delete_person_event(created.event_id, session_factory=factory)
+    with pytest.raises(ValueError, match='анулюванням'):
+        Events.delete_person_event(created.event_id, session_factory=factory)
+    with factory() as db: assert db.get(PersonEvent, created.event_id) is not None
 
 
 @pytest.mark.parametrize("field, value", [("date_start", "_.02.2025"), ("date_end", "_._.2025"),
@@ -234,7 +235,8 @@ def test_external_event_change_and_delete_are_reversible(factory):
         assert changed.date_start.day == 2
         db.rollback()
         assert db.get(PersonEvent, created.event_id).date_start.day == 1
-        assert Events.delete_person_event(created.event_id, db=db)
+        with pytest.raises(ValueError, match='анулюванням'):
+            Events.delete_person_event(created.event_id, db=db)
         db.rollback()
         assert db.get(PersonEvent, created.event_id) is not None
 

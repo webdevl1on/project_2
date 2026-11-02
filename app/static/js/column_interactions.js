@@ -16,7 +16,7 @@
                 header.querySelectorAll("a").forEach(link => { link.draggable = false; });
                 let allowed = true;
                 header.addEventListener("pointerdown", event => {
-                    allowed = !event.target.closest("button,input,select,textarea,form,.dropdown-menu,[data-column-resize]");
+                    allowed = Boolean(controller.config.dragHandleSelector && event.target.closest(controller.config.dragHandleSelector)) || !event.target.closest("button,input,select,textarea,form,.dropdown-menu,[data-column-resize]");
                 });
                 header.addEventListener("dragstart", event => {
                     if (!movable || !allowed || this.resizing) { event.preventDefault(); return; }

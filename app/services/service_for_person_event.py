@@ -211,7 +211,7 @@ class PersonEventService:
         location=None,
         note=None,
         event_status=None,
-        *, db=None, session_factory=None, planned_end=None, planned_duration=None, completion_confirmed=None
+        *, db=None, session_factory=None, planned_end=None, planned_duration=None, completion_confirmed=None, confirm_type_change=False, actor_id=None
     ):
         with session_scope(db, session_factory=session_factory, write=True) as db:
             owner = EventRepository.owner_id(db, event_id)
@@ -220,6 +220,13 @@ class PersonEventService:
             # Always lock Person before an event, matching creation lock order.
             ServicePersonCheck.get_person_or_raise(owner, db)
             person_event_old = CommonEventFunc.get_event_or_raise(event_id, db)
+            if person_event_old.annulled_at is not None:
+                raise EventValidationError('Анульований запис доступний лише для перегляду.', 'event_type_id')
+            type_changed = person_event_old.event_type_id != int(event_type_id)
+            if type_changed and confirm_type_change is not True:
+                raise EventValidationError('Підтвердьте зміну типу збереженої події.', 'event_type_id')
+            from app.services.event_corrections import capture, record
+            before = capture(db, person_event_old) if type_changed else None
             event_type = CommonEventFunc.get_event_type_or_raise(event_type_id,db)
             event_subtype = CommonEventFunc.get_event_subtype_or_raise(event_subtype_id,db) if event_subtype_id else None
             PersonEventService.validate_catalog(event_type, event_subtype, person_event_old)
@@ -255,6 +262,7 @@ class PersonEventService:
             person_event_old.location = person_event_new.location
             person_event_old.note = person_event_new.note
             person_event_old.event_status = person_event_new.event_status
+            if type_changed: record(db, person_event_old, 'type_change', before, actor_id)
             db.flush()
             db.refresh(person_event_old)
             return person_event_old

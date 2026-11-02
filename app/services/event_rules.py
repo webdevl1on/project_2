@@ -18,7 +18,7 @@ def problem(record, *, on=None):
     """Stable single issue per event, calculated from current dates, no daily rows."""
     on = on or today()
     start = date.fromisoformat(record['date_start'])
-    if start > on or record['completion_confirmed']:
+    if start > on or record['completion_confirmed'] or record.get('annulled_at'):
         return None
     end = date.fromisoformat(record['planned_end']) if record['planned_end'] else None
     code, subtype = record['type_code'], record.get('subtype_code')

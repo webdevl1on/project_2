@@ -1,5 +1,6 @@
 """Read-only journal and date-specific staff presence; events remain person-owned."""
 from collections import Counter, defaultdict
+import re
 from datetime import date, timedelta
 from app.repositories.event_repository import EventRepository as Repo
 from app.repositories.person_repository import PersonRepository
@@ -13,6 +14,7 @@ WEEKDAYS = ('Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд')
 
 
 def state_on(events, on):
+    events = [r for r in events if not r.get('annulled_at')]
     iso = on.isoformat()
     active = [r for r in events if r['date_start'] <= iso and (r['date_end'] is None or r['date_end'] >= iso)]
     unresolved = [r for r in events if r['date_start'] <= iso and not r['completion_confirmed'] and
@@ -77,7 +79,13 @@ def parse_options(raw):
         if kind is not None and kind < 1: raise ValueError()
     except (ValueError, TypeError): raise ValueError('Некоректний тип події.') from None
     sort = raw.get('sort', 'name')
-    if sort not in ('name', 'unit'): raise ValueError('Невідоме сортування журналу.')
+    if sort not in ('name', 'unit', 'position_number', 'position_short'):
+        parts = re.fullmatch(r'date:(\d{4}-\d{2}-\d{2}):(\d{4}-\d{2}-\d{2})', sort)
+        try:
+            if not parts: raise ValueError()
+            left, right = map(date.fromisoformat, parts.groups())
+            if left > right or (right-left).days >= 366: raise ValueError()
+        except ValueError: raise ValueError('Невідоме сортування журналу.') from None
     direction = raw.get('direction', 'asc')
     if direction not in ('asc', 'desc'): raise ValueError('Невідомий напрямок сортування.')
     return {'start': start, 'end': end, 'scale': scale, 'search': search, 'unit': unit,
@@ -152,6 +160,13 @@ def journal(db, raw):
     kinds = {t.event_type_id: t for t in types}
     by_person = defaultdict(list)
     for item in records(db, start, end): by_person[item['person_id']].append(item)
+    by_sort = by_person
+    sort_period = None
+    if options['sort'].startswith('date:'):
+        _, left, right = options['sort'].split(':')
+        sort_period = (date.fromisoformat(left), date.fromisoformat(right))
+        by_sort = defaultdict(list)
+        for item in records(db, *sort_period): by_sort[item['person_id']].append(item)
     units = defaultdict(set)
     for pid, unit in Repo.assignment_units(db, start, end):
         if unit: units[pid].add(unit)
@@ -173,10 +188,37 @@ def journal(db, raw):
                        'birth': format_partial_date(person.birth_day, person.birth_month, person.birth_year),
                        'unit': unit_label, 'units': sorted(units[pid]), 'position_number': position.position_number if position else None,
                        'position_short': position.name_short if position else None, 'events': available})
-    people.sort(key=lambda p: ((p['unit'].casefold(), p['name'].casefold(), p['id']) if options['sort'] == 'unit' else
-                               (p['name'].casefold(), p['id'])), reverse=options['direction'] == 'desc')
+    sort_people(people, options, by_sort, sort_period, kinds)
+    archive = defaultdict(list)
+    archive_rows = Repo.annulled_rows(db, [p['id'] for p in people]) if people else []
+    archive_types = {kind.event_type_id: kind for _, kind, _ in archive_rows}
+    archive_subs = {sub.event_subtype_id: sub for _, _, sub in archive_rows if sub}
+    for row, _, _ in archive_rows: archive[row.person_id].append(serialize(row, archive_types, archive_subs))
+    for person in people: person['annulled'] = archive[person['id']]
+
     return {'options': {**options, 'start': start.isoformat(), 'end': end.isoformat()},
             'buckets': periods, 'people': people,
             'types': [{'id': t.event_type_id, 'code': t.event_type, 'name': t.event_name,
                        'active': bool(t.event_is_active), **{'presentation': event_presentation({'type_code': t.event_type, 'type_name': t.event_name, 'type_color': t.event_color})}} for t in types],
             'units': sorted({u for entries in units.values() for u in entries}), 'legend': [p for p in legend() if p['code'] != '__vacant__']}
+
+
+def sort_people(people, options, by_person, period, kinds):
+    """One server sort. Empty staff values always last; deterministic person tie."""
+    from app.utils.text_search import normalized_text
+    def key(person):
+        column = options['sort']
+        tie = (normalized_text(person['name']), person['id'])
+        if column == 'name': return tie
+        if column in ('unit', 'position_short'): return (normalized_text(person[column] or ''), *tie)
+        if column == 'position_number': return (person[column] or 0, *tie)
+        start, end = period
+        cells, summary = calendar_projection(by_person[person['id']], [{'start': start.isoformat(), 'end': end.isoformat(), 'period': day_label(start)+' — '+day_label(end)}], kinds)
+        cell = cells[0]
+        return (normalized_text(cell['name']), normalized_text(cell.get('subtype') or ''),
+                tuple(sorted((normalized_text(r['name']), r['days']) for r in summary if r['days'])), *tie)
+    column = options['sort']
+    missing = [p for p in people if column in ('position_number','position_short') and p[column] is None]
+    missing_ids = {p['id'] for p in missing}
+    available = [p for p in people if p['id'] not in missing_ids]
+    people[:] = sorted(available, key=key, reverse=options['direction']=='desc') + sorted(missing, key=lambda p:(normalized_text(p['name']),p['id']))

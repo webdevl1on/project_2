@@ -1,11 +1,11 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 from sqlalchemy import (
     Integer,
     String,
     Date,
     ForeignKey,
-    Text, Boolean, CheckConstraint, text
+    Text, Boolean, CheckConstraint, text, DateTime
 )
 from sqlalchemy.orm import Mapped, mapped_column, validates
 from app.database.base import Base
@@ -49,11 +49,16 @@ class PersonEvent(Base):
     
     date_end: Mapped[Optional[date]] = mapped_column(Date)
 
+    annulled_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
+    annulment_reason: Mapped[Optional[str]] = mapped_column(Text)
+    annulled_by: Mapped[Optional[int]] = mapped_column(ForeignKey('users.id'))
+
     planned_end: Mapped[Optional[date]] = mapped_column(Date)
 
     completion_confirmed: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"), nullable=False)
 
     __table_args__ = (
+        CheckConstraint("(annulled_at IS NULL AND annulment_reason IS NULL AND annulled_by IS NULL) OR (annulled_at IS NOT NULL AND length(trim(annulment_reason)) > 0 AND annulment_reason IS NOT NULL)", name="event_annulment_reason"),
         CheckConstraint("planned_end IS NULL OR planned_end >= date_start", name="event_planned_period"),
         CheckConstraint("NOT completion_confirmed OR date_end IS NOT NULL", name="event_confirmed_end"),
     )

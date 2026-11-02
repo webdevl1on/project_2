@@ -1,6 +1,7 @@
 """Person-event editor contract; mutations delegate to PersonEventService."""
 from hashlib import sha256
-from datetime import date
+from datetime import date, datetime, UTC
+from app.services import event_corrections
 from app.services.staff_service import today
 import json
 import re
@@ -31,7 +32,7 @@ def serialize(row, types, subtypes):
     for field in ('date_start', 'date_end', 'order_date', 'planned_end'):
         values[field] = values[field].isoformat() if values[field] else None
     kind, subtype = types[row.event_type_id], subtypes.get(row.event_subtype_id)
-    identity = {'event_id': row.event_id, 'person_id': row.person_id, **values}
+    identity = {'event_id': row.event_id, 'person_id': row.person_id, **values, 'annulled_at': event_corrections.utc_text(row.annulled_at), 'annulment_reason': row.annulment_reason, 'annulled_by': row.annulled_by}
     return {**identity, 'type_name': kind.event_name, 'type_code': kind.event_type,
             'subtype_name': subtype.event_subtype_name if subtype else None,
             'subtype_code': subtype.event_subtype if subtype else None,
@@ -52,6 +53,8 @@ def dictionaries(db):
 def page(db, person_id):
     ServicePersonCheck.get_person_or_raise(person_id, db)
     types, subtypes = dictionaries(db)
+    corrections = event_corrections.history(db, person_id)
+    rows = [dict(serialize(row, types, subtypes), corrections=corrections.get(row.event_id, [])) for row in reversed(Repo.for_person(db, person_id, include_annulled=True))]
     return {'person_id': person_id, 'today': today().isoformat(),
             'types': [{'id': kind.event_type_id, 'code': kind.event_type, 'name': kind.event_name,
                        'color': kind.event_color, 'active': bool(kind.event_is_active),
@@ -60,7 +63,8 @@ def page(db, person_id):
                                      'name': sub.event_subtype_name, 'active': bool(sub.event_subtype_is_active)}
                                     for sub in subtypes.values() if sub.event_type_id == kind.event_type_id]}
                       for kind in types.values()],
-            'events': [serialize(row, types, subtypes) for row in reversed(Repo.for_person(db, person_id))]}
+            'events': [row for row in rows if not row['annulled_at']],
+            'annulled': [row for row in rows if row['annulled_at']]}
 
 
 def identifier(value, field, *, optional=False):
@@ -75,7 +79,7 @@ def identifier(value, field, *, optional=False):
         raise EventValidationError('Оберіть коректне значення з довідника.', field) from error
 
 
-def save(db, person_id, data, key=None):
+def save(db, person_id, data, key=None, *, actor_id=None):
     fields = {field: data.get(field) for field in FIELDS}
     for field in ('date_start', 'date_end', 'order_date', 'planned_end'):
         raw = fields[field]
@@ -110,10 +114,27 @@ def save(db, person_id, data, key=None):
             if data.get('expected_state') != serialize(old, types, subtypes)['expected_state']:
                 raise EventConflictError([serialize(old, types, subtypes)],
                                          'Подію вже змінено. Перевірте актуальний запис і відкрийте його для редагування знову.', None)
-            result = PersonEventService.change_person_event(key, **fields, db=db)
+            result = PersonEventService.change_person_event(key, **fields, db=db, confirm_type_change=data.get('confirm_type_change') in (True, '1', 'true'), actor_id=actor_id)
         else:
             result = PersonEventService.create_person_event(person_id, **fields, db=db)
         if isinstance(result, list):
             raise EventConflictError([serialize(row, types, subtypes) for row in result])
         result_id = result.event_id
     return result_id
+
+
+def annul(db, person_id, key, data, *, actor_id=None):
+    reason = str(data.get('reason') or '').strip()
+    if not reason or len(reason) > 2000:
+        raise EventValidationError('Укажіть причину анулювання (до 2000 символів).', 'reason')
+    with service_transaction(db, immediate=True):
+        ServicePersonCheck.get_person_or_raise(person_id, db)
+        old = Repo.get(db, key)
+        if old is None or old.person_id != person_id: raise ValueError('Подію цієї людини не знайдено.')
+        types, subtypes = dictionaries(db)
+        if old.annulled_at is not None or data.get('expected_state') != serialize(old, types, subtypes)['expected_state']:
+            raise EventConflictError([serialize(old, types, subtypes)], 'Стан події змінився. Оновіть історію перед анулюванням.', None)
+        before = event_corrections.capture(db, old)
+        old.annulled_at, old.annulment_reason, old.annulled_by = datetime.now(UTC), reason, actor_id
+        event_corrections.record(db, old, 'annul', before, actor_id)
+    return key
