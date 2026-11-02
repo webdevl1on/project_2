@@ -4,7 +4,11 @@ module.exports = async ({context, base}) => {
     page.on('pageerror', error => errors.push(error.message));
     const scenario = async (name, run) => { await run(); console.log(`PASS events: ${name}`); };
     const modal = page.locator('#person-events-modal'), form = modal.locator('[data-event-form]');
-    const field = name => form.locator(`[name="${name}"]`);
+    const field = name => {
+        const locator=form.locator(['date_start','date_end','order_date','planned_end'].includes(name)?`[data-exact-date-for="${name}"]`:`[name="${name}"]`);
+        if(['date_start','date_end','order_date','planned_end'].includes(name)){const fill=locator.fill.bind(locator);locator.fill=value=>fill(/^\d{4}-/.test(value)?value.split('-').reverse().join('.'):value);}
+        return locator;
+    };
     const cards = modal.locator('[data-event-id]');
     let catalog;
     const kind = code => String(catalog.types.find(t => t.code === code).id);
@@ -42,11 +46,11 @@ module.exports = async ({context, base}) => {
             await field('event_subtype_id').selectOption(subtype('VACATION_ANNUAL'));
             await field('event_type_id').selectOption(kind('SERVICE'));
             assert.equal(await field('event_subtype_id').inputValue(), '');
-            assert.equal(await field('event_subtype_id').locator('option').count(), 1);
+            assert.equal(await field('event_subtype_id').locator('option').count(), 4);
         });
         await scenario('open creation has NULL end and duration, and displays the full period without a fabricated date', async () => {
-            await field('event_type_id').selectOption(kind('VACATION'));
-            await field('event_subtype_id').selectOption(subtype('VACATION_ANNUAL'));
+            await field('event_type_id').selectOption(kind('SERVICE'));
+            await field('event_subtype_id').selectOption(subtype('SERVICE_DUTY'));
             await field('date_start').fill('2026-10-01');
             await field('note').fill('<img src=x onerror="window.eventInjected=true">');
             assert.equal((await save()).status(), 200);
@@ -68,6 +72,7 @@ module.exports = async ({context, base}) => {
         await scenario('client date errors and server overlaps preserve every entered value and the open editor', async () => {
             await fresh(); await field('event_type_id').selectOption(kind('SERVICE'));
             await field('date_start').fill('2026-10-05'); await field('date_end').fill('2026-10-04');
+            await field('completion_confirmed').check();
             await field('note').fill('Чернетка після помилки');
             const url = page.url();
             await form.getByRole('button', {name:'Зберегти подію', exact:true}).click();
@@ -76,8 +81,8 @@ module.exports = async ({context, base}) => {
             await field('date_end').fill('2026-10-08');
             assert.equal((await save()).status(), 409);
             await modal.locator('[data-events-conflicts] li').first().waitFor();
-            assert.equal(await field('date_start').inputValue(), '2026-10-05');
-            assert.equal(await field('date_end').inputValue(), '2026-10-08');
+            assert.equal(await field('date_start').inputValue(), '05.10.2026');
+            assert.equal(await field('date_end').inputValue(), '08.10.2026');
             assert.equal(await field('note').inputValue(), 'Чернетка після помилки');
             assert.equal(page.url(), url); assert.equal(await form.isVisible(), true);
             assert.equal((await listing(1)).events.length, 2);

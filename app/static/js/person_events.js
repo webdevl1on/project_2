@@ -19,7 +19,7 @@
         message.className = text ? `alert alert-${failed ? 'danger' : 'success'}` : '';
     }
     function clearErrors() {
-        form.querySelectorAll('.is-invalid').forEach(input => { input.classList.remove('is-invalid'); input.removeAttribute('aria-invalid'); });
+        form.querySelectorAll('.is-invalid').forEach(input => { input.classList.remove('is-invalid'); input.removeAttribute('aria-invalid'); const display=form.querySelector(`[data-exact-date-for="${input.name}"]`); display?.classList.remove('is-invalid'); display?.removeAttribute('aria-invalid'); });
         conflictList.replaceChildren(); conflictList.hidden = true;
     }
     function showError(data) {
@@ -31,7 +31,7 @@
         }
         conflictList.hidden = !conflictList.childElementCount;
         const input = data.field && field(data.field);
-        if (input) { input.classList.add('is-invalid'); input.setAttribute('aria-invalid', 'true'); input.focus(); }
+        if (input) { const target=form.querySelector(`[data-exact-date-for="${input.name}"]`) || input; target.classList.add('is-invalid'); target.setAttribute('aria-invalid', 'true'); target.focus(); }
     }
     function option(select, value, text) { select.add(new Option(text, String(value ?? ''))); }
     function subtypes(selected = '') {
@@ -54,7 +54,7 @@
         if (saving || (dirty() && !window.confirm('Відхилити незбережені зміни події?'))) return;
         editing = record; form.reset(); clearErrors(); notice('');
         typeOptions(record?.event_type_id); subtypes(record?.event_subtype_id || '');
-        for (const input of form.elements) if (input.name && !input.name.endsWith('_id')) input.value = record?.[input.name] ?? '';
+        for (const input of form.elements) if (input.name && !input.name.endsWith('_id')) { if(input.type==='checkbox')input.checked=Boolean(record?.[input.name]); else input.value = record?.[input.name] ?? ''; }
         modal.querySelector('[data-event-editor-title]').textContent = record ? 'Редагування події' : 'Нова подія';
         editor.hidden = false; baseline = values(); field('event_type_id').focus();
     }
@@ -67,18 +67,20 @@
             const title = document.createElement('strong'); title.textContent = record.type_name + (record.subtype_name ? ' · ' + record.subtype_name : '');
             const color = model.types.find(kind => kind.id === record.event_type_id)?.color;
             if (color && CSS.supports('border-color', color)) card.style.borderLeft = `4px solid ${color}`;
-            const period = document.createElement('p'); period.className = 'mb-1'; period.textContent = record.period;
+            const period = document.createElement('p'); period.className = 'mb-1'; period.textContent = (record.mirage ? 'Міраж · ' : '') + record.period + (record.legacy_future_end ? ' — перевірте стару майбутню дату у фактичному полі; плановий строк тепер задається окремо' : '');
             const detail = document.createElement('dl'); detail.className = 'small mb-1';
-            for (const name of ['duration', 'order_date', 'order_number', 'purpose', 'location', 'note', 'event_status']) {
+            for (const name of ['duration', 'order_date', 'planned_end', 'order_number', 'purpose', 'location', 'note', 'event_status']) {
                 if (record[name] === null || record[name] === '') continue;
                 const label = document.createElement('dt'), value = document.createElement('dd');
                 label.textContent = field(name).closest('label').firstChild.textContent.trim();
-                value.textContent = name === 'order_date' ? displayDate(record[name]) : String(record[name]);
+                value.textContent = ['order_date','planned_end'].includes(name) ? displayDate(record[name]) : String(record[name]);
                 value.style.whiteSpace = 'pre-wrap'; detail.append(label, value);
             }
             const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'btn btn-sm btn-outline-primary';
             edit.textContent = 'Редагувати'; edit.dataset.eventEdit = record.event_id; edit.disabled = saving;
-            edit.addEventListener('click', () => openEditor(record)); card.append(title, period, detail, edit); list.append(card);
+            edit.addEventListener('click', () => openEditor(record)); card.append(title, period, detail, edit);
+            if (!record.completion_confirmed && !record.mirage) { const confirm=document.createElement('button');confirm.type='button';confirm.className='btn btn-sm btn-outline-success ms-2';confirm.dataset.eventConfirm=record.event_id;confirm.textContent='Підтвердити завершення / повернення';confirm.addEventListener('click',()=>{openEditor(record);field('completion_confirmed').checked=true;field('duration').value='';field('date_end').value=record.planned_end && record.planned_end<=model.today ? record.planned_end : '';field('date_end').focus();});card.append(confirm); }
+            list.append(card);
         }
     }
     async function load() {
@@ -108,7 +110,7 @@
     document.addEventListener('click', event => {
         const button = event.target.closest('[data-events-open]'); if (!button) return;
         event.preventDefault(); event.stopPropagation();
-        open(button.dataset.personId, button.dataset.eventsPersonLabel);
+        open(button.dataset.personId, button.dataset.eventsPersonLabel, {eventId:button.dataset.eventsEventId});
     });
     field('event_type_id').addEventListener('change', () => subtypes(field('event_subtype_id').value));
     form.addEventListener('input', event => { event.target.classList.remove('is-invalid'); event.target.removeAttribute('aria-invalid'); });
@@ -120,15 +122,18 @@
     modal.querySelector('[data-events-reload]').addEventListener('click', async () => {
         try { await load(); notice('Список оновлено. Введені поля збережено.'); } catch (error) { notice(error.message, true); }
     });
+    function submission(){const data=new FormData(form);data.set('completion_confirmed',field('completion_confirmed').checked?'1':'0');return data;}
     form.addEventListener('submit', async event => {
         event.preventDefault(); if (saving) return; clearErrors(); notice('');
         if (!form.reportValidity()) return;
         if (field('date_end').value && field('date_end').value < field('date_start').value) {
             showError({ detail: 'Дата завершення не може бути раніше дати початку.', field: 'date_end' }); return;
         }
+        if(field('planned_end').value && field('planned_end').value<field('date_start').value){showError({detail:'Орієнтовне завершення не може бути раніше початку.',field:'planned_end'});return;}
+        if((field('date_end').value || field('duration').value) && !field('completion_confirmed').checked){showError({detail:'Підтвердьте фактичне завершення або внесіть строк як орієнтовний.',field:'completion_confirmed'});return;}
         saving = true; newButton.disabled = true; const submit = form.querySelector('[type=submit]'); submit.disabled = true;
         try {
-            const response = await fetch(endpoint() + (editing ? `/${editing.event_id}` : ''), { method: 'POST', body: new FormData(form), headers: { Accept: 'application/json' } });
+            const response = await fetch(endpoint() + (editing ? `/${editing.event_id}` : ''), { method: 'POST', body: submission(), headers: { Accept: 'application/json' } });
             const data = await response.json(); if (!response.ok) { showError(data); return; }
             editor.hidden = true; editing = null;
             // Saving is already successful even if the subsequent list request fails.

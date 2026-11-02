@@ -43,7 +43,7 @@ class EventRepository:
     @staticmethod
     def for_person(db, person_id):
         return db.scalars(select(PersonEvent).where(PersonEvent.person_id == person_id)
-                          .order_by(PersonEvent.date_start, PersonEvent.event_id)).all()
+                          .order_by(PersonEvent.date_start, PersonEvent.event_id).execution_options(populate_existing=True)).all()
 
     @staticmethod
     def conflicts(db, person_id, start, end, exclude=None):
@@ -67,7 +67,7 @@ class EventRepository:
                                         or_(PersonEvent.date_end.is_(None), PersonEvent.date_end >= start))
         if end:
             stmt = stmt.where(PersonEvent.date_start <= end)
-        return db.scalars(stmt.order_by(PersonEvent.date_start, PersonEvent.event_id)).all()
+        return db.scalars(stmt.order_by(PersonEvent.date_start, PersonEvent.event_id).execution_options(populate_existing=True)).all()
 
     @staticmethod
     def add(db, record):
@@ -82,10 +82,10 @@ class EventRepository:
         stmt = (select(PersonEvent, EventType, EventSubtype)
                 .join(EventType, EventType.event_type_id == PersonEvent.event_type_id)
                 .outerjoin(EventSubtype, EventSubtype.event_subtype_id == PersonEvent.event_subtype_id)
-                .where(overlap_conditions(start, end)))
+                .where(PersonEvent.date_start <= end, or_(PersonEvent.date_end.is_(None), PersonEvent.date_end >= start, PersonEvent.completion_confirmed.is_(False))))
         if person_ids is not None:
             stmt = stmt.where(PersonEvent.person_id.in_(person_ids))
-        return db.execute(stmt.order_by(PersonEvent.date_start, PersonEvent.event_id)).all()
+        return db.execute(stmt.order_by(PersonEvent.date_start, PersonEvent.event_id).execution_options(populate_existing=True)).all()
 
     @staticmethod
     def assignment_units(db, start, end):
@@ -94,3 +94,10 @@ class EventRepository:
                           .join(Position, Position.position_id == PersonAssignment.staff_position_id)
                           .where(PersonAssignment.assigned_from <= end,
                                  or_(PersonAssignment.assigned_to.is_(None), PersonAssignment.assigned_to >= start))).all()
+
+    @staticmethod
+    def problem_rows(db, on):
+        stmt = (select(PersonEvent, EventType, EventSubtype).join(EventType, EventType.event_type_id == PersonEvent.event_type_id)
+                .outerjoin(EventSubtype, EventSubtype.event_subtype_id == PersonEvent.event_subtype_id)
+                .where(PersonEvent.date_start <= on, PersonEvent.completion_confirmed.is_(False)))
+        return db.execute(stmt.order_by(PersonEvent.date_start, PersonEvent.event_id).execution_options(populate_existing=True)).all()

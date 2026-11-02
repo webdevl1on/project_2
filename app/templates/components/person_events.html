@@ -13,9 +13,12 @@
           <div class="col-md-6"><label class="w-100">Тип події<select name="event_type_id" class="form-select" required></select></label></div>
           <div class="col-md-6"><label class="w-100">Підтип події<select name="event_subtype_id" class="form-select"></select></label></div>
           <div class="col-md-4"><label class="w-100">Початок<input type="date" name="date_start" class="form-control" required></label></div>
-          <div class="col-md-4"><label class="w-100">Завершення<input type="date" name="date_end" class="form-control"></label></div>
+          <div class="col-md-4"><label class="w-100">Фактичне завершення<input type="date" name="date_end" class="form-control"></label></div>
           <div class="col-md-4"><label class="w-100">Тривалість, днів<input type="number" name="duration" class="form-control" min="1" step="1"></label></div>
-          <p class="small text-secondary mb-1">Без завершення й тривалості подія залишається відкритою — «по сьогодні». Для завершеної події обидва граничні дні включаються до тривалості. Якщо є лише одна попередня незакрита подія й немає інших конфліктів, вона завершиться днем перед новою.</p>
+          <div class="col-md-4"><label class="w-100">Орієнтовне завершення<input type="date" name="planned_end" class="form-control"></label></div>
+          <div class="col-md-4"><label class="w-100">Орієнтовна тривалість, днів<input type="number" name="planned_duration" class="form-control" min="1" step="1"></label></div>
+          <div class="col-md-4 d-flex align-items-center"><label><input type="checkbox" name="completion_confirmed" value="1"> Підтверджую фактичне завершення / повернення</label></div>
+          <p class="small text-secondary mb-1">Орієнтовний строк не завершує подію. Фактичне завершення підтверджується окремо; для нього тривалість рахується включно. Майбутня подія — міраж, без закриття поточної.</p>
           <div class="col-md-6"><label class="w-100">Дата наказу<input type="date" name="order_date" class="form-control"></label></div>
           <div class="col-md-6"><label class="w-100">Номер наказу<input name="order_number" class="form-control"></label></div>
           <div class="col-md-6"><label class="w-100">Мета<input name="purpose" class="form-control"></label></div>

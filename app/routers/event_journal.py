@@ -31,3 +31,9 @@ def journal_data(request: Request, db: Session = Depends(get_db)):
 @router.get('/events/presence')
 def presence(person_id: int, on: date, db: Session = Depends(get_db)):
     return JSONResponse(event_views.presence_for_people(db, [person_id], on)[person_id], headers={'Cache-Control': 'no-store'})
+
+
+@router.get('/events/problems')
+def problems(request: Request, db: Session = Depends(get_db)):
+    return templates.TemplateResponse(request=request, name='event_problems.html',
+                                      context={'problems': event_views.problems(db)}, headers={'Cache-Control': 'no-store'})

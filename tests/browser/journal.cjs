@@ -21,7 +21,7 @@ module.exports = async ({context, base}) => {
             await page.screenshot({path:'/tmp/project2-event-journal.png',fullPage:true});
             const start = page.locator('[data-exact-date-for=start]'), end = page.locator('[data-exact-date-for=end]');
             assert.equal(await start.inputValue(),'01.10.2026');
-            assert.equal(await page.locator('#person-events-modal input[name=date_start]').getAttribute('type'),'date');
+            assert.equal(await page.locator('#person-events-modal input[name=date_start]').getAttribute('type'),'hidden');
             const url = page.url(); await start.fill('15.10.2026');
             await page.getByRole('button',{name:'Застосувати',exact:true}).click();
             assert.ok((await end.evaluate(el=>el.validationMessage)).includes('передувати')); assert.equal(page.url(),url);
@@ -81,7 +81,7 @@ module.exports = async ({context, base}) => {
             const cell=page.locator('[data-event-presence-person="1"]');
             assert.equal(await cell.locator('[data-column-value]').textContent().then(t=>t.trim()),'відпустка');
             assert.ok(await page.locator('[data-event-presence-person=""] .event-tone-vacant').count());
-            assert.equal(await page.locator('[data-event-presence-person="2"] [data-column-value]').textContent().then(t=>t.trim()),'Немає події');
+            assert.equal(await page.locator('[data-event-presence-person="2"] [data-column-value]').textContent().then(t=>t.trim()),'служба');
             await page.screenshot({path:'/tmp/project2-staff-events.png',fullPage:true});
             await page.reload(); assert.equal(await page.locator('#person-positions thead th:not([hidden])').count(),8);
         });

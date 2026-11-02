@@ -10,7 +10,7 @@ from alembic import command
 from alembic.config import Config
 
 @pytest.fixture
-def pg_factory(monkeypatch):
+def pg_factory(monkeypatch, request):
     raw=os.environ.get('PROJECT2_TEST_DATABASE_URL')
     if not raw:pytest.skip('PROJECT2_TEST_DATABASE_URL is required for actual PostgreSQL tests')
     url=make_url(raw)
@@ -25,7 +25,7 @@ def pg_factory(monkeypatch):
         with engine.begin() as db:
             db.exec_driver_sql('CREATE TABLE alembic_version (version_num varchar(32) PRIMARY KEY)')
             cfg.attributes['connection']=db
-            command.upgrade(cfg,'head')
+            command.upgrade(cfg,getattr(request,'param','head'))
         yield sessionmaker(bind=engine,autoflush=False)
     finally:
         engine.dispose()

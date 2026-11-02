@@ -1,6 +1,7 @@
 """Person-event editor contract; mutations delegate to PersonEventService."""
 from hashlib import sha256
 from datetime import date
+from app.services.staff_service import today
 import json
 import re
 from app.repositories.event_repository import EventRepository as Repo
@@ -9,7 +10,7 @@ from app.services.service_person_checking import ServicePersonCheck
 from app.database.transactions import service_transaction
 
 FIELDS = ('event_type_id', 'event_subtype_id', 'date_start', 'date_end', 'duration',
-          'order_date', 'order_number', 'purpose', 'location', 'note', 'event_status')
+          'order_date', 'order_number', 'purpose', 'location', 'note', 'event_status', 'planned_end', 'completion_confirmed')
 
 
 class EventConflictError(ValueError):
@@ -27,13 +28,18 @@ def day_label(value):
 
 def serialize(row, types, subtypes):
     values = {field: getattr(row, field) for field in FIELDS}
-    for field in ('date_start', 'date_end', 'order_date'):
+    for field in ('date_start', 'date_end', 'order_date', 'planned_end'):
         values[field] = values[field].isoformat() if values[field] else None
     kind, subtype = types[row.event_type_id], subtypes.get(row.event_subtype_id)
     identity = {'event_id': row.event_id, 'person_id': row.person_id, **values}
     return {**identity, 'type_name': kind.event_name, 'type_code': kind.event_type,
             'subtype_name': subtype.event_subtype_name if subtype else None,
-            'period': day_label(row.date_start) + ' — ' + (day_label(row.date_end) if row.date_end else 'по сьогодні'),
+            'subtype_code': subtype.event_subtype if subtype else None,
+            'subtype_tint': (.30 + .24 * (sorted(s.event_subtype_id for s in subtypes.values() if s.event_type_id == row.event_type_id).index(row.event_subtype_id)+1) / (1+sum(s.event_type_id == row.event_type_id for s in subtypes.values()))) if subtype else .22,
+            'type_color': kind.event_color,
+            'mirage': row.date_start > today(),
+            'legacy_future_end': bool(row.date_end and row.date_end > today() and not row.completion_confirmed),
+            'period': day_label(row.date_start) + ' — ' + (day_label(row.date_end) if row.date_end else 'заплановано' if row.date_start > today() else 'по сьогодні'),
             # Optimistic editor snapshot without inventing a database revision.
             'expected_state': sha256(json.dumps(identity, sort_keys=True, ensure_ascii=False).encode()).hexdigest()}
 
@@ -46,7 +52,7 @@ def dictionaries(db):
 def page(db, person_id):
     ServicePersonCheck.get_person_or_raise(person_id, db)
     types, subtypes = dictionaries(db)
-    return {'person_id': person_id,
+    return {'person_id': person_id, 'today': today().isoformat(),
             'types': [{'id': kind.event_type_id, 'code': kind.event_type, 'name': kind.event_name,
                        'color': kind.event_color, 'active': bool(kind.event_is_active),
                        'exclusive': bool(kind.event_exclusive),
@@ -71,7 +77,7 @@ def identifier(value, field, *, optional=False):
 
 def save(db, person_id, data, key=None):
     fields = {field: data.get(field) for field in FIELDS}
-    for field in ('date_start', 'date_end', 'order_date'):
+    for field in ('date_start', 'date_end', 'order_date', 'planned_end'):
         raw = fields[field]
         # Native HTML dates use ISO; the legacy event validator keeps its DMY
         # contract. Convert only a complete ISO date at this UI boundary.
@@ -84,6 +90,11 @@ def save(db, person_id, data, key=None):
             fields[field] = exact_date(raw, field, required=field == 'date_start')
     for field in ('event_type_id', 'event_subtype_id'):
         fields[field] = identifier(fields[field], field, optional=field == 'event_subtype_id')
+    raw_confirmation = fields['completion_confirmed']
+    if raw_confirmation not in (None, '', '0', '1', 'false', 'true', False, True):
+        raise EventValidationError('Некоректна ознака підтвердження.', 'completion_confirmed')
+    fields['completion_confirmed'] = None if raw_confirmation is None else raw_confirmation in ('1', 'true', True)
+    fields['planned_duration'] = data.get('planned_duration')
     # Own one complete transaction; nested event calls borrow it without commit.
     with service_transaction(db, immediate=True):
         ServicePersonCheck.get_person_or_raise(person_id, db)

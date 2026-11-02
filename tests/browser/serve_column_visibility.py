@@ -65,8 +65,8 @@ def reset_data():
         old_type.event_is_active=False
         old_sub=db.query(EventSubtype).filter_by(event_subtype='VACATION_OTHER').one()
         old_sub.event_subtype_is_active=False
-        db.add_all([PersonEvent(person_id=people[1].person_id,event_type_id=old_type.event_type_id,date_start=date(2000,1,1),date_end=date(2000,1,2),duration=2),
-                    PersonEvent(person_id=people[1].person_id,event_type_id=old_sub.event_type_id,event_subtype_id=old_sub.event_subtype_id,date_start=date(2000,2,1),date_end=date(2000,2,2),duration=2)])
+        db.add_all([PersonEvent(person_id=people[1].person_id,event_type_id=old_type.event_type_id,date_start=date(2000,1,1),date_end=date(2000,1,2),duration=2,completion_confirmed=True),
+                    PersonEvent(person_id=people[1].person_id,event_type_id=old_sub.event_type_id,event_subtype_id=old_sub.event_subtype_id,date_start=date(2000,2,1),date_end=date(2000,2,2),duration=2,completion_confirmed=True)])
         db.commit()
 
 

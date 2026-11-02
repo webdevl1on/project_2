@@ -53,9 +53,9 @@
 .event-badge svg {width:15px;height:15px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
 .event-badge>span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .event-tone-service {background:#e2f5d9;color:#265b31;}
-.event-tone-vacation {background:#dfedff;color:#17518c;}
-.event-tone-hospital {background:#fff3cd;color:#765a14;}
-.event-tone-trip {background:#ede2fa;color:#634082;}
+.event-tone-vacation {background:#fff0bb;color:#655014;}
+.event-tone-hospital {background:#f8dce8;color:#742b4e;}
+.event-tone-trip {background:#daebff;color:#17518c;}
 .event-tone-absence {background:#ffe0e3;color:#9c3444;}
 .event-tone-vacant,.event-tone-other {background:#edf0f4;color:#505d6d;}
 .event-tone-empty {background:#f3f6f5;color:#748078;}
@@ -116,3 +116,18 @@
 .event-period .profile-exact-date>button:hover {background:#eaf2fd;}
 .event-scale-day .event-day-cell>button {font-size:9px;letter-spacing:-.15px;}
 .event-view .table-viewport .event-badge {font-size:inherit;}
+/* Journal preferences and planned events do not affect staff layout settings. */
+.event-timeline .event-person-heading,.event-timeline .event-person-cell {width:var(--journal-name-width,172px);min-width:var(--journal-name-width,172px);max-width:var(--journal-name-width,172px);}
+.event-date-heading {width:58px;min-width:58px;}
+.event-timeline [data-journal-extra] {white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:4px 6px;}
+.event-name-resizer {position:absolute;right:0;top:0;bottom:0;width:8px;cursor:col-resize;touch-action:none;border-right:2px solid transparent;}
+.event-name-resizer:hover,.event-name-resizer:focus,.event-name-resizer.is-resizing {border-right-color:#126bc0;background:#126bc022;}
+.event-cell-type,.event-cell-subtype,.event-cell-plan {display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.event-cell-type {font-size:10px;}.event-cell-subtype,.event-cell-plan {font-size:9px;}
+.event-mirage {background-image:repeating-linear-gradient(135deg,transparent,transparent 4px,#ffffff77 4px,#ffffff77 8px);outline:1px dashed currentColor;outline-offset:-2px;}
+.event-journal-columns {display:flex;gap:18px;flex-wrap:wrap;margin:0 0 10px;border:0;padding:0;}
+.event-journal-columns legend {font-size:12px;width:auto;float:none;margin:0;}.event-journal-columns label {font-size:12px;}
+.event-month-navigation {display:flex;gap:4px;align-items:center;flex-basis:100%;}
+.event-month-menu {position:relative;min-width:190px;}.event-month-menu summary {cursor:pointer;text-align:center;font-weight:650;list-style:none;}
+.event-month-menu>div {position:absolute;z-index:10;top:30px;left:0;background:white;border:1px solid #d3dae5;border-radius:6px;padding:12px;box-shadow:0 3px 12px #263f5c33;display:grid;gap:8px;}
+.event-month-menu label {display:grid;gap:4px;}.event-month-menu input {max-width:160px;}

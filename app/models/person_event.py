@@ -5,7 +5,7 @@ from sqlalchemy import (
     String,
     Date,
     ForeignKey,
-    Text
+    Text, Boolean, CheckConstraint, text
 )
 from sqlalchemy.orm import Mapped, mapped_column, validates
 from app.database.base import Base
@@ -49,6 +49,15 @@ class PersonEvent(Base):
     
     date_end: Mapped[Optional[date]] = mapped_column(Date)
 
+    planned_end: Mapped[Optional[date]] = mapped_column(Date)
+
+    completion_confirmed: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("planned_end IS NULL OR planned_end >= date_start", name="event_planned_period"),
+        CheckConstraint("NOT completion_confirmed OR date_end IS NOT NULL", name="event_confirmed_end"),
+    )
+
     order_date: Mapped[Optional[date]] = mapped_column(Date)
 
     order_number: Mapped[Optional[str]]= mapped_column(String)
@@ -61,7 +70,7 @@ class PersonEvent(Base):
 
     event_status: Mapped[Optional[str]]= mapped_column(String)
 
-    @validates("date_start", "date_end", "order_date")
+    @validates("date_start", "date_end", "order_date", "planned_end")
     def validate_exact_dates(self, key, value):
         from app.utils.date_utils import parse_exact_date
         return parse_exact_date(value, required=key == "date_start")

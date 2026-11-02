@@ -1,5 +1,5 @@
 {% macro event_badge(item, column_value=false) -%}
-<span class="event-badge event-tone-{{ item.tone }}" title="{{ item.description or item.name }}" {% if column_value %}data-column-value{% endif %}><svg aria-hidden="true"><use href="#event-icon-{{ item.icon }}"/></svg><span>{{ item.label }}</span></span>
+<span class="event-badge event-tone-{{ item.tone }}{{ ' event-mirage' if item.mirage else '' }}" {% if item.background %}style="background-color:{{ item.background }};{% if item.accent_color %}background-color:color-mix(in srgb,{{ item.accent_color }} {{ item.mix }}%,white);{% endif %}color:{{ item.foreground }}"{% endif %} title="{{ item.description or item.name }}" {% if column_value %}data-column-value{% endif %}><svg aria-hidden="true"><use href="#event-icon-{{ item.icon }}"/></svg><span>{{ item.label }}</span></span>
 {%- endmacro %}
 {% macro event_legend(items) -%}
 <section class="event-legend" aria-label="Умовні позначення"><h2>Умовні позначення</h2><div class="event-legend-items">{% for item in items %}<div>{{ event_badge(item) }}<span>{{ item.name }}</span></div>{% endfor %}</div></section>

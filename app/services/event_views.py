@@ -5,28 +5,39 @@ from app.repositories.event_repository import EventRepository as Repo
 from app.repositories.person_repository import PersonRepository
 from app.services.staff_service import today
 from app.services.person_events import serialize, day_label
-from app.event_display import presentation, legend
+from app.event_display import presentation, legend, event_presentation
+from app.services import event_rules
 
 MONTHS = ('січ', 'лют', 'бер', 'кві', 'тра', 'чер', 'лип', 'сер', 'вер', 'жов', 'лис', 'гру')
 WEEKDAYS = ('Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд')
 
 
-def classification(events):
-    return events[0]['event_type_id'] if len(events) == 1 else '__conflict__' if events else None
-
-
-def presence(events, *, vacant=False):
-    key = classification(events)
-    if vacant:
-        result = presentation('__vacant__')
-    elif key == '__conflict__':
+def state_on(events, on):
+    iso = on.isoformat()
+    active = [r for r in events if r['date_start'] <= iso and (r['date_end'] is None or r['date_end'] >= iso)]
+    unresolved = [r for r in events if r['date_start'] <= iso and not r['completion_confirmed'] and
+                  ((r['planned_end'] and r['planned_end'] < iso) or (r['date_end'] and r['date_end'] < iso))]
+    if len(active) > 1 or (unresolved and any(r['event_id'] not in {e['event_id'] for e in unresolved} for r in active)):
         result = presentation('__conflict__')
-    elif events:
-        result = presentation(events[0]['type_code'], events[0]['type_name'])
+    elif unresolved:
+        result = presentation('__pending__')
+        if len(unresolved) == 1:
+            result.update(event_type_name=unresolved[0]['type_name'], subtype=unresolved[0]['subtype_name'])
+    elif active:
+        result = event_presentation(active[0])
     else:
         result = presentation()
-    return {**result, 'event_ids': [r['event_id'] for r in events],
-            'description': '; '.join(r['type_name'] + ': ' + r['period'] for r in events) or result['name']}
+    relevant = {r['event_id']: r for r in [*active, *unresolved]}
+    result.update(event_ids=list(relevant), mirage=any(r['mirage'] for r in active),
+                  description='; '.join(r['type_name'] + (' · ' + r['subtype_name'] if r['subtype_name'] else '') + ': ' + r['period'] +
+                  ('; орієнтовно до ' + day_label(date.fromisoformat(r['planned_end'])) if r['planned_end'] else '') for r in relevant.values()) or result['name'])
+    if unresolved: result['description'] += '; завершення не підтверджене'
+    if result['mirage']: result['description'] = 'Міраж (план). ' + result['description']
+    return result
+
+
+def presence(events, *, vacant=False, on=None):
+    return {**presentation('__vacant__'), 'event_ids': []} if vacant else state_on(events, on or today())
 
 
 def records(db, start, end, ids=None):
@@ -40,7 +51,7 @@ def presence_for_people(db, ids, on):
     grouped = defaultdict(list)
     if ids:
         for row in records(db, on, on, ids): grouped[row['person_id']].append(row)
-    return {pid: presence(grouped[pid]) for pid in ids}
+    return {pid: presence(grouped[pid], on=on) for pid in ids}
 
 
 def parse_options(raw):
@@ -93,37 +104,42 @@ def buckets(start, end, scale):
 
 
 def calendar_projection(events, periods, types):
-    """Count calendar days once; simultaneous records become an explicit conflict."""
-    all_counts = Counter()
-    cells = []
+    """Project each date once; base service, unconfirmed ends and plans are distinct."""
+    all_counts, cells = Counter(), []
     for bucket in periods:
-        counts = Counter()
-        ids = set()
-        day = date.fromisoformat(bucket['start'])
-        finish = date.fromisoformat(bucket['end'])
+        counts, states, ids = Counter(), [], set()
+        day, finish = date.fromisoformat(bucket['start']), date.fromisoformat(bucket['end'])
         while day <= finish:
-            iso = day.isoformat()
-            active = [item for item in events if item['date_start'] <= iso and (item['date_end'] is None or item['date_end'] >= iso)]
-            key = classification(active)
-            counts[key] += 1
-            ids.update(item['event_id'] for item in active)
+            state = state_on(events, day)
+            states.append(state); counts[state['code']] += 1; ids.update(state['event_ids'])
             if day == date.max: break
             day += timedelta(days=1)
         all_counts.update(counts)
-        entries = [count_entry(key, value, types) for key, value in counts.items()]
-        cell = {**entries[0]} if len(entries) == 1 else {**presentation('__mixed__', 'Різні події'), 'label': f'{len(entries)} стани'}
-        if len(entries) == 1 and sum(counts.values()) > 1: cell['label'] += f" · {sum(counts.values())}"
-        cell['description'] = bucket['period'] + ': ' + '; '.join(f"{r['name']} — {r['days']} дн." for r in entries)
-        cell['event_ids'] = sorted(ids)
+        same = len({(r['code'], r.get('subtype'), r.get('mirage')) for r in states}) == 1
+        cell = dict(states[0]) if same else {**presentation('__mixed__', 'Різні події'), 'label': f'{len(counts)} стани'}
+        if same and len(states) > 1: cell['label'] += f' · {len(states)}'
+        cell['description'] = bucket['period'] + ': ' + '; '.join(dict.fromkeys(r['description'] for r in states))
+        cell['event_ids'] = sorted(ids); cell['mirage'] = any(r.get('mirage') for r in states)
         cells.append(cell)
-    wanted = [t.event_type_id for meta in legend() for t in types.values() if t.event_type == meta['code']]
-    keys = list(dict.fromkeys([*wanted, *all_counts, None]))
-    return cells, [count_entry(key, all_counts[key], types) for key in keys]
+    names = {t.event_type: t.event_name for t in types.values()}
+    wanted = [r['code'] for r in legend() if r['code'] != '__vacant__']
+    keys = list(dict.fromkeys([*wanted, *all_counts]))
+    return cells, [{**presentation(key, names.get(key)), 'days': all_counts[key]} for key in keys]
 
 
-def count_entry(key, days, types):
-    kind = types.get(key)
-    return {**presentation(kind.event_type if kind else key, kind.event_name if kind else None), 'days': days}
+def problems(db, on=None):
+    on = on or today()
+    rows = Repo.problem_rows(db, on)
+    types = {kind.event_type_id: kind for _, kind, _ in rows}
+    subs = {sub.event_subtype_id: sub for _, _, sub in rows if sub}
+    names = {p.person_id: ' '.join(v for v in (name.surname, name.name, name.patronymic) if v) if name else 'Без ПІБ'
+             for p, name, *_ in PersonRepository.picker_rows(db, on)}
+    items = []
+    for row, _, _ in rows:
+        item = event_rules.problem(serialize(row, types, subs), on=on)
+        if item: items.append({**item, 'person_name': names.get(row.person_id, 'Без ПІБ')})
+    return {'on': on.isoformat(), 'on_label': day_label(on), 'groups': event_rules.PROBLEM_GROUPS, 'items': items,
+            'has_vlk': any(t.event_type == 'VLK' for t in Repo.types(db)) or any(s.event_subtype in {'VLK','HOSPITAL_VLK'} for s in Repo.subtypes(db))}
 
 
 def journal(db, raw):
@@ -155,11 +171,12 @@ def journal(db, raw):
         cells, summary = calendar_projection(available, periods, kinds)
         people.append({'cells': cells, 'summary': summary, 'id': pid, 'name': label, 'rank': rank.nominative if rank else 'Звання не зазначено',
                        'birth': format_partial_date(person.birth_day, person.birth_month, person.birth_year),
-                       'unit': unit_label, 'units': sorted(units[pid]), 'events': available})
+                       'unit': unit_label, 'units': sorted(units[pid]), 'position_number': position.position_number if position else None,
+                       'position_short': position.name_short if position else None, 'events': available})
     people.sort(key=lambda p: ((p['unit'].casefold(), p['name'].casefold(), p['id']) if options['sort'] == 'unit' else
                                (p['name'].casefold(), p['id'])), reverse=options['direction'] == 'desc')
     return {'options': {**options, 'start': start.isoformat(), 'end': end.isoformat()},
             'buckets': periods, 'people': people,
             'types': [{'id': t.event_type_id, 'code': t.event_type, 'name': t.event_name,
-                       'active': bool(t.event_is_active), **{'presentation': presentation(t.event_type, t.event_name)}} for t in types],
+                       'active': bool(t.event_is_active), **{'presentation': event_presentation({'type_code': t.event_type, 'type_name': t.event_name, 'type_color': t.event_color})}} for t in types],
             'units': sorted({u for entries in units.values() for u in entries}), 'legend': [p for p in legend() if p['code'] != '__vacant__']}

@@ -2,6 +2,8 @@ from datetime import timedelta
 from app.database.transactions import session_scope
 from app.repositories.event_repository import EventRepository
 from app import models
+from app.services.staff_service import today
+from app.services.event_rules import confirmation_required, planned
 from app.services.service_person_checking import ServicePersonCheck
 from app.services.service_common_event_func import CommonEventFunc
 from app.validators.event_validatotor import EventValidator
@@ -53,6 +55,43 @@ class PersonEventService:
                 raise EventValidationError("Тривалість виходить за допустимий календарний період.", "duration") from error
         if person_event.date_end is not None:
             person_event.duration = (person_event.date_end - person_event.date_start).days + 1
+
+    @staticmethod
+    def lifecycle(record, planned_end, planned_duration, confirmed):
+        record.planned_end = exact_date(planned_end, 'planned_end')
+        if planned_duration not in ('', None):
+            try:
+                days = duration_days(planned_duration)
+                calculated = record.date_start + timedelta(days=days-1)
+            except (ValueError, TypeError, OverflowError) as error:
+                raise EventValidationError('Орієнтовна тривалість має бути додатним числом у межах календаря.', 'planned_duration') from error
+            if record.planned_end and calculated != record.planned_end:
+                raise EventValidationError('Орієнтовна тривалість не відповідає плановій даті.', 'planned_duration')
+            record.planned_end = calculated
+        if record.planned_end and record.planned_end < record.date_start:
+            raise EventValidationError('Орієнтовне завершення не може бути раніше початку.', 'planned_end')
+        # Legacy callers explicitly supplying actual end/duration keep that contract.
+        record.completion_confirmed = record.date_end is not None if confirmed is None else confirmed
+        if not isinstance(record.completion_confirmed, bool):
+            raise EventValidationError('Некоректна ознака підтвердження.', 'completion_confirmed')
+        if record.completion_confirmed and not record.date_end:
+            raise EventValidationError('Укажіть фактичну дату підтвердженого завершення.', 'date_end')
+        if record.date_end and not record.completion_confirmed:
+            raise EventValidationError('Фактичне завершення потребує явного підтвердження. Планову дату внесіть окремо.', 'completion_confirmed')
+        if record.completion_confirmed and record.date_end > today():
+            raise EventValidationError('Не можна підтвердити завершення в майбутньому.', 'date_end')
+
+    @staticmethod
+    def period_conflicts(record, db, exclude=None):
+        # Future plans may overlap facts, never silently close them. Once their
+        # start arrives, an unresolved overlap is visible and requires a decision.
+        if planned(record):
+            candidates = EventRepository.for_person(db, record.person_id)
+            return [r for r in candidates if r.event_id != exclude and planned(r) and
+                    (record.planned_end is None or r.date_start <= record.planned_end) and
+                    (r.planned_end is None or r.planned_end >= record.date_start)]
+        conflicts = PersonEventService.get_conflicting_events(record.person_id, record.date_start, record.date_end, db, exclude)
+        return [r for r in conflicts if not planned(r)]
 
     @staticmethod
     def validate_catalog(event_type, event_subtype, previous=None):
@@ -113,7 +152,7 @@ class PersonEventService:
         location=None,
         note=None,
         event_status=None,
-        *, db=None, session_factory=None
+        *, db=None, session_factory=None, planned_end=None, planned_duration=None, completion_confirmed=None
     ):
         with session_scope(db, session_factory=session_factory, write=True) as db:
             person = ServicePersonCheck.get_person_or_raise(person_id,db)
@@ -134,7 +173,8 @@ class PersonEventService:
                     event_status)
             person_event.person_id = person.person_id
             PersonEventService.compare_date_end_and_duration(person_event)
-            conflicts = PersonEventService.get_conflicting_events(person_id, person_event.date_start, person_event.date_end, db)
+            PersonEventService.lifecycle(person_event, planned_end, planned_duration, completion_confirmed)
+            conflicts = PersonEventService.period_conflicts(person_event, db)
             if conflicts:
                 # Inspect ALL conflicts before changing the previous record.
                 # Finite conflicts, equal/later starts or ambiguous open history
@@ -142,12 +182,16 @@ class PersonEventService:
                 if len(conflicts) != 1 or conflicts[0].date_end is not None or conflicts[0].date_start >= person_event.date_start:
                     return conflicts
                 previous = conflicts[0]
+                previous_type = EventRepository.get_type(db, previous.event_type_id)
+                if planned(person_event) or confirmation_required(previous_type.event_type):
+                    return conflicts
                 previous_end = person_event.date_start - timedelta(days=1)
                 historical_conflicts = EventRepository.conflicts(db, person.person_id, previous.date_start, previous_end, previous.event_id)
                 if historical_conflicts:
                     return [previous, *historical_conflicts]
                 previous.date_end = previous_end
                 previous.duration = (previous.date_end - previous.date_start).days + 1
+                previous.completion_confirmed = True
             EventRepository.add(db, person_event)
             db.flush()
             db.refresh(person_event)
@@ -167,7 +211,7 @@ class PersonEventService:
         location=None,
         note=None,
         event_status=None,
-        *, db=None, session_factory=None
+        *, db=None, session_factory=None, planned_end=None, planned_duration=None, completion_confirmed=None
     ):
         with session_scope(db, session_factory=session_factory, write=True) as db:
             owner = EventRepository.owner_id(db, event_id)
@@ -194,14 +238,12 @@ class PersonEventService:
             )
             person_event_new.person_id = person_event_old.person_id
             PersonEventService.compare_date_end_and_duration(person_event_new)
-            conflicts = PersonEventService.get_conflicting_events(
-                person_event_new.person_id,
-                person_event_new.date_start,
-                person_event_new.date_end,
-                db,
-                person_event_old.event_id)
+            PersonEventService.lifecycle(person_event_new, planned_end, planned_duration, completion_confirmed)
+            conflicts = PersonEventService.period_conflicts(person_event_new, db, person_event_old.event_id)
             if conflicts:
                 return conflicts
+            person_event_old.planned_end = person_event_new.planned_end
+            person_event_old.completion_confirmed = person_event_new.completion_confirmed
             person_event_old.event_type_id = person_event_new.event_type_id
             person_event_old.event_subtype_id = person_event_new.event_subtype_id
             person_event_old.date_start = person_event_new.date_start

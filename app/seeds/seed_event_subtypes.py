@@ -2,6 +2,7 @@ from app.models.event_type import EventType
 from app.models.event_subtype import EventSubtype
 
 EVENT_SUBTYPES = {
+    "SERVICE": [("SERVICE_DUTY", "Чергування"), ("SERVICE_AFTER_DUTY", "Після чергування"), ("SERVICE_DAY_OFF", "Вихідний")],
     "BUSINESS_TRIP": [
         ("BUSINESS_TRIP_TRAINING", "БЗВП"),
         ("BUSINESS_TRIP_STUDING", "Навчання"),

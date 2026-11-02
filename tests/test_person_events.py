@@ -14,6 +14,7 @@ from tests.test_service_transactions import factory, data
 @pytest.fixture
 def person(factory):
     with factory() as db:
+        kind=db.scalar(select(EventType).order_by(EventType.event_type_id));kind.event_type="SERVICE";db.commit()
         record = People.create_person(data(), db)
         return record.person_id, db.scalar(select(EventType.event_type_id).order_by(EventType.event_type_id))
 

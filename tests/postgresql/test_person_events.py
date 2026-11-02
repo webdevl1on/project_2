@@ -25,7 +25,7 @@ def events(pg_factory):
 def test_event_crud_open_closure_and_edit_on_postgresql(events):
     factory,pid,service,vacation,sub=events
     with factory() as db:
-        old=editor.save(db,pid,{'event_type_id':vacation,'event_subtype_id':sub,'date_start':'2026-10-01'})
+        old=editor.save(db,pid,{'event_type_id':service,'date_start':'2026-10-01'})
         current=editor.save(db,pid,{'event_type_id':service,'date_start':'2026-10-15'})
         assert (db.get(PersonEvent,old).date_end,db.get(PersonEvent,old).duration)==(date(2026,10,14),14)
         state=editor.page(db,pid)['events']
@@ -42,7 +42,7 @@ def test_event_crud_open_closure_and_edit_on_postgresql(events):
 def test_concurrent_http_creates_close_previous_exactly_once(events):
     from app.main import app
     factory,pid,service,vacation,sub=events
-    with factory() as db:old=editor.save(db,pid,{'event_type_id':vacation,'date_start':'2026-10-01'})
+    with factory() as db:old=editor.save(db,pid,{'event_type_id':service,'date_start':'2026-10-01'})
     def session():
         with factory() as db:yield db
     overrides=app.dependency_overrides.copy();app.dependency_overrides[get_db]=session
@@ -64,7 +64,7 @@ def test_concurrent_http_creates_close_previous_exactly_once(events):
 
 def test_postgresql_insert_failure_rolls_back_closure(events):
     factory,pid,service,vacation,sub=events
-    with factory() as db:old=editor.save(db,pid,{'event_type_id':vacation,'date_start':'2026-10-01'})
+    with factory() as db:old=editor.save(db,pid,{'event_type_id':service,'date_start':'2026-10-01'})
     def refuse(*args):raise RuntimeError('synthetic insert refusal')
     event.listen(PersonEvent,'before_insert',refuse)
     try:

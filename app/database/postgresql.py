@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 from sqlalchemy import inspect,text
 
-REVISION='0001_postgresql'
+REVISION='0002_event_completion'
 
 
 def require_postgresql_schema(engine):

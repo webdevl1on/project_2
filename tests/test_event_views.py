@@ -41,7 +41,7 @@ def test_inclusive_day_projection_and_open_event_do_not_write_dates(views):
         person=next(p for p in page['people'] if p['id']==pid)
         assert [c['label'] for c in person['cells']]==['відпустка']*3+['служба']*4
         counts={c['code']:c['days'] for c in person['summary']}
-        assert counts['VACATION']==3 and counts['SERVICE']==4 and counts[None]==0
+        assert counts['VACATION']==3 and counts['SERVICE']==4 and counts['__base__']==0
         assert sum(c['days'] for c in person['summary'])==7
         assert len(page['people'])==2
         assert next(p for p in page['people'] if p['id']==second)['unit']=='Без штатного призначення'
@@ -74,7 +74,7 @@ def test_staff_projection_has_one_row_and_distinguishes_vacancy_from_no_event(vi
     factory,pid,second,version,*_=views
     with factory() as db:
         early=ServicePersonPositionFunc.get_positions(db,version_id=version,on=date(2026,9,30))
-        assert [r['values']['event_on_date'] for r in early['rows']]==['Немає події','вакантна']
+        assert [r['values']['event_on_date'] for r in early['rows']]==['служба','вакантна']
         state=ServicePersonPositionFunc.get_positions(db,version_id=version,on=date(2026,10,3))
         assert len(state['rows'])==2 and state['rows'][0]['values']['event_on_date']=='відпустка'
         after=ServicePersonPositionFunc.get_positions(db,version_id=version,on=date(2026,10,4))
@@ -86,7 +86,7 @@ def test_staff_projection_has_one_row_and_distinguishes_vacancy_from_no_event(vi
 def test_ambiguous_legacy_events_are_explicit_without_double_counting(views):
     factory,pid,second,version,service,vacation=views
     with factory.begin() as db:
-        db.add(PersonEvent(person_id=pid,event_type_id=service,date_start=date(2026,10,2),date_end=date(2026,10,2)))
+        db.add(PersonEvent(person_id=pid,event_type_id=service,date_start=date(2026,10,2),date_end=date(2026,10,2),completion_confirmed=True))
     with factory() as db:
         page=event_views.journal(db,{'start':'2026-10-01','end':'2026-10-03'})
         person=next(p for p in page['people'] if p['id']==pid)
