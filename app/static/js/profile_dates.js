@@ -2,7 +2,7 @@
 ((root,factory)=>{
  const api=factory();
  if(typeof module==='object'&&module.exports)module.exports=api;
- else{root.ProfileDates=api;api.enhance(document);new MutationObserver(records=>{for(const r of records)for(const n of r.addedNodes)if(n.nodeType===1)api.enhance(n);}).observe(document.body,{childList:true,subtree:true});}
+ else{root.ProfileDates=api;const selector=document.currentScript?.dataset.dateScope,scope=selector?document.querySelector(selector):document;if(!scope)return;api.enhance(scope);new MutationObserver(records=>{for(const r of records)for(const n of r.addedNodes)if(n.nodeType===1)api.enhance(n);}).observe(scope===document?document.body:scope,{childList:true,subtree:true});}
 })(globalThis,()=>{
  'use strict';
  function valid(day,month,year){const leap=year%4===0&&(year%100!==0||year%400===0);return year>=1&&year<=9999&&month>=1&&month<=12&&day>=1&&day<=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31][month-1];}

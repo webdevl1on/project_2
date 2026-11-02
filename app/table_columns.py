@@ -37,9 +37,11 @@ def table_configuration(table_id, selections, *, overrides=None, controls=False)
 
 
 PERSON_POSITIONS_COLUMNS = table_configuration(
-    "person-positions", [(group, [field.key for field in FIELDS.values() if field.group == group]) for group in GROUPS],
-    controls=True,
+    "person-positions", [(group, [field.key for field in FIELDS.values() if field.group == group]) for group in GROUPS if group != 'events'],
+    controls=True, overrides={"position_number": {"min_width": 64}},
 )
+PERSON_POSITIONS_COLUMNS['groups'].append({'key': 'events', 'label': GROUPS['events'],
+                                         'columns': [FIELDS['event_on_date'].metadata()]})
 PERSON_POSITIONS_FIELDS = {column["key"]: FIELDS[column["key"]]
                           for group in PERSON_POSITIONS_COLUMNS["groups"] for column in group["columns"]
                           if column["key"] in FIELDS}

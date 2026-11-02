@@ -31,7 +31,7 @@ module.exports = async ({context,base}) => {
             await submit('Початковий');
             await save.waitFor({state:'hidden'});
             const [preset] = await stored();
-            assert.equal(preset.columns.length,12);
+            assert.equal(preset.columns.length,await table.locator('thead th:visible').count());
             assert.equal(preset.version,1);
             assert.equal(preset.table_id,'person-positions');
             assert.ok(preset.id);

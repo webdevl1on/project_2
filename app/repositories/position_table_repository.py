@@ -19,7 +19,7 @@ DATE_FILTER_COLUMNS = {key: field.date_binding for key, field in PERSON_POSITION
                        if field.data_type == "partial_date"}
 DATE_FILTER_RECORDS = {key: PERSON_POSITIONS_FIELDS[key].record_id for key in DATE_FILTER_COLUMNS}
 SORT_COLUMNS = {key: field.expression for key, field in PERSON_POSITIONS_FIELDS.items()
-                if field.data_type != "partial_date"}
+                if field.data_type != "partial_date" and field.sortable}
 HISTORY_MODELS = (PersonName, PersonRank, Passport, PersonServiceHistory)
 
 
@@ -87,7 +87,7 @@ class PositionTableRepository:
         from app.utils.text_search import contains_clause
         for key,field in PERSON_POSITIONS_FIELDS.items():
             alias=key+'__contains'
-            if field.data_type=='text' and key!=exclude_key and column_filters.get(alias):
+            if field.filterable and field.data_type=='text' and key!=exclude_key and column_filters.get(alias):
                 values=PositionTableRepository._normalise_values(column_filters[alias])
                 if len(values)!=1:raise ValueError('Містить текст: один запит на колонку.')
                 query=query.filter(contains_clause(field.expression,values[0]))

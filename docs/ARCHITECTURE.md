@@ -16,6 +16,7 @@ PostgreSQL — цільова БД; `Settings` вимагає явні PROJECT2_
 
 | Завдання | Основні файли |
 | --- | --- |
+| Журнал і стан події на дату | `docs/EVENT_VIEWS.md`, `app/event_display.py`, `app/services/event_views.py`, `app/routers/event_journal.py`, `app/templates/event_journal.html`, `app/static/js/event_journal.js`, `app/static/css/event_views.css` |
 | Події зі штатки | `docs/PERSON_EVENTS.md`, `app/routers/person_events.py`, `app/services/person_events.py`, `app/services/service_for_person_event.py`, `app/repositories/event_repository.py`, `app/templates/components/person_events.html`, `app/static/js/person_events.js` |
 | PostgreSQL, Alembic, конфігурація й засівання | `docs/POSTGRESQL_SETUP.md`, `app/database/settings.py`, `db.py`, `locking.py`, `postgresql.py`, `migrations/`, `app/services/seed_postgresql.py` |
 | Список, створення, базове редагування людини | `app/routers/persons.py`, `app/services/person_read.py`, `app/services/service_person_create.py`, `app/repositories/person_repository.py`, `app/templates/persons.html`, `app/templates/person_form.html` |
@@ -400,3 +401,10 @@ GET `/admin/staff` у `routers/admin.py` повторно використову
 `routers/person_events.py → services/person_events.py → PersonEventService → EventRepository` обслуговує один Bootstrap Modal зі списком, створенням і редагуванням за справжнім person_id офіційної людини. Події не належать посаді/версії, не множать рядки штатки й не переносяться під час перепризначення. Каталог колонок, URL-фільтри, копіювання та Undo/Redo не змінені.
 
 Нова подія може атомарно завершити лише одну ранішу відкриту, днем перед своїм початком; duration перераховується. Усі інші включні перетини, неоднозначна відкрита історія, неправильний підтип і неповні дати відхиляються. Редагування зберігає event_id і не завершує інші події. Транзакція блокує Person у PostgreSQL до перевірки, далі за потреби сам PersonEvent; без глобального DB-lock. UI перевіряє відбиток початкових полів, зберігає форму при відмові та показує всі конфлікти. Схема/міграції не змінені. Контракти, межі доступу та тести — [PERSON_EVENTS.md](PERSON_EVENTS.md).
+
+
+## Журнал подій і проєкція на дату
+
+`event_journal.py → event_views.py → EventRepository/PersonRepository` читає матрицю за період без зміни подій. Один selector визначає невідомий день, одну подію або конфлікт; підсумки рахуються за днями незалежно від масштабу. Тип/підрозділ/ПІБ відбирають людей, події лишаються прив'язаними до Person. Додавання/редагування відкриває той самий PersonEvents Modal і чинний write API.
+
+Штатка має один computed ключ `event_on_date`, заповнений bulk-вибіркою на as_of після головного запиту. Це не SQL-колонка: спеціального SQL-фільтра/сортування немає, а видимість/порядок/ширина/пресети/копіювання використовують чинний менеджер. Поточні rows/призначення не множаться. Палітра й SVG спільні з журналом, нових моделей/міграцій немає. Детальна карта та правила — [EVENT_VIEWS.md](EVENT_VIEWS.md).

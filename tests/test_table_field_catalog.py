@@ -63,8 +63,8 @@ def test_catalogue_covers_all_displayable_mapped_attributes():
         # Mapper attributes use private names for the exact-date projections.
         actual = {column.name for column in inspect(model).columns} - excluded
         assert actual <= covered, (model.__name__, actual - covered)
-    assert all(field.group not in ("events", "event_types", "event_subtypes") for field in FIELDS.values())
-    assert len([f for f in FIELDS.values() if f.group not in ("medical","injuries","awards","tasks","dna")]) == 55
+    assert {field.key for field in FIELDS.values() if field.group == "events"} == {"event_on_date"}
+    assert len([f for f in FIELDS.values() if f.group not in ("medical","injuries","awards","tasks","dna","events")]) == 55
     assert set(PERSON_POSITIONS_FIELDS) == set(FIELDS)
 
 
@@ -99,7 +99,9 @@ def test_single_inactive_records_are_displayed_and_vacancies_are_empty(catalog_d
     assert row["values"]["passport_series"] == "-"
     assert not result["data_warnings"]
     for key, field in FIELDS.items():
-        if field.source != "position":
+        if key == "event_on_date":
+            assert vacant["values"][key] == "вакантна"
+        elif field.source != "position":
             assert vacant["values"][key] == "-", key
 
 
@@ -188,17 +190,17 @@ def test_query_count_is_independent_of_rows_and_field_count(catalog_db):
     event.listen(catalog_db.bind, "before_cursor_execute", record_sql)
     try:
         Service.get_positions(catalog_db)
-        assert len(calls) == 2
+        assert len(calls) == 3
         calls.clear()
         for number in range(2, 8):
             populate(catalog_db, number)
         catalog_db.expire_all(); calls.clear()
         result = Service.get_positions(catalog_db)
         assert len(result["rows"]) == 7
-        assert len(calls) == 2
+        assert len(calls) == 3
         calls.clear()
         Service.get_positions(catalog_db, column_filters={"unit_short": ["Підрозділ"], "passport_number": ["000123"]})
-        assert len(calls) == 4  # result + one bulk mirage read + one query per active facet
+        assert len(calls) == 5  # result + bulk events + bulk mirages + one query per active facet
     finally:
         event.remove(catalog_db.bind, "before_cursor_execute", record_sql)
 

@@ -76,3 +76,21 @@ class EventRepository:
     @staticmethod
     def delete(db, record):
         db.delete(record)
+
+    @staticmethod
+    def window_rows(db, start, end, person_ids=None):
+        stmt = (select(PersonEvent, EventType, EventSubtype)
+                .join(EventType, EventType.event_type_id == PersonEvent.event_type_id)
+                .outerjoin(EventSubtype, EventSubtype.event_subtype_id == PersonEvent.event_subtype_id)
+                .where(overlap_conditions(start, end)))
+        if person_ids is not None:
+            stmt = stmt.where(PersonEvent.person_id.in_(person_ids))
+        return db.execute(stmt.order_by(PersonEvent.date_start, PersonEvent.event_id)).all()
+
+    @staticmethod
+    def assignment_units(db, start, end):
+        from app.models import PersonAssignment, Position
+        return db.execute(select(PersonAssignment.person_id, Position.unit_short)
+                          .join(Position, Position.position_id == PersonAssignment.staff_position_id)
+                          .where(PersonAssignment.assigned_from <= end,
+                                 or_(PersonAssignment.assigned_to.is_(None), PersonAssignment.assigned_to >= start))).all()

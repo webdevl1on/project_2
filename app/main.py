@@ -43,3 +43,5 @@ from app.routers import profile_records
 app.include_router(profile_records.router)
 from app.routers import person_events
 app.include_router(person_events.router)
+from app.routers import event_journal
+app.include_router(event_journal.router)

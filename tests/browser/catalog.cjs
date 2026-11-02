@@ -18,8 +18,8 @@ module.exports = async ({context, base}) => {
         await page.evaluate(() => localStorage.clear()); await page.reload();
         await scenario('all configured fields have unique keyed cells, new groups are hidden by default', async () => {
             const keys = await table.locator('thead th').evaluateAll(nodes => nodes.map(node => node.dataset.columnKey));
-            assert.equal(keys.length, 78); assert.equal(new Set(keys).size, 78);
-            assert.equal(await table.locator('thead th:visible').count(), 12);
+            assert.equal(keys.length, 79); assert.equal(new Set(keys).size, 79);
+            assert.equal(await table.locator('thead th:visible').count(), 13);
             assert.equal(await table.locator('tbody tr').count(), 3);
             for (const row of await table.locator('tbody tr').all()) {
                 assert.deepEqual(await row.locator('td').evaluateAll(nodes => nodes.map(node => node.dataset.columnKey)), keys);

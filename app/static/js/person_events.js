@@ -88,16 +88,27 @@
         if (pid !== personId) return;
         model = data; newButton.disabled = saving; render();
     }
-    document.addEventListener('click', async event => {
+    async function open(id, label, options = {}) {
+        const nextId = String(id);
+        if (saving || (personId !== nextId && dirty() && !window.confirm('Відхилити незбережені зміни події?'))) return;
+        if (personId !== nextId) {
+            personId = nextId; model = null; editing = null; editor.hidden = true; form.reset(); clearErrors(); list.replaceChildren();
+        }
+        modal.querySelector('[data-events-person]').textContent = label || 'Військовослужбовець';
+        newButton.disabled = true; notice('Завантаження…'); bootstrap.Modal.getOrCreateInstance(modal).show();
+        try {
+            await load(); if (personId !== nextId) return; notice('');
+            if (options.eventId) {
+                const record = model.events.find(row => row.event_id === Number(options.eventId));
+                if (record) openEditor(record); else notice('Подію не знайдено в актуальній історії.', true);
+            } else if (options.create) openEditor();
+        } catch (error) { notice(error.message, true); }
+    }
+    globalThis.PersonEvents = {open};
+    document.addEventListener('click', event => {
         const button = event.target.closest('[data-events-open]'); if (!button) return;
         event.preventDefault(); event.stopPropagation();
-        if (saving || (personId !== button.dataset.personId && dirty() && !window.confirm('Відхилити незбережені зміни події?'))) return;
-        if (personId !== button.dataset.personId) {
-            personId = button.dataset.personId; model = null; editing = null; editor.hidden = true; form.reset(); clearErrors(); list.replaceChildren();
-        }
-        modal.querySelector('[data-events-person]').textContent = button.dataset.eventsPersonLabel || 'Військовослужбовець';
-        newButton.disabled = true; notice('Завантаження…'); bootstrap.Modal.getOrCreateInstance(modal).show();
-        try { await load(); notice(''); } catch (error) { notice(error.message, true); }
+        open(button.dataset.personId, button.dataset.eventsPersonLabel);
     });
     field('event_type_id').addEventListener('change', () => subtypes(field('event_subtype_id').value));
     form.addEventListener('input', event => { event.target.classList.remove('is-invalid'); event.target.removeAttribute('aria-invalid'); });
@@ -122,6 +133,7 @@
             editor.hidden = true; editing = null;
             // Saving is already successful even if the subsequent list request fails.
             try { await load(); notice(data.message); } catch { notice('Подію збережено. Не вдалося оновити список; натисніть «Оновити список».'); }
+            document.dispatchEvent(new CustomEvent('person-events:saved', {detail: {personId: Number(personId), eventId: data.event_id}}));
         } catch { notice('Не вдалося отримати відповідь сервера. Введені поля збережено; перевірте список перед повторною спробою.', true); }
         finally { saving = false; submit.disabled = false; newButton.disabled = !model; render(); }
     });

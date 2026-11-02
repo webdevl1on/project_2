@@ -96,3 +96,19 @@ def test_events_survive_position_change_and_exist_without_assignments(events):
         assert original.date_start==date(2026,10,1) and original.date_end is None
         assert len(event_positions(db,original,date(2026,10,31))['positions'])==2
         assert db.scalar(select(func.count()).select_from(PersonServiceHistory))==0
+
+
+def test_journal_and_date_presence_read_postgresql_without_changing_history(events):
+    from app.services import event_views
+    factory,pid,service,vacation,sub=events
+    with factory() as db:
+        key=editor.save(db,pid,{'event_type_id':vacation,'date_start':'2026-10-01','date_end':'2026-10-03'})
+        later=editor.save(db,pid,{'event_type_id':service,'date_start':'2026-10-04'})
+        payload=event_views.journal(db,{'start':'2026-10-01','end':'2026-10-07','scale':'week'})
+        assert len(payload['people'])==1 and len(payload['buckets'])==2
+        assert sum(c['days'] for c in payload['people'][0]['summary'])==7
+        assert event_views.presence_for_people(db,[pid],date(2026,10,3))[pid]['label']=='відпустка'
+        assert event_views.presence_for_people(db,[pid],date(2026,10,4))[pid]['label']=='служба'
+        assert db.get(PersonEvent,key).date_end==date(2026,10,3)
+        assert db.get(PersonEvent,later).date_end is None
+        assert db.scalar(select(func.count()).select_from(PersonAssignment))==0

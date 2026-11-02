@@ -1,4 +1,7 @@
 from copy import deepcopy
+from datetime import date
+from types import SimpleNamespace
+from app.event_display import presentation
 from app.models.reference_book import Position
 
 from app.routers.person_positions import templates
@@ -13,8 +16,9 @@ def test_column_metadata_covers_real_columns_with_unique_keys():
     assert len({group["key"] for group in groups}) == len(groups)
     assert len(columns) == len({column["key"] for column in columns}) == len(PERSON_POSITIONS_FIELDS) + 2
     assert sum(column["informational"] for column in columns) == len(PERSON_POSITIONS_FIELDS)
-    assert sum(column["default_visible"] for column in columns) == 12
-    assert all(not column["default_visible"] for column in groups[-2]["columns"])
+    assert sum(column["default_visible"] for column in columns) == 13
+    assert all(not column["default_visible"] for column in next(g for g in groups if g["key"] == "dna")["columns"])
+    assert groups[-1]["columns"][0]["key"] == "event_on_date"
     assert [column["key"] for column in columns if column["system"]] == ["row_number"]
 
 
@@ -33,10 +37,10 @@ def test_table_headers_and_cells_follow_config_order_and_labels():
 
     rendered = templates.env.get_template("person_positions.html").render(
         table_columns=config, rows=[{
-            "position": position, "rank": None, "name": None, "assignment": None,
+            "position": position, "rank": None, "name": None, "assignment": None, "person": None, "event_presence": presentation("__vacant__"),
             "values": {key: field.display({"position": position}) for key, field in PERSON_POSITIONS_FIELDS.items()},
         }], people=[], total=1, occupied=0, vacant=1,
-        active_filters={}, sort_urls={}, filter_numbers={}, sort_commands={},
+        active_filters={}, sort_urls={}, filter_numbers={}, sort_commands={}, filter_options={}, as_of=date(2026,10,7), event_status_legend=[],
         active_query="", filter_order="", occupancy="all", sort_by="position_number", direction="asc",
     )
     document = html.fromstring(rendered)
@@ -76,10 +80,10 @@ def test_staff_profile_button_uses_assigned_person_id_and_keeps_values_plain():
         values = {key: "-" for key in PERSON_POSITIONS_FIELDS}
         values["full_name"] = "Тестове ПІБ" if assignment else "-"
         rows.append({"position": Position(position_id=position_id, position_number=position_id * 10),
-                     "assignment": assignment, "values": values})
+                     "assignment": assignment, "values": values, "person": SimpleNamespace(person_id=987) if assignment else None, "event_presence": presentation() if assignment else presentation("__vacant__")})
     rendered = templates.env.get_template("person_positions.html").render(
         table_columns=PERSON_POSITIONS_COLUMNS, rows=rows, people=[], people_labels={987: "Тестове ПІБ"},
-        total=2, occupied=1, vacant=1, active_filters={}, sort_urls={}, filter_numbers={},
+        total=2, occupied=1, vacant=1, active_filters={}, sort_urls={}, filter_numbers={}, filter_options={}, as_of=date(2026,10,7), event_status_legend=[],
         sort_commands={}, active_query="", filter_order="", occupancy="all",
         sort_by="position_number", direction="asc",
     )

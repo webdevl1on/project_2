@@ -29,6 +29,7 @@ GROUPS = {
     "person": "Особисті дані", "service": "Військова служба",
     "documents": "Документи", "system_data": "Системні дані",
     "medical": "ВЛК", "injuries":"Поранення", "awards":"Нагородження", "tasks":"Завдання", "dna":"ДНК",
+    "events": "Подія на дату",
 }
 
 
@@ -66,7 +67,11 @@ class TableField:
     @property
     def filterable(self):
         # A date-only component filter would discard the time in a timestamp.
-        return self.data_type != "datetime"
+        return self.data_type != "datetime" and self.key != 'event_on_date'
+
+    @property
+    def sortable(self):
+        return self.key != 'event_on_date'
 
     @property
     def date_binding(self):
@@ -81,6 +86,7 @@ class TableField:
         return SOURCES[self.source].__mapper__.primary_key[0]
 
     def value(self, row):
+        if self.key == 'event_on_date': return row.get('event_presence', {}).get('label')
         if self.group in ('medical','injuries','awards','tasks','dna') and self.source=='person':return row.get('medical_values',{}).get(self.key) if row.get('person') is not None else None
         if self.key == 'full_address':return row.get('full_address')
         record = row.get(self.source)
@@ -112,7 +118,7 @@ class TableField:
     def metadata(self):
         model = SOURCES[self.source]
         attributes = [f"{self.prefix}_{part}" for part in ("day", "month", "year")] if self.prefix else [self.attribute]
-        computed = self.key in ("full_name","full_address") or (self.source=="person" and self.group in ("medical","injuries","awards","tasks","dna"))
+        computed = self.key in ("full_name","full_address",'event_on_date') or (self.source=="person" and self.group in ("medical","injuries","awards","tasks","dna"))
         result = {
             "key": self.key, "label": self.label, "group": self.group,
             "source": {"model": model.__name__, "attributes": ["surname", "name", "patronymic"] if self.key == "full_name" else ["person_id"] if computed else attributes,
@@ -123,7 +129,7 @@ class TableField:
             "selection_source": "person_rank" if self.source == "rank" else self.source,
             "historical": self.source in ("name", "person_rank", "passport", "service", "medical_exam"),
             "system_data": self.group == "system_data",
-            "filterable": self.filterable, "sortable": True,
+            "filterable": self.filterable, "sortable": self.sortable,
             "informational": True, "system": False, "draggable": True, "resizable": True,
             "min_width": 100, "width": 180,
         }
@@ -142,6 +148,7 @@ def _add(key, label, group, source, attribute=None, **kwargs):
 
 
 _add("position_number", "№ посади за штатом", "position", "position", data_type="integer", default_visible=True)
+_add('event_on_date', 'Наявність / подія', 'events', 'person', 'person_id', default_visible=True)
 _add("unit_short", "Взвод / підрозділ", "position", "position", default_visible=True)
 _add("name_short", "Коротка посада", "position", "position", default_visible=True)
 _add("name_nominative", "Повна посада", "position", "position", default_visible=True)

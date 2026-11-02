@@ -67,3 +67,8 @@
 - `tests/browser/serve_column_visibility.py`
 - `tests/postgresql/test_person_events.py`
 - `tests/test_person_events.py`
+
+
+## Журнал і кнопки правої панелі
+
+Редактор повторно використовується журналом /events через `PersonEvents.open(personId,label,{eventId,create})`. Після успіху DOM-подія `person-events:saved` оновлює журнал і значок штатки. Запис/конфлікти/expected_state не дублюються в нових представленнях. Опис матриці та стану на дату — [EVENT_VIEWS.md](EVENT_VIEWS.md).

@@ -1,0 +1,112 @@
+const assert = require('node:assert/strict');
+module.exports = async ({context, base}) => {
+    const page = await context.newPage(), errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    const scenario = async (name, run) => { await run(); console.log(`PASS journal: ${name}`); };
+    try {
+        const catalog = await (await context.request.get(base + '/persons/1/events')).json();
+        const vacation = catalog.types.find(t => t.code === 'VACATION').id, service = catalog.types.find(t => t.code === 'SERVICE').id;
+        assert.equal((await context.request.post(base + '/persons/1/events', {form: {event_type_id:vacation,date_start:'2026-10-01',date_end:'2026-10-10',note:'Тестова відпустка'}})).status(),200);
+        assert.equal((await context.request.post(base + '/persons/1/events', {form: {event_type_id:service,date_start:'2026-10-11',note:'Виконання обов’язків'}})).status(),200);
+        await page.setViewportSize({width:1440,height:1000});
+        await scenario('separate journal renders a daily matrix and selected-person panel, including people without positions', async () => {
+            await page.goto(base + '/events?start=2026-10-01&end=2026-10-14');
+            assert.equal(await page.locator('[data-journal-person-id]').count(),3);
+            assert.equal(await page.locator('.event-date-heading').count(),14);
+            await page.locator('[data-journal-person-id="1"] .event-person-cell button').click();
+            assert.ok((await page.locator('[data-journal-person]').textContent()).includes('Альфа'));
+            assert.equal(await page.locator('[data-journal-person-id="1"] .event-tone-vacation').count(),10);
+            assert.equal(await page.locator('[data-journal-person-id="1"] .event-tone-service').count(),4);
+            assert.ok((await page.locator('[data-journal-summary]').textContent()).includes('10 дн.'));
+            await page.screenshot({path:'/tmp/project2-event-journal.png',fullPage:true});
+            const start = page.locator('[data-exact-date-for=start]'), end = page.locator('[data-exact-date-for=end]');
+            assert.equal(await start.inputValue(),'01.10.2026');
+            assert.equal(await page.locator('#person-events-modal input[name=date_start]').getAttribute('type'),'date');
+            const url = page.url(); await start.fill('15.10.2026');
+            await page.getByRole('button',{name:'Застосувати',exact:true}).click();
+            assert.ok((await end.evaluate(el=>el.validationMessage)).includes('передувати')); assert.equal(page.url(),url);
+            await start.fill('01.01.2025'); await page.getByRole('button',{name:'Застосувати',exact:true}).click();
+            assert.ok((await end.evaluate(el=>el.validationMessage)).includes('366')); assert.equal(page.url(),url);
+            await start.fill('01.10.2026');
+        });
+        await scenario('week and month scales preserve totals and working tabs and person navigation', async () => {
+            await page.locator('[name=scale][value=week]').check();
+            await Promise.all([page.waitForURL(u=>u.searchParams.get('scale')==='week'),page.getByRole('button',{name:'Застосувати',exact:true}).click()]);
+            assert.equal(await page.locator('.event-date-heading').count(),3);
+            await page.locator('[data-journal-person-id="1"] .event-person-cell button').click();
+            await page.locator('[data-journal-tab=presence]').click();
+            assert.equal(await page.locator('[data-journal-presence-tab]').isVisible(),true);
+            await page.locator('[data-journal-next]').click();
+            assert.ok(!(await page.locator('[data-journal-person]').textContent()).includes('Альфа'));
+            await page.locator('[name=scale][value=month]').check();
+            await Promise.all([page.waitForURL(u=>u.searchParams.get('scale')==='month'),page.getByRole('button',{name:'Застосувати',exact:true}).click()]);
+            assert.equal(await page.locator('.event-date-heading').count(),1);
+        });
+        await scenario('filters use real names and event types and keep query state across reload', async () => {
+            await page.locator('[name=search]').fill('аЛьФа'); await page.locator('[name=event_type]').selectOption(String(vacation));
+            await Promise.all([page.waitForURL(u=>u.searchParams.get('search')==='аЛьФа' && u.searchParams.get('event_type')===String(vacation)),page.getByRole('button',{name:'Застосувати',exact:true}).click()]);
+            assert.equal(await page.locator('[data-journal-person-id]').count(),1);
+            await page.reload(); assert.equal(await page.locator('[name=search]').inputValue(),'аЛьФа');
+            assert.equal(await page.locator('[data-journal-events] [data-journal-event-id]').count(),2);
+            await page.locator('[name=search]').fill('Немаєлюдини');
+            await Promise.all([page.waitForURL(u=>u.searchParams.get('search')==='Немаєлюдини'),page.getByRole('button',{name:'Застосувати',exact:true}).click()]);
+            assert.equal(await page.locator('[data-journal-person-id]').count(),0);
+            assert.equal(await page.locator('[data-journal-add]').first().isDisabled(),true);
+        });
+        await scenario('side-panel editing uses the existing modal and refreshes the journal without navigation', async () => {
+            await page.goto(base + '/events?start=2026-10-01&end=2026-10-14&person_id=1');
+            const url = page.url(), modal = page.locator('#person-events-modal');
+            await page.locator('[data-journal-events] [data-journal-event-id]').first().getByRole('button',{name:'Редагувати подію'}).click();
+            await modal.locator('[data-event-form]').waitFor({state:'visible'});
+            await modal.locator('[name=note]').fill('Оновлено з правої панелі');
+            const response = page.waitForResponse(r=>r.url().includes('/persons/1/events/')&&r.request().method()==='POST');
+            await modal.getByRole('button',{name:'Зберегти подію',exact:true}).click(); assert.equal((await response).status(),200);
+            await page.locator('[data-journal-events]').getByText('Оновлено з правої панелі',{exact:true}).waitFor();
+            assert.equal(page.url(),url);
+            await modal.getByRole('button',{name:'Закрити',exact:true}).click(); await modal.waitFor({state:'hidden'});
+        });
+        await scenario('CSV export is an actual download and mobile layout keeps the page within the viewport', async () => {
+            const download = page.waitForEvent('download'); await page.locator('[data-journal-export]').click();
+            assert.equal((await download).suggestedFilename(),'events-2026-10-01-2026-10-14.csv');
+            await page.setViewportSize({width:390,height:844});
+            assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+            assert.ok(await page.locator('.event-timeline-scroll').evaluate(e=>e.scrollWidth>e.clientWidth));
+        });
+        await scenario('staff compact view has exactly one date-specific presence column and distinct vacancy and missing-event badges', async () => {
+            await page.setViewportSize({width:1440,height:1000});
+            await page.goto(base + '/person-positions?as_of=2026-10-07');
+            await page.locator('[data-staff-compact]').click();
+            const keys=await page.locator('#person-positions thead th:not([hidden])').evaluateAll(nodes=>nodes.map(n=>n.dataset.columnKey));
+            assert.deepEqual(keys,['row_number','position_number','unit_short','name_short','rank','full_name','assignment','event_on_date']);
+            const cell=page.locator('[data-event-presence-person="1"]');
+            assert.equal(await cell.locator('[data-column-value]').textContent().then(t=>t.trim()),'відпустка');
+            assert.ok(await page.locator('[data-event-presence-person=""] .event-tone-vacant').count());
+            assert.equal(await page.locator('[data-event-presence-person="2"] [data-column-value]').textContent().then(t=>t.trim()),'Немає події');
+            await page.screenshot({path:'/tmp/project2-staff-events.png',fullPage:true});
+            await page.reload(); assert.equal(await page.locator('#person-positions thead th:not([hidden])').count(),8);
+        });
+        await scenario('staff badge refreshes after editing, and the shared visibility and quick filters remain functional', async () => {
+            await page.locator('[data-events-open][data-person-id="1"]').click();
+            const modal=page.locator('#person-events-modal'); await modal.locator('[data-event-edit]').last().click();
+            await modal.locator('[name=event_type_id]').selectOption(String(service));
+            const response=page.waitForResponse(r=>r.url().includes('/persons/1/events/')&&r.request().method()==='POST');
+            await modal.getByRole('button',{name:'Зберегти подію',exact:true}).click(); assert.equal((await response).status(),200);
+            await page.locator('[data-event-presence-person="1"] .event-tone-service').waitFor();
+            await modal.getByRole('button',{name:'Закрити',exact:true}).click(); await modal.waitFor({state:'hidden'});
+            await page.locator('[data-column-toggle]').click();
+            await page.locator('[data-visibility-tree] [data-column-choice=unit_short]').uncheck();
+            await page.locator('[data-column-apply]').click();
+            assert.equal(await page.locator('[data-staff-quick-filter=unit_short]').isDisabled(),true);
+            await page.locator('[data-column-toggle]').click();
+            await page.locator('[data-visibility-tree] [data-column-choice=unit_short]').check();
+            await page.locator('[data-column-apply]').click();
+            assert.equal(await page.locator('[data-staff-quick-filter=unit_short]').isDisabled(),false);
+            const versionBefore=new URL(page.url()).searchParams.get('as_of');
+            await page.locator('[data-staff-quick-filter=unit_short]').selectOption('Другий');
+            await page.waitForURL(u=>u.searchParams.get('unit_short')==='Другий');
+            assert.equal(new URL(page.url()).searchParams.get('as_of'),versionBefore);
+            assert.equal(await page.locator('#person-positions tbody tr[data-row-key]').count(),1);
+            assert.deepEqual(errors,[]);
+        });
+    } finally {await page.close();}
+};

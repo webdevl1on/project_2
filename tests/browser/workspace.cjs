@@ -87,7 +87,7 @@ module.exports=async({context,base})=>{
   });
   await scenario('multiple rows and columns, Ctrl toggle, Shift ranges, and native keyboard shortcuts',async()=>{
    await picker().locator('[data-selection-mode]').selectOption('rows');await row(10).locator('[data-column-key="unit_short"]').click();await row(30).locator('[data-column-key="unit_short"]').click({modifiers:['Shift']});
-   let matrix=await controller();assert.equal(matrix.length,3);assert.equal(matrix[0].length,11);
+   let matrix=await controller();assert.equal(matrix.length,3);assert.equal(matrix[0].length,await table().locator('thead th:visible:not([data-column-key="assignment"])').count());
    await row(20).locator('[data-column-key="unit_short"]').click({modifiers:['Control']});matrix=await controller();assert.ok(matrix[1].every(v=>v===''));
    await picker().locator('[data-selection-clear]').click();assert.equal(await table().locator('.table-cell-selected').count(),0);
    await picker().locator('[data-selection-mode]').selectOption('columns');await row(10).locator('[data-column-key="unit_short"]').click();await row(10).locator('[data-column-key="name_short"]').click({modifiers:['Control']});

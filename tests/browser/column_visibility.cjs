@@ -67,7 +67,7 @@ async function main() {
             const version = route.request().url().split("bootstrap@")[1].split("/")[0];
             return route.fulfill({ body: assets[`${version}/${file}`], contentType: file.endsWith(".js") ? "application/javascript" : "text/css" });
         });
-        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "events", "history_forms", "name_cases", "geography", "contacts", "personnel", "service_bases", "documents", "workspace", "medical", "injury_vlk", "vlk_workflow"];
+        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "events", "journal", "history_forms", "name_cases", "geography", "contacts", "personnel", "service_bases", "documents", "workspace", "medical", "injury_vlk", "vlk_workflow"];
         if (process.env.COLUMN_STAGE) {
             assert.ok([...suites,'dev_auth','open_access','profile_dates','document_ui','document_workflow','additional_records'].includes(process.env.COLUMN_STAGE));
             await require(`./${process.env.COLUMN_STAGE}.cjs`)({ context, base, adminToken });
@@ -89,7 +89,7 @@ async function main() {
 
         await scenario("defaults without saved settings", async () => {
             await visit();
-            assert.equal(await visibleHeaders(), 12);
+            assert.equal(await visibleHeaders(), 13);
             assert.equal(await table.locator("tbody tr").count(), 3);
             assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("project2:table-history:person-positions")).entries.length), 1);
         });
@@ -104,7 +104,7 @@ async function main() {
             await checkbox.check();
             assert.equal(await positionGroup.locator("[data-column-choice]:checked").count(), 11);
             await checkbox.uncheck();
-            assert.equal(await visibleHeaders(), 12); // Draft does not change the table yet.
+            assert.equal(await visibleHeaders(), 13); // Draft does not change the table yet.
             await choice("position_number").check();
             assert.equal(await checkbox.evaluate(element => element.indeterminate), true);
             await positionGroup.locator("[data-column-expand]").click();
@@ -112,14 +112,14 @@ async function main() {
             await positionGroup.locator("[data-column-expand]").click();
             assert.equal(await choice("position_number").isChecked(), true);
             await apply();
-            assert.equal(await visibleHeaders(), 9);
+            assert.equal(await visibleHeaders(), 10);
             assert.equal(await table.locator('td[data-column-key="unit_short"]:visible').count(), 0);
             assert.equal(await table.locator("tbody tr").count(), 3);
         });
 
         await scenario("reload persistence and closing without applying", async () => {
             await page.reload();
-            assert.equal(await visibleHeaders(), 9);
+            assert.equal(await visibleHeaders(), 10);
             await toggle.click();
             await choice("surname").uncheck();
             await page.keyboard.press("Escape");
@@ -127,10 +127,10 @@ async function main() {
             await toggle.click();
             assert.equal(await choice("surname").isChecked(), true);
             await picker.locator("[data-column-reset]").click();
-            assert.equal(await picker.locator("[data-visibility-tree] [data-column-choice]:checked").count(), 12);
-            assert.equal(await visibleHeaders(), 9);
+            assert.equal(await picker.locator("[data-visibility-tree] [data-column-choice]:checked").count(), 13);
+            assert.equal(await visibleHeaders(), 10);
             await apply();
-            assert.equal(await visibleHeaders(), 12);
+            assert.equal(await visibleHeaders(), 13);
         });
 
         await scenario("cannot hide every informational column; show all", async () => {
@@ -141,6 +141,7 @@ async function main() {
             await group("person").locator("[data-column-group-choice]").uncheck();
             await group("rank").locator("[data-column-group-choice]").check();
             await group("rank").locator("[data-column-group-choice]").uncheck();
+            await choice("event_on_date").uncheck();
             assert.equal(await picker.locator("[data-column-apply]").isDisabled(), true);
             assert.equal(await picker.locator("[data-column-error]").isVisible(), true);
             assert.equal(await choice("row_number").isChecked(), true);
@@ -154,11 +155,11 @@ async function main() {
             const values = ["broken json", "null", "[]", JSON.stringify({ version: 99 }),
                 JSON.stringify({ version: 1, visibility: { removed: false, surname: "wrong" } }),
                 JSON.stringify({ version: 1, visibility: Object.fromEntries(
-                    ["position_number", "unit_short", "name_short", "name_nominative", "rank", "full_name", "surname", "name", "patronymic", "birth_date"].map(key => [key, false])) })];
+                    ["position_number", "unit_short", "name_short", "name_nominative", "rank", "full_name", "surname", "name", "patronymic", "birth_date", "event_on_date"].map(key => [key, false])) })];
             for (const value of values) {
                 await page.evaluate(value => localStorage.setItem("project2:table-columns:person-positions", value), value);
                 await page.reload();
-                assert.equal(await visibleHeaders(), 12);
+                assert.equal(await visibleHeaders(), 13);
             }
         });
 
@@ -198,7 +199,7 @@ async function main() {
             assert.equal(await table.locator("tbody tr").first().locator('[data-person-value]').inputValue(), "2");
             assert.equal(new URL(page.url()).searchParams.get('filter_order'),'unit_short');
             assert.equal(new URL(page.url()).searchParams.get('direction'),'desc');
-            assert.equal(await visibleHeaders(), 9);
+            assert.equal(await visibleHeaders(), 10);
         });
 
         await scenario("empty-table colspan follows visibility", async () => {

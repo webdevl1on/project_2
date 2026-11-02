@@ -8,7 +8,7 @@ from app.table_columns import PERSON_POSITIONS_FIELDS
 
 HISTORY_SOURCES = tuple(zip(("name", "person_rank", "passport", "service"),
                            HISTORY_MODELS, ("ПІБ", "звання", "паспорт", "служба")))
-TEXT_FILTERS = {key+"__contains":key for key,field in PERSON_POSITIONS_FIELDS.items() if field.data_type=="text"}
+TEXT_FILTERS = {key+"__contains":key for key,field in PERSON_POSITIONS_FIELDS.items() if field.data_type=="text" and field.filterable}
 FILTER_KEYS = (*FILTER_COLUMNS, *DATE_FILTER_COLUMNS, *TEXT_FILTERS)
 DATE_FILTER_KEYS = tuple(DATE_FILTER_COLUMNS)
 SORT_KEYS = (*SORT_COLUMNS, *DATE_FILTER_COLUMNS)
@@ -80,6 +80,11 @@ class ServicePersonPositionFunc:
         rows = [_row(record) for record in repository.records(
             column_filters, occupancy, sort_by=sort_by, direction=direction,
             date_sort_priority=date_sort_priority)]
+        from app.services.event_views import presence_for_people, presence
+        statuses = presence_for_people(db, list({r['person'].person_id for r in rows if r['person'] is not None}), on or today())
+        for row in rows:
+            row['event_presence'] = statuses[row['person'].person_id] if row['person'] is not None else presence([], vacant=True)
+            row['values']['event_on_date'] = row['event_presence']['label']
         from app.repositories.service_history_repository import ServiceHistoryRepository
         mirages={}
         for record,position in ServiceHistoryRepository.mirages(db,position_ids=[r['position'].position_id for r in rows]):

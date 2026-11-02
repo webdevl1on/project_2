@@ -11,6 +11,7 @@ from app.services.service_person_positions import FILTER_KEYS, DATE_FILTER_KEYS,
 from app.table_columns import PERSON_POSITIONS_COLUMNS
 from app.utils.date_query import DateFilter, date_priority
 from app.templating import templates
+from app.event_display import legend as event_legend
 
 
 router = APIRouter()
@@ -138,6 +139,7 @@ def get_person_positions_page(request, occupancy="all", sort_by="position_number
             "staff_versions":versions,"staff_structures":structures,"structure_names":{item.id:f"{item.name} ({item.code})" for item in structures},"chosen_version":chosen,"as_of":on,
             "staff_message":request.query_params.get("staff_message", ""),
             "table_columns": PERSON_POSITIONS_COLUMNS,
+            "event_status_legend": event_legend(),
             "date_filters": date_filters,
             "date_priorities": {key: list(value) for key, value in priorities.items()},
             "table_column_filters": {
