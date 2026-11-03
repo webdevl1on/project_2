@@ -117,3 +117,7 @@ Linux: `.venv/bin/python -m alembic upgrade head`. Reset не потрібний
 - `docs/PERSON_EVENTS.md`
 - `docs/POSTGRESQL_SETUP.md`
 - `docs/TABLE_UI.md`
+
+## Уточнення представлення журналу
+
+Склад/посади тепер визначає незалежний as_of, а не кінець календарного періоду; без офіційного призначення людина не показується. start/end не обрізають її події датами призначення/версії. Сортування, confirmed type change, append-only аудит й анулювання не переписані. Header menus використовують спільні value_filter/QueryFilterAdapter, text/cell selection і Wrap Text описані в [EVENT_VIEWS.md](EVENT_VIEWS.md). Подальша 0004 — лише актуалізація довідника DAY_OFF/VLK, без зміни таблиць виправлень.

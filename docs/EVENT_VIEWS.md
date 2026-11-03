@@ -14,7 +14,7 @@ PersonEvent — єдине джерело подій; PersonAssignment — дж�
 - «вакантна» — штатна посада не має офіційного призначення на вибрану дату. До персонального журналу вакансії не додаються.
 - «Кілька подій» — суперечливі історичні записи на одному дні. Довільний запис не обирається; підсумок рахує цей день один раз у категорії конфлікту.
 
-Непризначені люди збережені в журналі, включно з їхніми незалежними подіями. Підрозділи рядка беруться з призначень, які перетинають період; при переведенні показується перелік фактичних підрозділів, а без таких призначень — «Без штатного призначення». ПІБ і звання використовують чинний однозначний вибір історії; невідомі значення не вигадуються.
+Склад журналу визначає незалежна **дата стану штатки as_of** (типово кадрове сьогодні Europe/Kyiv). PersonRepository.picker_rows(..., official_only=True) використовує офіційний PersonAssignment і чинний період StaffVersion на цю дату. Майбутні/закриті щодо as_of призначення та PersonPositionMirage не є поточним джерелом. Без офіційного призначення людина не показується; групи «Без штатного призначення» немає. Посада/номер/підрозділ беруться саме на as_of, а не з кінця календаря чи з переліку всіх підрозділів за період. ПІБ/звання зберігають чинний однозначний вибір історії.
 
 ## Журнал
 
@@ -59,7 +59,7 @@ CSV-експорт завантажує фактичну відфільтров�
 
 Для planned_end/completion_confirmed потрібна явна Alembic-ревізія 0002_event_completion; робочі БД не мігрувалися. Reset не потрібний. Нової системи доступу не додано: read views мають чинну політику кадрових/staff-сторінок, тому загальні production-прогалини авторизації з POSTGRESQL_SETUP залишаються.
 
-Матриця завантажує всіх людей, які відповідають фільтрам, без вигаданої пагінації. Для дуже великих наборів може знадобитися окремий етап серверної пагінації/віртуалізації. Поточне обмеження періоду — 366 днів; це не обмежує довжину історії PersonEvent у БД.
+Матриця завантажує всіх людей, які відповідають фільтрам, без вигаданої пагінації. Для дуже великих наборів може знадобитися окремий етап віртуалізації зі збереженням перегляду без пагінації. Поточне обмеження періоду — 366 днів; це не обмежує довжину історії PersonEvent у БД.
 
 Тести: `test_event_views.py`, доповнення PostgreSQL `test_person_events.py`, `browser/journal.cjs`, `js/event_ui.test.cjs`, регресія каталогу/колонок, дат і штатних операцій. Результати запусків наведені в CURRENT_STATE.
 
@@ -68,3 +68,84 @@ CSV-експорт завантажує фактичну відфільтров�
 ## Виправлення, анулювання й порядок колонок
 
 Журнал використовує спільні ColumnModel/ColumnInteractions: № нерухома в першій позиції, календарні/інформаційні колонки переставляються за стабільними ключами, порядок збережений локально. Підсумок явно називає людину та інтервал. Тип змінюється в тому самому редакторі з клієнтським і серверним підтвердженням та історією. Анульовані події виключені з обліку, але доступні в нижньому архіві; фізичного видалення немає. Міграція 0003, сортування, actor та знімки — [EVENT_CORRECTIONS.md](EVENT_CORRECTIONS.md).
+
+## Незалежний стан штатки та інструменти журналу
+
+`as_of` і `start/end` — три окремі точні ISO-параметри URL. Події відібраних людей читаються за start/end без обрізання датами StaffVersion/PersonAssignment/as_of/сьогодні. Подія 05–15 жовтня залишається на цих днях навіть для посади версії з 10 жовтня. Читання нічого не записує; розрахункова служба/непідтвердження/міражі/анулювання використовують попередні правила. Якщо на as_of немає офіційних призначень або фільтри не дають збігів — порожній результат із поясненням, без підстановки нинішніх людей.
+
+Стрілки дати стану змінюють as_of на календарний день через UTC-арифметику без DST; «На сьогодні» використовує кадрову дату сервера Europe/Kyiv. Ручне введення — ProfileDates. Зміна as_of зберігає поточний URL-період/масштаб/сортування/фільтри; місячна навігація й ручний період залишаються окремими операціями. Усі видимі дати й підказки — ДД.ММ.РРРР, canonical всередині — ISO. Browser Back/Forward працюють через GET-навігацію.
+
+Меню заголовків повторно використовують value_filter.html, column_filter_menu.js та QueryFilterAdapter. Є ASC/DESC, індикатор напряму, пошук варіантів, множинні точні значення, вибір/очищення/скасування й виділення колонки. URL-ключі jf_name/jf_unit/jf_position_number/jf_position_short та jf_date:початок:кінець містять повторювані JSON-токени; filter_order визначає послідовність каскаду. Facets формуються тільки з поточного офіційного складу й попередніх активних фільтрів. Несумісні з новим календарем ключі видаляються з URL без reload; приховування додаткової колонки прибирає лише її фільтр. Після збереження події AJAX оновлює також варіанти меню. Це метадані відображення, не довільна побудова SQL.
+
+Верхня панель компактно групує календар, період/масштаб/as_of, пошук/фільтри та дії. Меню у скролі використовують попередній top-layer механізм table_workspace через data-table-viewport. DnD, sticky, resize, CSV й незалежні локальні налаштування збережені.
+
+Wrap Text у тому самому project2:event-journal:layout:v1 зберігає wrap і режим виділення разом із шириною/порядком/видимістю. CSS переносить повний DOM-текст, автоматично збільшує рядок, не змінює ширини чи дані. Для змішаних календарних інтервалів текст/фільтри містять типи, підтипи та кількість днів; колір та індикатори збережені.
+
+«Текст» — типове нативне виділення символів, Ctrl+C та контекстне меню браузера без перехоплення. «Клітинки/Рядки/Колонки» — чинний TableSelection, кнопка копіювання Excel/Word та вузький opt-in Ctrl+C тільки для вибраних клітинок журналу. Текстові поля й Ctrl+A не перехоплюються. Основний ПІБ — span з повним значенням; окрема компактна кнопка відкриває праву панель. Drag текстового фрагмента не перемикає людину й не відкриває редактор. CSV і табличне копіювання використовують поточний порядок/видимість та повні значення.
+
+### Довідник та оновлення БД
+
+Ревізія **0004_event_catalog** після 0003: деактивація DAY_OFF для нових подій, додавання VLK лише якщо його немає. Старі події/типи/підтипи не видаляються й не переносяться. SERVICE_DAY_OFF залишається доступним. Існуючі назва/колір/активність користувацького VLK не перезаписуються, нових підтипів VLK немає. Новий типовий VLK активний і використовує чинний >15-днів контроль діловода, без медичних FK/моделей. Підпис purpose — «Мета/роль», поле/API незмінні.
+
+Робочу БД не оновлювали. Після перевіреного backup й вибору потрібної DATABASE_URL окремо: `.\.venv\Scripts\python.exe -m alembic upgrade head` (PowerShell) або `.venv/bin/python -m alembic upgrade head` (Linux). Це зміна довідника через Alembic, без нових таблиць/полів і без reset; startup лише перевіряє head.
+
+### Файли етапу незалежного штатного snapshot
+
+Застосунок:
+
+- `app/database/postgresql.py`
+- `app/event_display.py`
+- `app/repositories/person_repository.py`
+- `app/seeds/seed_event_types.py`
+- `app/services/event_journal_filters.py`
+- `app/services/event_views.py`
+- `app/services/person_events.py`
+- `app/services/seed_postgresql.py`
+- `app/services/service_for_person_event.py`
+- `app/static/css/column_visibility.css`
+- `app/static/css/event_views.css`
+- `app/static/js/column_filter_menu.js`
+- `app/static/js/event_journal.js`
+- `app/static/js/journal_controls.js`
+- `app/static/js/table_selection.js`
+- `app/static/js/table_workspace.js`
+- `app/templates/components/column_visibility.html`
+- `app/templates/components/journal_header.html`
+- `app/templates/components/person_events.html`
+- `app/templates/components/table_copy.html`
+- `app/templates/components/value_filter.html`
+- `app/templates/event_journal.html`
+- `app/templates/person_positions.html`
+
+Міграція:
+
+- `migrations/versions/0004_event_catalog.py`
+
+Тести:
+
+- `tests/browser/column_visibility.cjs`
+- `tests/browser/event_corrections.cjs`
+- `tests/browser/event_lifecycle.cjs`
+- `tests/browser/journal.cjs`
+- `tests/browser/journal_snapshot.cjs`
+- `tests/browser/serve_column_visibility.py`
+- `tests/js/journal_controls.test.cjs`
+- `tests/postgresql/test_journal_snapshot.py`
+- `tests/postgresql/test_person_events.py`
+- `tests/postgresql/test_postgresql.py`
+- `tests/test_database_commands.py`
+- `tests/test_event_corrections.py`
+- `tests/test_event_views.py`
+- `tests/test_journal_snapshot.py`
+
+Документація:
+
+- `docs/ARCHITECTURE.md`
+- `docs/CURRENT_STATE.md`
+- `docs/EVENT_CONTROL.md`
+- `docs/EVENT_CORRECTIONS.md`
+- `docs/EVENT_VIEWS.md`
+- `docs/MEDICAL_AND_AWARDS.md`
+- `docs/PERSON_EVENTS.md`
+- `docs/POSTGRESQL_SETUP.md`
+- `docs/TABLE_UI.md`

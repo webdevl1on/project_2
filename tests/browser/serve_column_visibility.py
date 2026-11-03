@@ -159,5 +159,35 @@ def many_positions():
     return {'ok':True}
 
 
+
+
+@app.post('/_column-test/journal-snapshot')
+def journal_snapshot_fixture():
+    """Synthetic history for the dedicated browser suite; never installed by app.main."""
+    from datetime import date
+    from app.models import StaffVersion,Position,EventType,PersonEvent
+    from app.services.staff_service import StaffService
+    from app.services import person_events
+    with Session() as db:
+        old=db.query(StaffVersion).one()
+        old_key,structure=old.id,old.staff_structure_id
+        db.get(Position,1).position_number=15
+        name=db.query(PersonName).filter_by(person_id=1).one()
+        name.surname='Надзвичайнодовгетестовепрізвище';name.name='Альфа';name.patronymic='Тестович';db.commit()
+        StaffService.close_version(db,old_key,db.get(StaffVersion,old_key).revision,date(2026,10,9))
+        version=StaffVersion(staff_structure_id=structure,name='Нова тестова версія',valid_from=date(2026,10,10));db.add(version);db.flush()
+        positions=[]
+        for number,unit,role in [(27,'Другий','Командир відділення безпілотних комплексів із довгою тестовою назвою'),(28,'Перший','Стрілець'),(29,'Майбутній','Радист')]:
+            p=make_position(number,unit,role,role);p.staff_version_id=version.id;db.add(p);positions.append(p)
+        db.commit()
+        StaffService.create_assignment(db,1,positions[0].position_id,date(2026,10,10))
+        StaffService.create_assignment(db,2,positions[1].position_id,date(2026,10,10))
+        StaffService.create_assignment(db,3,positions[2].position_id,date(2026,11,10))
+        kinds={r.event_type:r.event_type_id for r in db.query(EventType)}
+        person_events.save(db,1,{'event_type_id':kinds['VACATION'],'date_start':'2026-10-05','date_end':'2026-10-15'})
+        person_events.save(db,2,{'event_type_id':kinds['VLK'],'date_start':'2026-09-01'})
+        return {'today':person_events.today().isoformat(),'name':name.surname+' '+name.name+' '+name.patronymic}
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=int(sys.argv[1]), log_level="warning")

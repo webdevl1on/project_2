@@ -60,7 +60,7 @@
         constructor(controller) {
             this.controller = controller; this.table = controller.table; this.picker = controller.picker;
             this.selected = new Set(); this.anchor = null;
-            this.mode='cells';this.columnAnchor=null;
+            this.mode=controller.config.textSelection?(this.picker.querySelector('[data-selection-mode]')?.value||'text'):'cells';this.columnAnchor=null;
             this.picker.querySelector('[data-selection-mode]')?.addEventListener('change',event=>{this.mode=event.target.value;this.anchor=null;this.columnAnchor=null;});
             this.picker.querySelector('[data-selection-clear]')?.addEventListener('click',()=>this.clear());
             this.button = this.picker.querySelector('[data-table-copy]');
@@ -78,7 +78,7 @@
             this.table.tabIndex = 0;
             this.table.classList.add('table-cell-selection');
             this.table.addEventListener('pointerdown', event => {
-                if (event.button !== 0 || interactive(event.target)) return;
+                if (this.mode==='text' || event.button !== 0 || interactive(event.target)) return;
                 const cell = event.target.closest('td[data-column-key]');
                 if (!this.grid().flat().includes(cell)) return;
                 event.preventDefault(); window.getSelection()?.removeAllRanges(); this.table.focus({preventScroll:true});
@@ -104,6 +104,7 @@
             window.addEventListener('blur', stop);
             this.table.addEventListener('keydown', event => {
                 if (interactive(event.target)) return;
+                if(controller.config.cellClipboardShortcuts && this.mode!=='text' && (event.ctrlKey||event.metaKey) && event.key.toLowerCase()==='c' && this.selected.size){event.preventDefault();this.copy();return;}
                 if (event.key === 'Escape') { this.clear(); return; }
 
             });

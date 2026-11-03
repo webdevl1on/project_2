@@ -43,8 +43,8 @@ def test_inclusive_day_projection_and_open_event_do_not_write_dates(views):
         counts={c['code']:c['days'] for c in person['summary']}
         assert counts['VACATION']==3 and counts['SERVICE']==4 and counts['__base__']==0
         assert sum(c['days'] for c in person['summary'])==7
-        assert len(page['people'])==2
-        assert next(p for p in page['people'] if p['id']==second)['unit']=='Без штатного призначення'
+        assert len(page['people'])==1
+        assert all(p['id']!=second for p in page['people'])
         assert [(r.event_id,r.date_end,r.duration) for r in db.scalars(select(PersonEvent))]==before
         assert not db.new and not db.dirty
 

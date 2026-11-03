@@ -101,9 +101,9 @@ class PersonRepository:
                 .order_by(*orders, Person.person_id).all())
 
     @staticmethod
-    def picker_rows(db, on):
+    def picker_rows(db, on, *, official_only=False):
         names=history_selection(PersonName); ranks=history_selection(PersonRank)
-        return (db.query(Person,PersonName,Rank,PersonAssignment,Position)
+        query = (db.query(Person,PersonName,Rank,PersonAssignment,Position)
                .outerjoin(names,names.c.person_id==Person.person_id)
                .outerjoin(PersonName,PersonName.person_name_id==names.c.chosen_id)
                .outerjoin(ranks,ranks.c.person_id==Person.person_id)
@@ -111,7 +111,12 @@ class PersonRepository:
                .outerjoin(Rank,Rank.rank_id==PersonRank.rank_id)
                .outerjoin(PersonAssignment,and_(PersonAssignment.person_id==Person.person_id,
                            active(PersonAssignment,"assigned_from","assigned_to",on)))
-               .outerjoin(Position,Position.position_id==PersonAssignment.staff_position_id)).all()
+               .outerjoin(Position,Position.position_id==PersonAssignment.staff_position_id))
+        if official_only:
+            from app.models.staff import StaffVersion
+            query = query.join(StaffVersion, StaffVersion.id==Position.staff_version_id).filter(
+                PersonAssignment.id.is_not(None), active(StaffVersion,'valid_from','valid_to',on))
+        return query.all()
 
 
 def history_selection(model):

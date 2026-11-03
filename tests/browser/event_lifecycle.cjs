@@ -34,7 +34,7 @@ module.exports=async({context,base})=>{
   await check('optional staff fields and name drag resize persist through reload and keep full text',async()=>{
    for(const name of ['row_number','position_number','position_short'])await page.locator(`[data-journal-column="${name}"]`).check();
    const row=page.locator('[data-journal-person-id="1"]');assert.equal((await row.locator('[data-journal-extra=row_number]').textContent()).trim(),'1');assert.equal((await row.locator('[data-journal-extra=position_number]').textContent()).trim(),'10');
-   const free=page.locator('[data-journal-person-id="3"]');assert.equal((await free.locator('[data-journal-extra=position_number]').textContent()).trim(),'');
+   const free=page.locator('[data-journal-person-id="3"]');assert.equal(await free.count(),0);
    const heading=page.locator('.event-person-heading'),before=(await heading.boundingBox()).width,handle=page.locator('.event-name-resizer');let box=await handle.boundingBox();
    await page.mouse.move(box.x+4,box.y+10);await page.mouse.down();await page.mouse.move(box.x+104,box.y+10,{steps:6});await page.mouse.up();
    assert.ok((await heading.boundingBox()).width>before+70);
@@ -53,12 +53,12 @@ module.exports=async({context,base})=>{
    assert.equal(new URL(page.url()).searchParams.get('end'),'2024-02-29');assert.equal(await page.locator('[data-exact-date-for=end]').inputValue(),'29.02.2024');
   });
   await check('future plans are dashed, never close current facts, and control issues are separate from medicine',async()=>{
-   assert.equal((await context.request.post(base+'/persons/3/events',{form:{event_type_id:kind('HOSPITAL'),date_start:'2026-10-01'}})).status(),200);
-   assert.equal((await context.request.post(base+'/persons/3/events',{form:{event_type_id:kind('VACATION'),date_start:'2099-01-01',planned_end:'2099-01-10'}})).status(),200);
-   const records=(await listing(3)).events;assert.equal(records.length,2);assert.equal(records.find(r=>r.type_code==='HOSPITAL').date_end,null);assert.equal(records.find(r=>r.type_code==='VACATION').mirage,true);
-   await page.goto(base+'/events?start=2099-01-01&end=2099-01-02&person_id=3');assert.ok(await page.locator('[data-journal-person-id="3"] .event-mirage').count());
+   assert.equal((await context.request.post(base+'/persons/2/events',{form:{event_type_id:kind('HOSPITAL'),date_start:'2026-10-01'}})).status(),200);
+   assert.equal((await context.request.post(base+'/persons/2/events',{form:{event_type_id:kind('VACATION'),date_start:'2099-01-01',planned_end:'2099-01-10'}})).status(),200);
+   const records=(await listing(2)).events;assert.equal(records.length,4);assert.equal(records.filter(r=>r.date_start<'2020-01-01').length,2);assert.equal(records.find(r=>r.type_code==='HOSPITAL').date_end,null);assert.equal(records.find(r=>r.type_code==='VACATION').mirage,true);
+   await page.goto(base+'/events?start=2099-01-01&end=2099-01-02&person_id=2');assert.ok(await page.locator('[data-journal-person-id="2"] .event-mirage').count());
    await page.goto(base+'/events/problems');assert.equal(await page.locator('[data-event-problem]').count(),1);assert.ok((await page.locator('[data-event-problem]').textContent()).includes('Лікування понад 15'));
-   assert.ok((await page.locator('main').textContent()).includes('немає типу або підтипу ВЛК'));
+   assert.ok(!(await page.locator('main').textContent()).includes('немає типу або підтипу ВЛК'));
    await page.reload();assert.equal(await page.locator('[data-event-problem]').count(),1);assert.deepEqual(errors,[]);
   });
  }finally{await page.close();}

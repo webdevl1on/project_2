@@ -293,10 +293,11 @@ def test_seed_invalid_workbook_rolls_back_other_components(pg_factory,tmp_path):
     from tests.test_name_cases import workbook as names_book,dictionary_data
     book=tmp_path/'duplicate.xlsx';book.write_bytes(names_book([('names_male',dictionary_data()),('names_male',dictionary_data())]))
     with pg_factory() as db:
+        baseline={model:db.scalar(select(func.count()).select_from(model)) for model in (Rank,EventType,NameDictionary)}
         report=seed(db,names=book)
         assert report['errors']
         with pytest.raises(ValueError):seed(db,dry_run=False,names=book)
-        for model in (Rank,EventType,NameDictionary):assert db.scalar(select(func.count()).select_from(model))==0
+        for model in (Rank,EventType,NameDictionary):assert db.scalar(select(func.count()).select_from(model))==baseline[model]
 
 
 def test_serialization_failure_is_controlled_and_rolls_back(pg_factory):

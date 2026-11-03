@@ -9,9 +9,9 @@ module.exports = async ({context, base}) => {
         assert.equal((await context.request.post(base + '/persons/1/events', {form: {event_type_id:vacation,date_start:'2026-10-01',date_end:'2026-10-10',note:'Тестова відпустка'}})).status(),200);
         assert.equal((await context.request.post(base + '/persons/1/events', {form: {event_type_id:service,date_start:'2026-10-11',note:'Виконання обов’язків'}})).status(),200);
         await page.setViewportSize({width:1440,height:1000});
-        await scenario('separate journal renders a daily matrix and selected-person panel, including people without positions', async () => {
+        await scenario('separate journal renders a daily matrix and selected-person panel, excluding people without official assignments', async () => {
             await page.goto(base + '/events?start=2026-10-01&end=2026-10-14');
-            assert.equal(await page.locator('[data-journal-person-id]').count(),3);
+            assert.equal(await page.locator('[data-journal-person-id]').count(),2);
             assert.equal(await page.locator('.event-date-heading').count(),14);
             await page.locator('[data-journal-person-id="1"] .event-person-cell button').click();
             assert.ok((await page.locator('[data-journal-person]').textContent()).includes('Альфа'));

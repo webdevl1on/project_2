@@ -2,7 +2,7 @@
 (() => {
     'use strict';
     if(matchMedia('(max-width:600px)').matches)document.querySelectorAll('[data-table-filters]').forEach(panel=>panel.open=false);
-    document.querySelectorAll('.table-viewport').forEach(viewport=>{
+    document.querySelectorAll('.table-viewport,[data-table-viewport]').forEach(viewport=>{
         const measure=()=>viewport.style.setProperty('--viewport-top',`${Math.max(0,viewport.getBoundingClientRect().top)}px`);
         measure();window.addEventListener('resize',measure);document.addEventListener('toggle',()=>requestAnimationFrame(measure),true);
         new ResizeObserver(measure).observe(document.body);

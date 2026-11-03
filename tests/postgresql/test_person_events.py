@@ -105,8 +105,8 @@ def test_journal_and_date_presence_read_postgresql_without_changing_history(even
         key=editor.save(db,pid,{'event_type_id':vacation,'date_start':'2026-10-01','date_end':'2026-10-03'})
         later=editor.save(db,pid,{'event_type_id':service,'date_start':'2026-10-04'})
         payload=event_views.journal(db,{'start':'2026-10-01','end':'2026-10-07','scale':'week'})
-        assert len(payload['people'])==1 and len(payload['buckets'])==2
-        assert sum(c['days'] for c in payload['people'][0]['summary'])==7
+        assert payload['people']==[] and len(payload['buckets'])==2 # No official assignment at the snapshot date.
+        assert db.get(PersonEvent,key).date_start==date(2026,10,1)
         assert event_views.presence_for_people(db,[pid],date(2026,10,3))[pid]['label']=='відпустка'
         assert event_views.presence_for_people(db,[pid],date(2026,10,4))[pid]['label']=='служба'
         assert db.get(PersonEvent,key).date_end==date(2026,10,3)

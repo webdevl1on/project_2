@@ -4,6 +4,7 @@ STYLES = {
     'DUTY': ('чергування', 'service', 'check'),
     'DAY_OFF': ('вихідний', 'other', 'clock'),
     'VACATION': ('відпустка', 'vacation', 'case'),
+    'VLK': ('ВЛК', 'vlk', 'medical'),
     'HOSPITAL': ('лік', 'hospital', 'medical'),
     'BUSINESS_TRIP': ('відрядження', 'trip', 'plane'),
     'UNAUTHORIZED_ABSENCE': ('СЗЧ', 'absence', 'alert'),
@@ -24,7 +25,7 @@ def presentation(code=None, name=None):
 
 
 def legend():
-    return [presentation(code) for code in ('SERVICE', 'VACATION', 'HOSPITAL', 'BUSINESS_TRIP', 'UNAUTHORIZED_ABSENCE')] + [presentation('__vacant__'), presentation()]
+    return [presentation(code) for code in ('SERVICE', 'VACATION', 'HOSPITAL', 'VLK', 'BUSINESS_TRIP', 'UNAUTHORIZED_ABSENCE')] + [presentation('__vacant__'), presentation()]
 
 
 def event_presentation(record):

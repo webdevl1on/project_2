@@ -32,7 +32,7 @@ def seed(db,*,dry_run=True,names=None,tcc=None,geography=None,staff_excel=None,v
         else:db.execute(text("SELECT pg_advisory_xact_lock(hashtext('project2_reference_seed'))"))
         for values in ReferenceRanks.RANKS:row(Rank,values,['code'])
         for code,name in EVENT_TYPES:
-            row(EventType,{'event_type':code,'event_name':name},['event_type'])
+            row(EventType,{'event_type':code,'event_name':name,**({'event_is_active':False} if code=='DAY_OFF' else {})},['event_type'])
         for code,subtypes in EVENT_SUBTYPES.items():
             event=db.scalar(select(EventType).where(EventType.event_type==code))
             if event:

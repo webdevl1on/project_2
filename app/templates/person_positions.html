@@ -1,3 +1,4 @@
+{% from 'components/value_filter.html' import value_filter %}
 {% from 'components/event_badge.html' import event_badge, event_legend %}
 {% from 'components/assignment_operations.html' import orders,release,mirage_actions %}
 {% from "components/person_picker.html" import person_picker %}
@@ -218,39 +219,7 @@
                                         {% if column.filterable %}
                                         <hr class="dropdown-divider">
                                         {% if column.data_type == 'text' %}<label class="form-label small">Містить текст<input class="form-control form-control-sm" data-contains-input value="{{ (active_filters.get(key ~ '__contains') or [''])[0] }}" maxlength="250"></label><button type="button" class="btn btn-sm btn-outline-primary mb-2" data-contains-apply>Застосувати текст</button><button type="button" class="btn btn-sm btn-outline-secondary mb-2" data-contains-clear>Прибрати текст</button>{% endif %}
-                                        <input type="search" class="form-control form-control-sm mb-2 filter-search"
-                                            placeholder="Пошук значень...">
-                                        <div class="filter-options" style="max-height: 240px; overflow-y: auto;">
-                                            {% for option in filter_options[key] %}
-                                            <label class="dropdown-item-text d-block filter-option">
-                                                <input type="checkbox" value="{{ option.value }}" {% if option.value in
-                                                    active_filters[key] %}checked{% endif %}>
-                                                {{ option.label }}
-                                            </label>
-                                            {% else %}
-                                            <p class="text-body-secondary small mb-0">Немає доступних значень.</p>
-                                            {% endfor %}
-                                        </div>
-                                        <div class="d-flex gap-1 mt-2 flex-wrap">
-                                            <button type="button"
-                                                class="btn btn-sm btn-outline-secondary select-all-filter">
-                                                Вибрати все
-                                            </button>
-                                            <button type="button"
-                                                class="btn btn-sm btn-outline-secondary deselect-filter">
-                                                Зняти вибір
-                                            </button>
-                                            <button type="button" class="btn btn-sm btn-outline-secondary clear-filter">
-                                                Очистити
-                                            </button>
-                                            <button type="button"
-                                                class="btn btn-sm btn-outline-secondary cancel-filter">
-                                                Скасувати
-                                            </button>
-                                            <button type="button" class="btn btn-sm btn-primary apply-filter">
-                                                Застосувати
-                                            </button>
-                                        </div>
+                                        {{ value_filter(filter_options[key], active_filters[key]) }}
                                         {% endif %}
                                     </div>
                                 </div>
@@ -336,7 +305,7 @@
     <script src="/static/js/column_tree.js"></script>
     <script src="/static/js/column_presets.js"></script>
     <script src="/static/js/column_interactions.js"></script>
-    <script src="/static/js/table_filters.js"></script>
+    <script src="/static/js/column_filter_menu.js"></script><script src="/static/js/table_filters.js"></script>
     <script src="/static/js/table_history.js"></script>
     <script src="/static/js/table_selection.js"></script>
     <script src="/static/js/table_appearance.js"></script>
@@ -375,46 +344,8 @@
                 const text=menu.querySelector('[data-contains-input]').value.trim();applyColumnFilter(key+'__contains',text?[text]:[]);
             });
             menu.querySelector('[data-contains-clear]')?.addEventListener('click',()=>applyColumnFilter(key+'__contains',[]));
-            const checkboxes = Array.from(menu.querySelectorAll("input[type=checkbox]"));
-            const initialValues = Array.from(savedFilters.querySelectorAll("input"))
-                .filter(input => input.name === key).map(input => input.value);
-            const availableValues = new Set(checkboxes.map(input => input.value));
-            const restoreDraft = () => {
-                checkboxes.forEach(input => input.checked = initialValues.includes(input.value));
-            };
-
-            menu.querySelector(".filter-search").addEventListener("input", event => {
-                const query = event.target.value.trim().toLocaleLowerCase("uk");
-                menu.querySelectorAll(".filter-option").forEach(option => {
-                    option.hidden = !option.textContent.toLocaleLowerCase("uk").includes(query);
-                });
-            });
-
-            menu.querySelector(".select-all-filter").addEventListener("click", () => {
-                checkboxes.filter(input => !input.closest(".filter-option").hidden)
-                    .forEach(input => input.checked = true);
-            });
-
-            menu.querySelector(".deselect-filter").addEventListener("click", () => {
-                checkboxes.forEach(input => input.checked = false);
-            });
-
-            menu.querySelector(".clear-filter").addEventListener("click", () => {
-                applyColumnFilter(key, []);
-            });
-
-            menu.querySelector(".apply-filter").addEventListener("click", () => {
-                // Keep selections hidden by other columns until explicitly cleared.
-                const values = initialValues.filter(value => !availableValues.has(value));
-                values.push(...checkboxes.filter(input => input.checked).map(input => input.value));
-                applyColumnFilter(key, values);
-            });
-
-            menu.querySelector(".cancel-filter").addEventListener("click", event => {
-                restoreDraft();
-                bootstrap.Dropdown.getOrCreateInstance(event.target.closest(".dropdown").querySelector("[data-bs-toggle=dropdown]")).hide();
-            });
-            menu.closest(".dropdown").addEventListener("hidden.bs.dropdown", restoreDraft);
+            const initialValues = Array.from(savedFilters.querySelectorAll('input')).filter(input=>input.name===key).map(input=>input.value);
+            TableColumns.bindValueFilter(menu,{initialValues,onApply:values=>applyColumnFilter(key,values)});
         });
     </script>
 </body>

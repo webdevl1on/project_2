@@ -1,3 +1,4 @@
+{% from 'components/table_copy.html' import table_copy_tools %}
 {% macro column_tree(config, prefix) %}
 <div class="column-visibility-tree">
     {% for group in config.groups %}
@@ -52,14 +53,7 @@
             </div>
         </div>
         <button type="button" class="btn btn-outline-primary" data-preset-create>Зберегти пресет</button>
-        <div class="table-copy-tools d-flex gap-2 align-items-center flex-wrap" role="group" aria-label="Копіювання таблиці">
-            <label>Виділення <select data-selection-mode aria-label="Режим виділення"><option value="cells">Клітинки</option><option value="rows">Рядки</option><option value="columns">Колонки</option></select></label>
-            <label><input type="radio" name="{{ config.id }}-copy-format" data-copy-format value="excel" checked> Excel</label>
-            <label><input type="radio" name="{{ config.id }}-copy-format" data-copy-format value="word"> Word</label>
-            <button type="button" class="btn btn-outline-secondary" data-table-copy disabled>Копіювати</button>
-            <button type="button" class="btn btn-outline-secondary" data-selection-clear>Очистити виділення</button>
-            <span class="small" role="status" aria-live="polite" data-copy-status></span>
-        </div>
+        {{ table_copy_tools(config.id) }}
         <div class="btn-group" role="group" aria-label="Історія станів таблиці">
             <button type="button" class="btn btn-outline-secondary" data-table-back disabled>Назад</button>
             <button type="button" class="btn btn-outline-secondary" data-table-forward disabled>Вперед</button>

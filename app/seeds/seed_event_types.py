@@ -8,6 +8,7 @@ EVENT_TYPES = [
     ("VACATION", "Відпустка"),
     ("BUSINESS_TRIP", "Відрядження"),
     ("HOSPITAL", "Лікарняний"),
+    ("VLK", "ВЛК"),
     ("UNAUTHORIZED_ABSENCE", "СЗЧ")
 ]
  
@@ -22,7 +23,7 @@ def seed_event_types(db):
         if exists:
             print("Already exists")
             continue
-        db.add(EventType(event_type=event_type, event_name=event_name))
+        db.add(EventType(event_type=event_type, event_name=event_name, event_is_active=event_type!='DAY_OFF'))
         db.flush()
     print("=== SEED EVENT_TYPES END ===") 
     

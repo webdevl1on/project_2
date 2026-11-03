@@ -95,7 +95,7 @@ class PersonEventService:
 
     @staticmethod
     def validate_catalog(event_type, event_subtype, previous=None):
-        if not event_type.event_is_active and (previous is None or previous.event_type_id != event_type.event_type_id):
+        if (not event_type.event_is_active or event_type.event_type == 'DAY_OFF') and (previous is None or previous.event_type_id != event_type.event_type_id):
             raise EventValidationError("Цей тип події неактивний. Оберіть активний тип.", "event_type_id")
         try:
             CommonEventFunc.validate_event_subtype_belongs_to_type(event_type, event_subtype)

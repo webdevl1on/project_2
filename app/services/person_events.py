@@ -57,7 +57,7 @@ def page(db, person_id):
     rows = [dict(serialize(row, types, subtypes), corrections=corrections.get(row.event_id, [])) for row in reversed(Repo.for_person(db, person_id, include_annulled=True))]
     return {'person_id': person_id, 'today': today().isoformat(),
             'types': [{'id': kind.event_type_id, 'code': kind.event_type, 'name': kind.event_name,
-                       'color': kind.event_color, 'active': bool(kind.event_is_active),
+                       'color': kind.event_color, 'active': bool(kind.event_is_active) and kind.event_type != 'DAY_OFF',
                        'exclusive': bool(kind.event_exclusive),
                        'subtypes': [{'id': sub.event_subtype_id, 'code': sub.event_subtype,
                                      'name': sub.event_subtype_name, 'active': bool(sub.event_subtype_is_active)}

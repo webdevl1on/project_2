@@ -115,7 +115,7 @@ def test_full_cli_setup_and_repeat_reference_and_person_seeding(tmp_path):
         assert people.returncode == 0, people.stderr
         assert f"створено: {2 if attempt == 1 else 0}" in people.stdout
         counts = table_counts(path)
-        assert counts == {"event_types": 7, "event_subtypes": 18, "ranks": 21, "positions": 1,
+        assert counts == {"event_types": 8, "event_subtypes": 18, "ranks": 21, "positions": 1,
                           "persons": 2, "person_names": 2, "person_ranks": 2}
         if first_counts is None:
             first_counts = counts

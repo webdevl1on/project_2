@@ -1,0 +1,17 @@
+{% from 'components/value_filter.html' import value_filter %}
+{% macro journal_header(column,journal) %}
+{% set key=column.key %}
+{% set filter_key=column.get('filter_key') %}
+<th data-column-key="{{ key }}" {% if key in ['row_number','position_number','position_short'] %}data-journal-extra="{{ key }}" hidden{% endif %} class="{{ 'event-person-heading' if key=='name' else 'event-unit-heading' if key=='unit' else 'event-date-heading' if column.bucket is defined else '' }}" title="{{ column.label }}">
+{% if column.system|default(false) %}{{ column.label }}{% else %}
+<div class="journal-column-heading"><button type="button" data-journal-sort="{{ column.sort }}" title="{{ column.label }}">{% if column.bucket is defined %}{{ column.bucket.label }}{% else %}{{ column.label }}{% endif %}{% if journal.options.sort==column.sort %} {{ '↑' if journal.options.direction=='asc' else '↓' }}{% endif %}</button>
+<div class="dropdown"><button type="button" class="btn btn-sm filter-toggle {{ 'text-primary border-primary' if filter_key in journal.active_filters else '' }}" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-label="Фільтр: {{ column.label }}">▼{% if filter_key in journal.filter_order %}<sup>{{ journal.filter_order.index(filter_key)+1 }}</sup>{% endif %}</button>
+<div class="dropdown-menu filter-menu p-2" data-journal-filter-key="{{ filter_key }}">
+<button type="button" class="dropdown-item" data-journal-sort-command="{{ column.sort }}" data-sort-direction="asc">Сортувати за зростанням</button><button type="button" class="dropdown-item" data-journal-sort-command="{{ column.sort }}" data-sort-direction="desc">Сортувати за спаданням</button><button type="button" class="dropdown-item" data-journal-select-column="{{ key }}">Виділити колонку</button><hr class="dropdown-divider">
+{{ value_filter(journal.facets[filter_key],journal.active_filters.get(filter_key,[])) }}
+</div></div></div>
+{% if key=='name' %}<small data-journal-count></small><span class="event-name-resizer" role="separator" aria-orientation="vertical" aria-label="Змінити ширину ПІБ" tabindex="0"></span>{% endif %}
+{% if column.bucket is defined %}<span>{{ column.bucket.start[:4] if journal.options.scale=='month' else column.bucket.month }}{% if journal.options.scale=='day' %}<br>({{ column.bucket.weekday }}){% endif %}</span>{% endif %}
+{% endif %}
+</th>
+{% endmacro %}

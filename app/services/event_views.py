@@ -1,6 +1,7 @@
 """Read-only journal and date-specific staff presence; events remain person-owned."""
 from collections import Counter, defaultdict
 import re
+import json
 from datetime import date, timedelta
 from app.repositories.event_repository import EventRepository as Repo
 from app.repositories.person_repository import PersonRepository
@@ -64,7 +65,8 @@ def parse_options(raw):
             parsed = date.fromisoformat(value)
             if parsed.isoformat() != value: raise ValueError()
             return parsed
-        except (ValueError, TypeError): raise ValueError('Період має містити повні календарні дати РРРР-ММ-ДД.') from None
+        except (ValueError, TypeError): raise ValueError('Введіть повну календарну дату ДД.ММ.РРРР.') from None
+    on = exact('as_of', today())
     end = exact('end', today())
     start = exact('start', end - timedelta(days=min(13, end.toordinal()-1)))
     if start > end: raise ValueError('Завершення періоду не може передувати початку.')
@@ -88,7 +90,7 @@ def parse_options(raw):
         except ValueError: raise ValueError('Невідоме сортування журналу.') from None
     direction = raw.get('direction', 'asc')
     if direction not in ('asc', 'desc'): raise ValueError('Невідомий напрямок сортування.')
-    return {'start': start, 'end': end, 'scale': scale, 'search': search, 'unit': unit,
+    return {'as_of': on, 'start': start, 'end': end, 'scale': scale, 'search': search, 'unit': unit,
             'event_type': kind, 'sort': sort, 'direction': direction}
 
 
@@ -128,6 +130,12 @@ def calendar_projection(events, periods, types):
         if same and len(states) > 1: cell['label'] += f' · {len(states)}'
         cell['description'] = bucket['period'] + ': ' + '; '.join(dict.fromkeys(r['description'] for r in states))
         cell['event_ids'] = sorted(ids); cell['mirage'] = any(r.get('mirage') for r in states)
+        distribution = Counter((r['code'],r.get('subtype') or '',bool(r.get('mirage'))) for r in states)
+        cell['filter_value']=json.dumps(sorted((*state,days) for state,days in distribution.items()),ensure_ascii=False,separators=(',',':'))
+        type_names={t.event_type:t.event_name for t in types.values()}
+        parts=[('Служба (розрах.)' if code=='__base__' else presentation(code,type_names.get(code))['name'])+(' · '+subtype if subtype else '')+(' · Міраж' if mirage else '')+f' — {days} дн.' for (code,subtype,mirage),days in sorted(distribution.items())]
+        cell['filter_label']='; '.join(parts)
+        if not same: cell['subtype']=cell['filter_label']
         cells.append(cell)
     names = {t.event_type: t.event_name for t in types.values()}
     wanted = [r['code'] for r in legend() if r['code'] != '__vacant__']
@@ -158,36 +166,37 @@ def journal(db, raw):
         raise ValueError('Тип події не знайдено.')
     periods = buckets(start, end, options['scale'])
     kinds = {t.event_type_id: t for t in types}
+    staff_rows = PersonRepository.picker_rows(db, options['as_of'], official_only=True)
+    selected_ids = list({row[0].person_id for row in staff_rows})
     by_person = defaultdict(list)
-    for item in records(db, start, end): by_person[item['person_id']].append(item)
+    for item in records(db, start, end, selected_ids): by_person[item['person_id']].append(item)
     by_sort = by_person
     sort_period = None
     if options['sort'].startswith('date:'):
         _, left, right = options['sort'].split(':')
         sort_period = (date.fromisoformat(left), date.fromisoformat(right))
         by_sort = defaultdict(list)
-        for item in records(db, *sort_period): by_sort[item['person_id']].append(item)
-    units = defaultdict(set)
-    for pid, unit in Repo.assignment_units(db, start, end):
-        if unit: units[pid].add(unit)
+        for item in records(db, *sort_period, selected_ids): by_sort[item['person_id']].append(item)
     from app.utils.text_search import normalized_text
     from app.utils.date_utils import format_partial_date
     people, seen = [], set()
-    for person, name, rank, assignment, position in PersonRepository.picker_rows(db, end):
+    for person, name, rank, assignment, position in staff_rows:
         if person.person_id in seen: continue
         seen.add(person.person_id)
         pid = person.person_id
         label = ' '.join(v for v in (name.surname, name.name, name.patronymic) if v) if name else 'Без ПІБ'
         available = by_person[pid]
         if options['search'] and normalized_text(options['search']) not in normalized_text(label): continue
-        if options['unit'] and options['unit'] not in units[pid]: continue
+        if options['unit'] and options['unit'] != position.unit_short: continue
         if options['event_type'] and not any(r['event_type_id'] == options['event_type'] for r in available): continue
-        unit_label = ', '.join(sorted(units[pid])) or 'Без штатного призначення'
+        unit_label = position.unit_short or ''
         cells, summary = calendar_projection(available, periods, kinds)
         people.append({'cells': cells, 'summary': summary, 'id': pid, 'name': label, 'rank': rank.nominative if rank else 'Звання не зазначено',
                        'birth': format_partial_date(person.birth_day, person.birth_month, person.birth_year),
-                       'unit': unit_label, 'units': sorted(units[pid]), 'position_number': position.position_number if position else None,
+                       'unit': unit_label, 'units': [unit_label] if unit_label else [], 'position_number': position.position_number if position else None,
                        'position_short': position.name_short if position else None, 'events': available})
+    from app.services.event_journal_filters import apply_filters, columns
+    people, facets, active_filters, filter_order = apply_filters(people, raw, periods)
     sort_people(people, options, by_sort, sort_period, kinds)
     archive = defaultdict(list)
     archive_rows = Repo.annulled_rows(db, [p['id'] for p in people]) if people else []
@@ -196,11 +205,12 @@ def journal(db, raw):
     for row, _, _ in archive_rows: archive[row.person_id].append(serialize(row, archive_types, archive_subs))
     for person in people: person['annulled'] = archive[person['id']]
 
-    return {'options': {**options, 'start': start.isoformat(), 'end': end.isoformat()},
+    return {'options': {**options, 'start': start.isoformat(), 'end': end.isoformat(), 'as_of': options['as_of'].isoformat()}, 'today': today().isoformat(),
+            'columns': columns(periods), 'facets': facets, 'active_filters': active_filters, 'filter_order': filter_order,
             'buckets': periods, 'people': people,
             'types': [{'id': t.event_type_id, 'code': t.event_type, 'name': t.event_name,
-                       'active': bool(t.event_is_active), **{'presentation': event_presentation({'type_code': t.event_type, 'type_name': t.event_name, 'type_color': t.event_color})}} for t in types],
-            'units': sorted({u for entries in units.values() for u in entries}), 'legend': [p for p in legend() if p['code'] != '__vacant__']}
+                       'active': bool(t.event_is_active) and t.event_type != 'DAY_OFF', **{'presentation': event_presentation({'type_code': t.event_type, 'type_name': t.event_name, 'type_color': t.event_color})}} for t in types],
+            'units': sorted({position.unit_short for _,_,_,_,position in staff_rows if position.unit_short}), 'legend': [p for p in legend() if p['code'] != '__vacant__']}
 
 
 def sort_people(people, options, by_person, period, kinds):

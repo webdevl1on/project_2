@@ -1,0 +1,36 @@
+{% macro value_filter(options, selected) %}
+                                        <input type="search" class="form-control form-control-sm mb-2 filter-search"
+                                            placeholder="Пошук значень...">
+                                        <div class="filter-options" style="max-height: 240px; overflow-y: auto;">
+                                            {% for option in options %}
+                                            <label class="dropdown-item-text d-block filter-option">
+                                                <input type="checkbox" value="{{ option.value }}" {% if option.value in
+                                                    selected %}checked{% endif %}>
+                                                {{ option.label }}
+                                            </label>
+                                            {% else %}
+                                            <p class="text-body-secondary small mb-0">Немає доступних значень.</p>
+                                            {% endfor %}
+                                        </div>
+                                        <div class="d-flex gap-1 mt-2 flex-wrap">
+                                            <button type="button"
+                                                class="btn btn-sm btn-outline-secondary select-all-filter">
+                                                Вибрати все
+                                            </button>
+                                            <button type="button"
+                                                class="btn btn-sm btn-outline-secondary deselect-filter">
+                                                Зняти вибір
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary clear-filter">
+                                                Очистити
+                                            </button>
+                                            <button type="button"
+                                                class="btn btn-sm btn-outline-secondary cancel-filter">
+                                                Скасувати
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-primary apply-filter">
+                                                Застосувати
+                                            </button>
+                                        </div>
+
+{% endmacro %}

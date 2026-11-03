@@ -244,4 +244,6 @@ pg_restore -h 127.0.0.1 -p 55432 -U project2_ci -d project2_ci -W --no-owner --n
 
 Ревізія планування — `0002_event_completion` після замороженого 0001. Два адитивні поля PersonEvent, два CHECK та відсутні SERVICE-підтипи додаються тільки явним `alembic upgrade head`. Дати/тривалість існуючих подій зберігаються; майбутні завершення не підтверджуються автоматично. Startup не оновлює схему. Порядок backup/upgrade, сумісність старих даних і окремі команди — [EVENT_CONTROL.md](EVENT_CONTROL.md#міграція-postgresql). Reset не потрібний.
 
-Поточний head — `0003_event_corrections`: метадані анулювання PersonEvent, append-only історія виправлень, FK/check та заборона фізичного DELETE/редагування анульованих записів. Окремий backup/upgrade, без reset і startup-міграцій — [EVENT_CORRECTIONS.md](EVENT_CORRECTIONS.md#міграція).
+Ревізія виправлень — `0003_event_corrections`: метадані анулювання PersonEvent, append-only історія виправлень, FK/check та заборона фізичного DELETE/редагування анульованих записів. Окремий backup/upgrade, без reset і startup-міграцій — [EVENT_CORRECTIONS.md](EVENT_CORRECTIONS.md#міграція).
+
+Поточний head — `0004_event_catalog`: без нових таблиць/полів, деактивує DAY_OFF для нових подій і додає відсутній кадровий VLK. Історичні події та наявні користувацькі реквізити VLK зберігаються. Явний backup/upgrade, без reset і startup-записів — [EVENT_VIEWS.md](EVENT_VIEWS.md).

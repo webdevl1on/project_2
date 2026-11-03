@@ -80,3 +80,5 @@
     user-select: text;
     -webkit-user-select: text;
 }
+/* Bootstrap display utilities must not reveal values excluded by menu search. */
+.filter-menu .filter-option[hidden] { display:none!important; }

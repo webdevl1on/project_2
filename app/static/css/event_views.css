@@ -139,3 +139,30 @@
 .event-card-actions button {font-size:10px;}
 .event-annulled-archive {color:#616973;font-size:12px;}
 .event-annulled-archive p {margin:5px 0;overflow-wrap:anywhere;white-space:pre-wrap;}
+/* Compact groups retain the application's palette and existing controls. */
+.event-journal-page .event-page-heading {margin:10px 2px;}.event-journal-page .event-page-heading p {margin-top:1px;}
+.event-journal-page .event-journal-filters {gap:8px;padding:8px;margin-bottom:8px;align-items:end;}
+.event-journal-page .event-month-navigation {flex-basis:auto;align-self:center;gap:2px;padding-right:8px;border-right:1px solid #dce2eb;}
+.event-journal-page .event-month-menu {min-width:145px;}.event-journal-page .event-month-menu summary {font-size:12px;}
+.event-journal-page .event-journal-filters fieldset {border-right:1px solid #dce2eb;padding-right:8px;}
+.event-staff-snapshot {display:flex;align-items:center;gap:3px;}.event-staff-snapshot input {max-width:115px;}
+.event-journal-page .event-journal-filters .btn {padding:5px 8px;font-size:12px;}.event-journal-page .event-journal-filters select {min-width:115px;max-width:185px;}
+.event-journal-page .event-heading-actions {gap:4px;flex-wrap:wrap;}.event-journal-page .event-journal-filters .event-search {min-width:130px;}
+[data-journal-copy-tools] {display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:12px;margin-bottom:7px;}
+[data-journal-copy-tools] .btn {font-size:12px;padding:4px 8px;}.event-journal-columns {gap:10px;}
+.journal-column-heading {display:flex;align-items:center;justify-content:space-between;gap:2px;}
+.journal-column-heading>button {border:0;background:transparent;color:inherit;font-weight:650;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;padding:0;}
+.event-timeline .filter-toggle {padding:1px 3px;font-size:10px;}.event-timeline .filter-menu {width:290px;max-width:calc(100vw - 12px);text-align:left;}
+.event-timeline .filter-option {font-size:12px;white-space:normal;}.event-timeline .filter-menu button {font-size:12px;}
+.event-person-cell {padding:3px 5px;}.event-person-text {display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:text;}
+.event-person-cell>button {display:block;width:auto;float:right;padding:0 3px;line-height:1;border:1px solid #d3dae5;border-radius:3px;font-size:12px;}
+.event-day-cell>[data-column-value] {display:block;min-height:31px;padding:3px 2px;font-size:10px;}
+.event-timeline[data-journal-selection=text] [data-column-value] {user-select:text;cursor:text;}
+.event-journal-wrap td[data-column-key] {height:auto;white-space:normal;overflow:visible;overflow-wrap:anywhere;}
+.event-journal-wrap .event-person-text,.event-journal-wrap .event-cell-type,.event-journal-wrap .event-cell-subtype,.event-journal-wrap .event-cell-plan,.event-journal-wrap [data-column-value] {white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;}
+.event-tone-vlk {background:#d6f5f0;color:#125c57;}
+@media(max-width:600px){.event-journal-page .event-journal-filters {gap:7px;}.event-staff-snapshot {flex-wrap:wrap;width:100%;}.event-journal-page .event-journal-filters>label {max-width:100%;}.event-journal-page .event-journal-filters select {max-width:100%;}.event-journal-page .event-heading-actions {width:100%;}.event-journal-page .event-month-navigation {flex-basis:100%;border:0;}}
+
+.event-person-text {font-weight:650;}
+
+.event-card-actions>button:not(.btn) {background:#fff;border:1px solid #dce3ed;border-radius:4px;padding:2px 6px;color:#3c5b80;}

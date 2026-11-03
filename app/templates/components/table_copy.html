@@ -1,0 +1,11 @@
+{% macro table_copy_tools(table_id, text_mode=false) %}
+        <div class="table-copy-tools d-flex gap-2 align-items-center flex-wrap" role="group" aria-label="Копіювання таблиці">
+            <label>Виділення <select data-selection-mode aria-label="Режим виділення">{% if text_mode %}<option value="text">Текст</option>{% endif %}<option value="cells">Клітинки</option><option value="rows">Рядки</option><option value="columns">Колонки</option></select></label>
+            <label><input type="radio" name="{{ table_id }}-copy-format" data-copy-format value="excel" checked> Excel</label>
+            <label><input type="radio" name="{{ table_id }}-copy-format" data-copy-format value="word"> Word</label>
+            <button type="button" class="btn btn-outline-secondary" data-table-copy disabled>Копіювати</button>
+            <button type="button" class="btn btn-outline-secondary" data-selection-clear>Очистити виділення</button>
+            <span class="small" role="status" aria-live="polite" data-copy-status></span>
+        </div>
+
+{% endmacro %}

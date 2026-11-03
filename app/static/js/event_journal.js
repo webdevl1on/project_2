@@ -14,23 +14,24 @@
     }
     function renderRows() {
         rows.replaceChildren(); document.querySelector('[data-journal-count]').textContent = `${model.people.length} осіб`;
-        if (!model.people.length) { const tr = node('tr'), td = node('td', 'За цими фільтрами людей немає.', 'text-center text-secondary p-4'); td.colSpan = model.buckets.length + 5;td.dataset.journalEmpty=''; tr.append(td); rows.append(tr); }
+        if (!model.people.length) { const tr = node('tr'), td = node('td', 'На вибрану дату стану штатки немає офіційних призначень, що відповідають фільтрам.', 'text-center text-secondary p-4'); td.colSpan = model.buckets.length + 5;td.dataset.journalEmpty=''; tr.append(td); rows.append(tr); }
         for (const person of model.people) {
             const tr = node('tr'); tr.dataset.journalPersonId = person.id;
             const number=node('td',String(model.people.indexOf(person)+1));number.dataset.journalExtra='row_number';number.dataset.columnKey='row_number';number.hidden=true;tr.append(number);
-            const name = node('td', null, 'event-person-cell'), button = node('button', person.name); button.type = 'button'; button.title = `${person.name} · ${person.birth}`; button.addEventListener('click', () => select(person.id)); name.dataset.columnKey='name';name.append(button);
+            const name = node('td', null, 'event-person-cell'), text=node('span',person.name,'event-person-text'),button = node('button', '›');text.dataset.columnValue='';text.title=`${person.name} · ${person.birth}`;name.append(text);button.setAttribute('aria-label',`Показати події: ${person.name}`); button.type = 'button'; button.title = `${person.name} · ${person.birth}`; button.addEventListener('click', event => {event.stopPropagation();select(person.id);}); name.dataset.columnKey='name';name.append(button);
             const unit = node('td', person.unit, 'event-unit-cell'); unit.title = person.unit;unit.dataset.columnKey='unit';
             tr.append(name, unit);
             for(const key of ['position_number','position_short']){const td=node('td',person[key]??'');td.dataset.journalExtra=key;td.dataset.columnKey=key;td.hidden=true;td.title=person[key]??'';tr.append(td);}
             for (const [index,cell] of person.cells.entries()) {
-                const td = node('td', null, `event-day-cell event-tone-${cell.tone}`), choose = node('button');
+                const td = node('td', null, `event-day-cell event-tone-${cell.tone}`), choose = node('span');choose.dataset.columnValue='';
                 choose.append(node('span',cell.calculated?'Служба':cell.event_type_name || cell.name || cell.label,'event-cell-type'));
-                if(cell.code==='__pending__')choose.prepend(node('small','⚠ Завершення','event-cell-plan')); if(cell.subtype)choose.append(node('small',cell.subtype,'event-cell-subtype'));
+                if(cell.code==='__pending__')choose.prepend(node('small','⚠ Завершення','event-cell-plan')); if(cell.subtype)choose.append('\n',node('small',cell.subtype,'event-cell-subtype'));
                 if(cell.mirage){td.classList.add('event-mirage');choose.prepend(node('small','Міраж','event-cell-plan'));}
                 td.dataset.columnKey=`date:${model.buckets[index].start}:${model.buckets[index].end}`;
                 EventUI.colour(td,cell);
-                choose.type = 'button'; choose.title = cell.description; choose.setAttribute('aria-label', `${person.name}: ${cell.description}`); choose.addEventListener('click', () => select(person.id)); td.append(choose); tr.append(td);
+                 choose.title = cell.description; choose.setAttribute('aria-label', `${person.name}: ${cell.description}`);  td.append(choose); tr.append(td);
             }
+            tr.addEventListener('click',event=>{if(document.querySelector('.event-timeline').dataset.journalSelection==='text' && !event.target.closest('button,input,select,textarea,a') && (window.getSelection()?.isCollapsed!==false))select(person.id);});
             rows.append(tr);
         }
         document.dispatchEvent(new Event('journal:rendered'));
@@ -75,12 +76,12 @@
         document.querySelector('[data-journal-events-tab]').hidden = button.dataset.journalTab !== 'events';
         document.querySelector('[data-journal-presence-tab]').hidden = button.dataset.journalTab !== 'presence';
     }));
-    all('[data-journal-sort]').forEach(button => button.addEventListener('click', () => {
-        const form = document.querySelector('[data-journal-filters]'); form.elements.direction.value = model.options.sort === button.dataset.journalSort && model.options.direction === 'asc' ? 'desc' : 'asc'; form.elements.sort.value = button.dataset.journalSort; form.requestSubmit();
+    all('[data-journal-sort],[data-journal-sort-command]').forEach(button => button.addEventListener('click', () => {
+        const sortKey=button.dataset.journalSort || button.dataset.journalSortCommand;const form = document.querySelector('[data-journal-filters]'); form.elements.direction.value = button.dataset.sortDirection || (model.options.sort === sortKey && model.options.direction === 'asc' ? 'desc' : 'asc'); form.elements.sort.value = sortKey; form.requestSubmit();
     }));
     document.querySelector('[data-journal-export]').addEventListener('click',()=>{
         const keys=[...document.querySelectorAll('.event-timeline thead th[data-column-key]')].filter(th=>!th.hidden).map(th=>th.dataset.columnKey);
-        const labels={row_number:'№',name:'ПІБ',unit:'Підрозділ',position_number:'№ посади за штатом',position_short:'Коротка посада'};
+        const labels=Object.fromEntries(model.columns.map(c=>[c.key,c.label]));
         const dates=Object.fromEntries(model.buckets.map((bucket,index)=>[`date:${bucket.start}:${bucket.end}`,{index,label:bucket.period}]));
         EventUI.download([keys.map(key=>labels[key]||dates[key].label),...model.people.map((person,index)=>keys.map(key=>key==='row_number'?index+1:dates[key]?person.cells[dates[key].index].description:person[key]??''))],`events-${model.options.start}-${model.options.end}.csv`);
     });
@@ -99,7 +100,7 @@
             const response = await fetch('/events/data' + location.search, {cache: 'no-store'}), data = await response.json();
             if (!response.ok) throw Error(data.detail || 'Не вдалося оновити журнал.');
             if (token !== generation) return;
-            model = data; renderRows(); select(model.people.some(p => p.id === selected) ? selected : model.people[0]?.id || null);
+            model = data;document.dispatchEvent(new CustomEvent('journal:model',{detail:model})); renderRows(); select(model.people.some(p => p.id === selected) ? selected : model.people[0]?.id || null);
         } catch (error) { message.textContent = error.message; message.className = 'alert alert-warning'; }
     });
     all('[data-journal-sort]').forEach(button=>{const active=model.options.sort===button.dataset.journalSort;button.closest('th').setAttribute('aria-sort',active?(model.options.direction==='asc'?'ascending':'descending'):'none');});

@@ -71,7 +71,7 @@ def test_annulment_preserves_data_excludes_all_projections_and_conflicts(lifecyc
         page=editor.page(db,pid);assert page['events']==[] and len(page['annulled'])==1
         assert page['annulled'][0]['corrections'][0]['operation']=='annul'
         view=event_views.journal(db,{'start':'2026-10-01','end':'2026-10-02'})
-        assert len(view['people'][0]['annulled'])==1 and all(c['calculated'] for c in view['people'][0]['cells'])
+        assert view['people']==[] # This person has no official assignment; editor archive above remains accessible.
         add(db,lifecycle,'SERVICE') # identical date now accepted, old event remains archived
         assert count(db,PersonEvent)==2
         with pytest.raises(ValueError):editor.save(db,pid,{**page['annulled'][0],'note':'rewrite'},key)
@@ -133,18 +133,26 @@ def test_http_cannot_forge_actor_or_delete_and_records_authenticated_actor(lifec
 
 @pytest.mark.parametrize('sort',['name','unit','position_number','position_short','date:2026-10-02:2026-10-02','date:2026-10-01:2026-10-07'])
 @pytest.mark.parametrize('direction',['asc','desc'])
-def test_supported_sort_keys_and_empty_staff_values(views,sort,direction):
+def test_supported_sort_keys_for_snapshot_staff(views,sort,direction):
     factory,pid,second,*_=views
     with factory() as db:
+        from app.models import Position
+        from app.services.staff_service import StaffService
+        position=db.scalar(select(Position).where(Position.position_number==2))
+        StaffService.create_assignment(db,second,position.position_id,date(2026,1,1))
         result=event_views.journal(db,{'start':'2026-10-01','end':'2026-10-07','sort':sort,'direction':direction})
         assert len(result['people'])==2 and result['options']['sort']==sort and result['options']['direction']==direction
-        if sort in ('position_number','position_short'):assert [p['id'] for p in result['people']]==[pid,second]
+        if sort in ('position_number','position_short'):assert [p['id'] for p in result['people']]==([pid,second] if direction=='asc' else [second,pid])
         if sort=='name':assert [p['id'] for p in result['people']]==([second,pid] if direction=='asc' else [pid,second])
 
 
 def test_date_sort_survives_period_change_without_changing_daily_totals(views):
     factory,pid,second,*_=views
     with factory() as db:
+        from app.models import Position
+        from app.services.staff_service import StaffService
+        position=db.scalar(select(Position).where(Position.position_number==2))
+        StaffService.create_assignment(db,second,position.position_id,date(2026,1,1))
         # On Oct 1 only pid is on vacation; the other person has base service.
         result=event_views.journal(db,{'start':'2026-09-01','end':'2026-09-02','sort':'date:2026-10-01:2026-10-01'})
         assert [p['id'] for p in result['people']]==[pid,second]

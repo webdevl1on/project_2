@@ -15,12 +15,12 @@ module.exports=async({context,base})=>{
   await check('all information headers sort with current row numbering and missing staff fields last',async()=>{
    await page.goto(base+'/events?start=2026-10-01&end=2026-10-14');
    for(const name of ['row_number','position_number','position_short'])await page.locator(`[data-journal-column="${name}"]`).check();
-   await sort('name','desc');assert.deepEqual(await ids(),[3,2,1]);
+   await sort('name','desc');assert.deepEqual(await ids(),[2,1]);
    await sort('unit','asc');assert.equal(new URL(page.url()).searchParams.get('sort'),'unit');
-   await sort('position_number','asc');assert.deepEqual(await ids(),[1,2,3]);await sort('position_number','desc');assert.deepEqual(await ids(),[2,1,3]);
-   await sort('position_short','asc');assert.deepEqual(await ids(),[1,2,3]);
-   await sort('date:2026-10-03:2026-10-03','asc');assert.deepEqual(await ids(),[1,2,3]);await sort('date:2026-10-03:2026-10-03','desc');assert.deepEqual(await ids(),[3,2,1]);
-   assert.deepEqual(await page.locator('tbody [data-journal-extra=row_number]').allTextContents(),['1','2','3']);
+   await sort('position_number','asc');assert.deepEqual(await ids(),[1,2]);await sort('position_number','desc');assert.deepEqual(await ids(),[2,1]);
+   await sort('position_short','asc');assert.deepEqual(await ids(),[1,2]);
+   await sort('date:2026-10-03:2026-10-03','asc');assert.deepEqual(await ids(),[1,2]);await sort('date:2026-10-03:2026-10-03','desc');assert.deepEqual(await ids(),[2,1]);
+   assert.deepEqual(await page.locator('tbody [data-journal-extra=row_number]').allTextContents(),['1','2']);
    await Promise.all([page.waitForURL(u=>u.searchParams.get('start')==='2026-11-01'),page.locator('[data-month-step="1"]').click()]);
    assert.equal(new URL(page.url()).searchParams.get('sort'),'date:2026-10-03:2026-10-03');
   });
