@@ -6,7 +6,8 @@ from app.models import StaffStructure, StaffVersion, Position, PersonAssignment
 
 def active(model, start, end, on):
     return and_(getattr(model, start) <= on,
-                or_(getattr(model, end).is_(None), getattr(model, end) >= on))
+                or_(getattr(model, end).is_(None), getattr(model, end) >= on),
+                model.annulled_at.is_(None) if hasattr(model, 'annulled_at') else True)
 
 
 class StaffRepository:
@@ -65,7 +66,7 @@ class StaffRepository:
     @staticmethod
     def assignments_for_version(db, version_id):
         return (db.query(PersonAssignment).join(Position)
-                .filter(Position.staff_version_id == version_id).all())
+                .filter(Position.staff_version_id == version_id, PersonAssignment.annulled_at.is_(None)).all())
 
     @staticmethod
     def assignment_history(db, version_id):
@@ -97,8 +98,16 @@ class StaffRepository:
         query = (db.query(PersonAssignment, Position, StaffVersion).select_from(PersonAssignment)
                  .join(Position, Position.position_id == PersonAssignment.staff_position_id)
                  .join(StaffVersion, StaffVersion.id == Position.staff_version_id)
-                 .filter(PersonAssignment.person_id == person_id,
+                 .filter(PersonAssignment.person_id == person_id, PersonAssignment.annulled_at.is_(None),
                          or_(PersonAssignment.assigned_to.is_(None), PersonAssignment.assigned_to >= start)))
         if end:
             query = query.filter(PersonAssignment.assigned_from <= end)
         return query.order_by(PersonAssignment.assigned_from).all()
+
+
+    @staticmethod
+    def audit_history(db, assignment_id):
+        from app.models import AssignmentAudit, User
+        return (db.query(AssignmentAudit,User).outerjoin(User,User.id==AssignmentAudit.actor_user_id)
+                .filter(AssignmentAudit.assignment_id==assignment_id)
+                .order_by(AssignmentAudit.occurred_at,AssignmentAudit.id).all())

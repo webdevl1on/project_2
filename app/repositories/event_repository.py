@@ -92,7 +92,7 @@ class EventRepository:
         from app.models import PersonAssignment, Position
         return db.execute(select(PersonAssignment.person_id, Position.unit_short)
                           .join(Position, Position.position_id == PersonAssignment.staff_position_id)
-                          .where(PersonAssignment.assigned_from <= end,
+                          .where(PersonAssignment.annulled_at.is_(None), PersonAssignment.assigned_from <= end,
                                  or_(PersonAssignment.assigned_to.is_(None), PersonAssignment.assigned_to >= start))).all()
 
     @staticmethod

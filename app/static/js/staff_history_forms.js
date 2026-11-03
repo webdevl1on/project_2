@@ -20,7 +20,7 @@
         const show=(text,names=[])=>{
             message.textContent=text;message.hidden=false;
             const fields=names.flatMap(name=>Array.from(form.elements).filter(field=>field.name===name))
-                .map(field=>field.type==='hidden' ? field.closest('[data-person-picker]')?.querySelector('[data-person-label]') : field).filter(Boolean);
+                .map(field=>field.type==='hidden' ? (field.closest('[data-person-picker]')?.querySelector('[data-person-label]') || form.querySelector(`[data-exact-date-for="${field.name}"]`)) : field).filter(Boolean);
             fields.forEach(field=>{
                 field.classList.add('is-invalid');field.setAttribute('aria-invalid','true');
                 field.setAttribute('aria-describedby',`${field.getAttribute('aria-describedby')||''} ${message.id}`.trim());
@@ -31,7 +31,7 @@
             event.preventDefault();if(pending)return;clear();
             for(const field of form.elements){
                 if(field.willValidate && (!field.checkValidity() || (field.required && !field.value.trim()))){
-                    show(field.validity.valueMissing || !field.value.trim() ? 'Заповніть обов’язкове поле.' : field.validationMessage,[field.name]);return;
+                    show(field.validity.valueMissing || !field.value.trim() ? 'Заповніть обов’язкове поле.' : field.validationMessage,[field.dataset.exactDateFor||field.name]);return;
                 }
             }
             const person=form.querySelector('[data-person-value]');
@@ -48,7 +48,8 @@
             const buttons=Array.from(form.querySelectorAll('button')).filter(button=>button.type==='submit');
             pending=true;buttons.forEach(button=>button.disabled=true);form.setAttribute('aria-busy','true');
             try{
-                const response=await fetch(form.action,{method:'POST',body:new FormData(form),headers:{Accept:'application/json'}});
+                const response=window.StaffHistory ? await window.StaffHistory.submit(form) : await fetch(form.action,{method:'POST',body:new FormData(form),headers:{Accept:'application/json'}});
+                if(!response)return;
                 if(response.ok && response.redirected){location.assign(response.url);return;}
                 if((response.headers.get('content-type')||'').includes('application/json')){
                     const data=await response.json();

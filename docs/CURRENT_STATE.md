@@ -530,3 +530,64 @@ DAY_OFF не пропонується новим подіям і блокуєт�
 Потрібен явний **Alembic 0004_event_catalog**, без нових таблиць/полів: лише деактивація старого DAY_OFF і додавання відсутнього VLK. Робочу БД/production не змінювали, reset/commit/push/merge не виконувалися. Не змінені штатні write-сервіси, медичні моделі, авторизація, підтвердження завершення, міражі/анулювання/аудит. Порядок оновлення, URL/фільтри та перелік файлів — [EVENT_VIEWS.md](EVENT_VIEWS.md).
 
 Перевірки: до змін **88 цільових Python passed**. Повний legacy/config Python-набір — **824 passed**, окремий повний реальний PostgreSQL-набір — **48 passed** тільки на випадкових схемах project2_ci; перевірені upgrade з 0003/no-op/збереження старих подій і користувацького VLK, повторне seed, rollback та read-only історичний snapshot. **49 Node passed**; фінальний повний **162 Chromium PASS** без зареєстрованих JS-помилок, включно з шістьма новими наскрізними сценаріями. Після завершальних уточнень повторені **93 цільові Python passed**, **3 PostgreSQL passed** та **6 Chromium PASS**. Native Ctrl+C реально перевірено з читанням системного clipboard; contextmenu не перехоплюється (натискання OS-пункту Copy не автоматизувалося). Перевірені також Word/Excel, Ctrl+A/C у полі редактора, VLK-запис через GUI, wrap/висота/ширини/reload, пошук/мультивибір/каскад/календарні фільтри, Back/Forward, CSV й мобільна ширина 390 px. Штатні/медичні/документальні браузерні регресії пройшли. Синтаксис Python/JS та git diff --check пройшли. Два попередні deprecation-попередження залежностей залишилися.
+
+
+## Історія призначень за посадами та повний аудит (2026-11-03)
+
+`/staff/history` перероблено на згорнуті картки всіх посад вибраної версії: поточні, архівні за фактичними датами, окремі майбутні й згорнуті анульовані записи. GET version_id/q відновлює версію/пошук номера та назв без регістру. Один спільний Bootstrap-редактор використовує чинні Person Picker, ProfileDates і обробку помилок без втрати чернетки. Посада попередньо вибрана; редагування зберігає assignment_id та охоплює всі накази/причину/примітку. Вакансії та посади без історії не приховуються. Читання пакетне, без SQL на кожну картку.
+
+Додано логічне анулювання з причиною/підтвердженням/UTC/nullable FK автора та відновлення того самого запису з повторною перевіркою revision, перетинів і меж версії. Інші призначення не змінюються. Анульовані виключено з фактичної зайнятості, кадрової хронології й складу журналу подій на дату. У StaffService додано централізовану серверну межу нового/зміненого початку: сьогодні Europe/Kyiv + 1 день. Це охоплює штатку, історію, переведення, Міражі та прямі виклики сервісів; накази/кінець не обмежено. Старі майбутні дати без зміни зберігаються.
+
+AssignmentAudit атомарно журналює create/edit/orders/complete/transfer/annul/restore, включно з автоматичним завершенням старої посади та закриттям версії. Before/after, точний UTC, причина та реальний автор кожної окремої cookie-сесії зберігаються незалежно; HTTP body автора не визначає. Без перевіреної персональної сесії — NULL/«Автор невідомий», без підміни службовим користувачем. Помилка аудиту відкочує кадрову зміну. UPDATE/DELETE аудиту заборонені тригерами, історія доступна в Modal як таблиця різниць полів. Чинні користувачі, ролі й політика доступу повторно використані; нових прав/автентифікації немає.
+
+Адитивний head **0005_assignment_history** після 0004: nullable-метадані PersonAssignment, нова assignment_audit, FK/check, append-only/restore guards; EXCLUDE і guards враховують тільки неанульовані призначення. Startup readonly-перевірка також перевіряє predicates обох EXCLUDE. Старі ID/дати/накази та раніше внесений майбутній запис збережено; фальшивий історичний аудит/автори не створювалися. Для оновлення потрібен backup і явний `python -m alembic upgrade head` на перевіреній цільовій БД; **reset не потрібний**. Робочі project2_dev/project2_prod не мігрувалися, не скидалися, дані не видалялися. Деталі — [STAFF_HISTORY.md](STAFF_HISTORY.md).
+
+Фактичні перевірки:
+
+- Baseline перед змінами: **73 Python passed** (штатна історія, транзакції та штатка).
+- Повний legacy/config Python: **848 passed, 54 PostgreSQL skipped**; PostgreSQL виконаний окремо, не зарахований як SQLite-перевірка.
+- Повний реальний PostgreSQL 17: **54 passed**, лише випадкові схеми project2_ci. Перевірено міграцію з 0004/no-op, старі накази/майбутній запис без backfill, часткові EXCLUDE, append-only/no-delete guards, rollback другого аудиту переведення, конкурентне редагування проти анулювання, два реальні автори/невідомий автор, межу майбутнього початку.
+- Після уточнення readonly schema checker додатково повторені **40 PostgreSQL passed** (кадровий і базовий PostgreSQL-набори).
+- **49 Node passed**. Повний браузерний набір: **170 Chromium PASS**, без зареєстрованих pageerror; потім цільовий розширений прогін **9 Chromium PASS** (додано реальне перемикання двох версій без витоку чужих посад), а також **5 history_forms PASS**. Перевірено DMY/ISO, чернетки/фокус, конфлікти, анулювання/відновлення, окремий наказ переведення, ручне виправлення запропонованого наказу, аудит і ширину 390 px. Старі штатка/журнал/Міражі/фільтри/пресети/копіювання/документи/медицина пройшли регресію.
+- Синтаксис Python/JavaScript, `git diff --check`, `python -m alembic heads` пройшли; один head 0005_assignment_history. Два наявні deprecation-попередження залежностей залишилися.
+
+Обмеження: навантажувальний benchmark на десятках тисяч посад та інші браузери не запускалися. Старі записи не мають вигаданого історичного аудиту; від цієї версії журналюються їхні нові операції. Системний час відображається чинним точним форматером UTC; політика зберігання часу не змінена. SQLite-тригери підтримують лише ізольовану legacy-регресію; нова робоча міграція — PostgreSQL/Alembic.
+
+Змінені та створені файли цього етапу:
+
+- `app/database/postgresql.py`
+- `app/database/schema_check.py`
+- `app/models/__init__.py`
+- `app/models/assignment_audit.py`
+- `app/models/staff.py`
+- `app/repositories/event_repository.py`
+- `app/repositories/person_repository.py`
+- `app/repositories/staff_repository.py`
+- `app/routers/service_chronology.py`
+- `app/routers/staff.py`
+- `app/security/accounts.py`
+- `app/services/assignment_audit.py`
+- `app/services/mirage.py`
+- `app/services/staff_read.py`
+- `app/services/staff_service.py`
+- `app/static/css/staff_history.css`
+- `app/static/js/staff_history.js`
+- `app/static/js/staff_history_forms.js`
+- `app/templates/components/assignment_audit.html`
+- `app/templates/staff_history.html`
+- `docs/ARCHITECTURE.md`
+- `docs/CURRENT_STATE.md`
+- `docs/DATE_SYSTEM.md`
+- `docs/POSTGRESQL_SETUP.md`
+- `docs/STAFF_HISTORY.md`
+- `docs/TABLE_UI.md`
+- `migrations/versions/0005_assignment_history.py`
+- `tests/browser/assignment_history.cjs`
+- `tests/browser/column_visibility.cjs`
+- `tests/browser/history_forms.cjs`
+- `tests/browser/serve_column_visibility.py`
+- `tests/browser/staff.cjs`
+- `tests/postgresql/test_assignment_history.py`
+- `tests/test_assignment_history.py`
+- `tests/test_journal_snapshot.py`
+- `tests/test_service_chronology.py`

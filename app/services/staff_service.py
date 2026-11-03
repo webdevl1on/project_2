@@ -1,6 +1,6 @@
 """Transactional domain operations; effective dates, never creation order."""
 from contextlib import contextmanager
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, UTC
 from zoneinfo import ZoneInfo
 from app.repositories.staff_repository import StaffRepository, active
 from app.repositories.person_repository import PersonRepository
@@ -10,10 +10,30 @@ from sqlalchemy.orm.exc import StaleDataError
 from app.models.staff import StaffStructure, StaffVersion, PersonAssignment, exact_date
 from app.models.reference_book import Position
 from app.models.person import Person
+from app.services.assignment_audit import snapshot as audit_snapshot, record_change
 
 
 def today():
     return datetime.now(ZoneInfo("Europe/Kyiv")).date()
+
+
+def official_start(start, previous=None):
+    exact_date(start)
+    if start != previous and start > today() + timedelta(days=1):
+        raise ValueError("Початок офіційного призначення дозволений не пізніше завтра (Europe/Kyiv). Для планування використайте Міраж.")
+
+
+def editable(record):
+    if record.annulled_at is not None:
+        raise ValueError("Призначення анульоване. Спочатку відновіть його з перевіркою конфліктів.")
+
+
+def completion_values(number=None, issued=None, reason=None, note=None):
+    if len(note or '') > 1000: raise ValueError('Примітка: максимум 1000 символів.')
+    if reason not in (None, '', 'release', 'transfer', 'version_closed', 'other'):
+        raise ValueError('Невідома причина завершення.')
+    return {**order_values(number, issued, 'release'), 'completion_reason': reason or None,
+            'completion_note': (note or '').strip() or None}
 
 
 def assignments_at(db, on):
@@ -92,24 +112,32 @@ class StaffService:
         return key
 
     @staticmethod
-    def create_assignment(db, person_id, position_id, start, end=None, *, order_number=None, order_date=None):
-        period(start, end)
+    def create_assignment(db, person_id, position_id, start, end=None, *, order_number=None, order_date=None, release_number=None, release_date=None, completion_reason=None, completion_note=None, actor_id=None):
+        period(start, end); official_start(start)
         with write_unit(db):
             checked(db, Person, person_id); checked(db, Position, position_id)
             record = PersonAssignment(person_id=person_id, staff_position_id=position_id, assigned_from=start, assigned_to=end, **order_values(order_number,order_date))
             StaffRepository.add(db, record); db.flush()
+            for field, value in completion_values(release_number, release_date, completion_reason, completion_note).items(): setattr(record, field, value)
+            record_change(db, record, 'create', actor_id=actor_id)
             key = record.id
         return key
 
     @staticmethod
-    def correct_assignment(db, key, revision, person_id, position_id, start, end):
+    def correct_assignment(db, key, revision, person_id, position_id, start, end, *, details=None, actor_id=None):
         period(start, end)
         with write_unit(db):
             record = checked(db, PersonAssignment, key, revision)
+            editable(record); official_start(start, record.assigned_from)
+            before = audit_snapshot(record)
             checked(db, Person, person_id); checked(db, Position, position_id)
             record.person_id=person_id; record.staff_position_id=position_id
             record.assigned_from=start; record.assigned_to=end
-            db.flush()
+            if details is not None:
+                values = {**order_values(details.get('assignment_order_number'), details.get('assignment_order_date')),
+                          **completion_values(details.get('release_order_number'), details.get('release_order_date'), details.get('completion_reason'), details.get('completion_note'))}
+                for field, value in values.items(): setattr(record, field, value)
+            record_change(db, record, 'edit', before, actor_id)
         return key
 
     @staticmethod
@@ -126,7 +154,7 @@ class StaffService:
         return key
 
     @staticmethod
-    def close_version(db, key, revision, end):
+    def close_version(db, key, revision, end, *, actor_id=None):
         exact_date(end)
         with write_unit(db):
             version=checked(db, StaffVersion, key, revision)
@@ -138,8 +166,10 @@ class StaffService:
                 raise ValueError("Є призначення після обраного завершення. Спочатку виправте їхні періоди.")
             for record in records:
                 if record.assigned_to is None or record.assigned_to>end:
+                    before = audit_snapshot(record)
                     record.assigned_to=end
                     record.completion_reason="version_closed"
+                    record_change(db, record, 'complete', before, actor_id, 'Закриття версії штату')
             db.flush()  # version guard must see already-closed assignment periods
             version.valid_to=end
             db.flush()
@@ -163,6 +193,7 @@ class StaffService:
             raise ValueError("Обрана дата не належить періоду цієї версії.")
         source=StaffRepository.person_assignment_at(db, person_id, on) if person_id else None
         occupied=StaffRepository.position_assignment_at(db, position_id, on)
+        if person_id is not None and (source is None or source.staff_position_id != position_id): official_start(on)
         if person_id: checked(db,Person,person_id)
         if occupied and occupied.person_id!=person_id and person_id is not None:
             raise ValueError("Цільова посада зайнята. Її не буде звільнено автоматично.")
@@ -177,13 +208,15 @@ class StaffService:
         return result
 
     @staticmethod
-    def assign(db, position_id, person_id, on, expected, confirmed=False):
+    def assign(db, position_id, person_id, on, expected, confirmed=False, *, actor_id=None):
         with write_unit(db):
-            return StaffService._assign_locked(db,position_id,person_id,on,expected,confirmed)
+            return StaffService._assign_locked(db,position_id,person_id,on,expected,confirmed,actor_id=actor_id)
 
     @staticmethod
-    def _assign_locked(db, position_id, person_id, on, expected, confirmed=False):
+    def _assign_locked(db, position_id, person_id, on, expected, confirmed=False, *, actor_id=None):
         snapshot=StaffService.assignment_snapshot(db,position_id,person_id,on,expected.get("orders"))
+        for field in ('end', 'completion'):
+            if field in expected: snapshot[field] = expected[field]
         if snapshot!=expected:
             raise ValueError("Призначення змінилося. Оновіть форму та повторіть підтвердження.")
         if snapshot["source"] and snapshot["target"]==snapshot["source"]:
@@ -195,22 +228,30 @@ class StaffService:
                 raise ValueError("Перепризначення потребує підтвердження.")
             if old.assigned_from>=on:
                 raise ValueError("Призначення починається цього дня. Виправте помилковий запис через редагування історії.")
+            before = audit_snapshot(old)
             old.assigned_to=on-timedelta(days=1)
             old.completion_reason="transfer" if person_id else "release"
             orders=expected.get('orders') or {}
             for key,value in order_values(orders.get('release_number'),date.fromisoformat(orders['release_date']) if orders.get('release_date') else None,'release').items():
                 setattr(old,key,value)
-            db.flush()
+            record_change(db, old, 'complete', before, actor_id, 'Переведення' if person_id else 'Звільнення з посади')
         if person_id is not None:
             position=checked(db,Position,position_id)
             version=checked(db,StaffVersion,position.staff_version_id)
-            StaffRepository.add(db, PersonAssignment(person_id=person_id,staff_position_id=position_id,
-                                    assigned_from=on,assigned_to=version.valid_to, **order_values((expected.get("orders") or {}).get("number"),date.fromisoformat(expected["orders"]["date"]) if (expected.get("orders") or {}).get("date") else None)))
-            db.flush()
+            orders = expected.get('orders') or {}
+            end = domain_date(expected['end'], False) if 'end' in expected else version.valid_to
+            period(on, end)
+            record = PersonAssignment(person_id=person_id, staff_position_id=position_id,
+                assigned_from=on, assigned_to=end, **order_values(orders.get('number'), domain_date(orders.get('date'), False)))
+            completion = dict(expected.get('completion') or {})
+            if isinstance(completion.get('issued'), str): completion['issued'] = domain_date(completion['issued'], False)
+            for field, value in completion_values(**completion).items(): setattr(record, field, value)
+            StaffRepository.add(db, record)
+            record_change(db, record, 'transfer' if old else 'create', actor_id=actor_id)
         return "Призначення збережено; історію попередньої посади збережено." if person_id else "Призначення завершено."
 
     @staticmethod
-    def correct_orders(db, key, revision, assignment_number=_ORDER_UNSET, assignment_date=_ORDER_UNSET, release_number=_ORDER_UNSET, release_date=_ORDER_UNSET):
+    def correct_orders(db, key, revision, assignment_number=_ORDER_UNSET, assignment_date=_ORDER_UNSET, release_number=_ORDER_UNSET, release_date=_ORDER_UNSET, *, actor_id=None):
         values={}
         for prefix,number,issued in [('assignment',assignment_number,assignment_date),('release',release_number,release_date)]:
             if number is not _ORDER_UNSET:values[prefix+'_order_number']=order_values(number,None,prefix)[prefix+'_order_number']
@@ -218,25 +259,51 @@ class StaffService:
                 exact_date(issued,False);values[prefix+'_order_date']=issued
         with write_unit(db):
             record=checked(db,PersonAssignment,key,revision)
+            editable(record); before = audit_snapshot(record)
             for field,value in values.items():setattr(record,field,value)
-            db.flush()
+            record_change(db, record, 'orders', before, actor_id)
         return key
 
     @staticmethod
-    def release_assignment(db,key,revision,effective,number=None,issued=None,note=None,confirmed=False):
+    def release_assignment(db,key,revision,effective,number=None,issued=None,note=None,confirmed=False, *, actor_id=None):
         exact_date(effective)
         if not confirmed:raise ValueError('Підтвердьте звільнення саме з посади.')
         values=order_values(number,issued,'release')
         if len(note or '')>1000:raise ValueError('Примітка: максимум 1000 символів.')
         with write_unit(db):
             record=checked(db,PersonAssignment,key,revision)
+            editable(record); before = audit_snapshot(record)
             if effective<=record.assigned_from:raise ValueError('Дата звільнення має бути пізніше першого дня призначення.')
             end=effective-timedelta(days=1)
             if (record.completion_reason and record.assigned_to!=end) or (record.assigned_to is not None and end>record.assigned_to):
                 raise ValueError('Призначення вже завершене або дата виходить за його межі. Використайте виправлення історичних дат.')
             record.assigned_to=end;record.completion_reason='release';record.completion_note=(note or '').strip() or None
             for field,value in values.items():setattr(record,field,value)
-            db.flush()
+            record_change(db, record, 'complete', before, actor_id, note)
+        return key
+
+    @staticmethod
+    def annul_assignment(db, key, revision, reason, *, confirmed=False, actor_id=None):
+        reason = (reason or '').strip()
+        if not confirmed: raise ValueError('Підтвердьте анулювання призначення.')
+        if not reason or len(reason) > 2000: raise ValueError('Причина анулювання обов’язкова: до 2000 символів.')
+        with write_unit(db):
+            record = checked(db, PersonAssignment, key, revision)
+            editable(record); before = audit_snapshot(record)
+            record.annulled_at = datetime.now(UTC)
+            record.annulment_reason = reason; record.annulled_by = actor_id
+            record_change(db, record, 'annul', before, actor_id, reason)
+        return key
+
+    @staticmethod
+    def restore_assignment(db, key, revision, *, actor_id=None):
+        with write_unit(db):
+            record = checked(db, PersonAssignment, key, revision)
+            if record.annulled_at is None: raise ValueError('Призначення вже не анульоване.')
+            # Restore the same existing period; no new or shifted future start.
+            before = audit_snapshot(record)
+            record.annulled_at = record.annulment_reason = record.annulled_by = None
+            record_change(db, record, 'restore', before, actor_id)
         return key
 
 

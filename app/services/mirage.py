@@ -29,7 +29,7 @@ def preview(db,key,revision,on,orders=None):
     return {'id':key,'revision':revision,'snapshot':snapshot}
 
 
-def convert(db,expected,confirmed=False):
+def convert(db,expected,confirmed=False, *, actor_id=None):
     if not confirmed:raise ValueError('Підтвердьте офіційне призначення та завершення попередньої посади, якщо воно потрібне.')
     from datetime import date
     with write_unit(db):
@@ -37,6 +37,6 @@ def convert(db,expected,confirmed=False):
         if record.status!='waiting':raise ValueError('Міраж уже завершено.')
         snapshot=expected['snapshot'];on=date.fromisoformat(snapshot['on'])
         if snapshot['person_id']!=record.person_id or snapshot['position_id']!=record.staff_position_id:raise ValueError('Некоректне підтвердження Міражу.')
-        StaffService._assign_locked(db,record.staff_position_id,record.person_id,on,snapshot,True)
+        StaffService._assign_locked(db,record.staff_position_id,record.person_id,on,snapshot,True,actor_id=actor_id)
         assignment=StaffRepository.person_assignment_at(db,record.person_id,on)
         record.status='converted';record.converted_assignment_id=assignment.id;db.flush()

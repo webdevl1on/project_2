@@ -10,6 +10,15 @@ from app.security.access_mode import open_access
 COOKIE = 'project2_user'
 
 
+def personal_actor(request, db):
+    """Optional verified personal session; never attribute the open-mode identity."""
+    check_origin(request)
+    try:
+        return accounts.authenticate(db, request.cookies.get(COOKIE, ''))[0].id
+    except PermissionError:
+        return None
+
+
 def check_origin(request):
     origin = request.headers.get('origin')
     if (origin and origin.rstrip('/') != str(request.base_url).rstrip('/')) or request.headers.get('sec-fetch-site') == 'cross-site':

@@ -246,4 +246,8 @@ pg_restore -h 127.0.0.1 -p 55432 -U project2_ci -d project2_ci -W --no-owner --n
 
 Ревізія виправлень — `0003_event_corrections`: метадані анулювання PersonEvent, append-only історія виправлень, FK/check та заборона фізичного DELETE/редагування анульованих записів. Окремий backup/upgrade, без reset і startup-міграцій — [EVENT_CORRECTIONS.md](EVENT_CORRECTIONS.md#міграція).
 
-Поточний head — `0004_event_catalog`: без нових таблиць/полів, деактивує DAY_OFF для нових подій і додає відсутній кадровий VLK. Історичні події та наявні користувацькі реквізити VLK зберігаються. Явний backup/upgrade, без reset і startup-записів — [EVENT_VIEWS.md](EVENT_VIEWS.md).
+Попередня ревізія `0004_event_catalog`: без нових таблиць/полів, деактивує DAY_OFF для нових подій і додає відсутній кадровий VLK. Історичні події та наявні користувацькі реквізити VLK зберігаються. Явний backup/upgrade, без reset і startup-записів — [EVENT_VIEWS.md](EVENT_VIEWS.md).
+
+## Head 0005: історія призначень
+
+Після 0004 застосовується адитивна **0005_assignment_history**: метадані анулювання PersonAssignment, assignment_audit, append-only/restore guards та предикати `annulled_at IS NULL` для assignment EXCLUDE/period guards. Існуючі ID/дати/накази залишаються, старі записи неанульовані, фальшивого аудиту/авторів немає. Потрібен backup та явний `python -m alembic upgrade head` на перевіреній цільовій БД; startup не мігрує. Reset не потрібний. Downgrade відхилено через втрату аудиту. Автоматично project2_dev/project2_prod не змінювалися; перевірки використовують тільки випадкові схеми project2_ci. Подробиці — [STAFF_HISTORY.md](STAFF_HISTORY.md).

@@ -165,7 +165,7 @@ def many_positions():
 def journal_snapshot_fixture():
     """Synthetic history for the dedicated browser suite; never installed by app.main."""
     from datetime import date
-    from app.models import StaffVersion,Position,EventType,PersonEvent
+    from app.models import StaffVersion,Position,EventType,PersonEvent,PersonAssignment
     from app.services.staff_service import StaffService
     from app.services import person_events
     with Session() as db:
@@ -182,7 +182,8 @@ def journal_snapshot_fixture():
         db.commit()
         StaffService.create_assignment(db,1,positions[0].position_id,date(2026,10,10))
         StaffService.create_assignment(db,2,positions[1].position_id,date(2026,10,10))
-        StaffService.create_assignment(db,3,positions[2].position_id,date(2026,11,10))
+        # Synthetic legacy future record, intentionally not a new service write.
+        db.add(PersonAssignment(person_id=3,staff_position_id=positions[2].position_id,assigned_from=date(2026,11,10)));db.commit()
         kinds={r.event_type:r.event_type_id for r in db.query(EventType)}
         person_events.save(db,1,{'event_type_id':kinds['VACATION'],'date_start':'2026-10-05','date_end':'2026-10-15'})
         person_events.save(db,2,{'event_type_id':kinds['VLK'],'date_start':'2026-09-01'})

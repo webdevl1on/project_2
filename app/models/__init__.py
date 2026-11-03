@@ -52,3 +52,5 @@ __all__ += ['PersonEducation', 'PersonFamilyMember', 'PersonDirective']
 
 from app.models.event_correction import PersonEventCorrection
 __all__ += ['PersonEventCorrection']
+from app.models.assignment_audit import AssignmentAudit
+__all__ += ['AssignmentAudit']

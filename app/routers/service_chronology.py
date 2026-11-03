@@ -6,6 +6,7 @@ from app.database.db import get_db
 from app.services import service_chronology as service
 from app.services.staff_service import StaffService
 from app.services.staff_service import domain_date
+from app.security.accounts import personal_actor
 router=APIRouter()
 
 @router.post('/persons/{person_id}/personal-number')
@@ -25,16 +26,16 @@ async def historical(request:Request,person_id:int,key:int|None=None,db:Session=
 @router.post('/personnel/assignments/{key}/{action}')
 async def assignment(request:Request,key:int,action:str,db:Session=Depends(get_db)):
     try:
-        data=dict(await request.form());revision=int(data['revision'])
+        data=dict(await request.form());revision=int(data['revision']);actor=personal_actor(request,db)
         if action=='orders':
             values={}
             for prefix in ('assignment','release'):
                 for suffix in ('number','date'):
                     field=prefix+'_order_'+suffix
                     if field in data:values[prefix+'_'+suffix]=domain_date(data[field],False) if suffix=='date' else data[field]
-            StaffService.correct_orders(db,key,revision,**values)
-        elif action=='release':StaffService.release_assignment(db,key,revision,domain_date(data.get('release_effective')),data.get('release_order_number'),domain_date(data.get('release_order_date'),False),data.get('note'),data.get('confirmed')=='on')
-        elif action=='period':StaffService.correct_assignment(db,key,revision,int(data['person_id']),int(data['position_id']),domain_date(data.get('assigned_from')),domain_date(data.get('assigned_to'),False))
+            StaffService.correct_orders(db,key,revision,**values,actor_id=actor)
+        elif action=='release':StaffService.release_assignment(db,key,revision,domain_date(data.get('release_effective')),data.get('release_order_number'),domain_date(data.get('release_order_date'),False),data.get('note'),data.get('confirmed')=='on',actor_id=actor)
+        elif action=='period':StaffService.correct_assignment(db,key,revision,int(data['person_id']),int(data['position_id']),domain_date(data.get('assigned_from')),domain_date(data.get('assigned_to'),False),actor_id=actor)
         else:raise ValueError('Невідома дія.')
         return {'ok':True}
     except (ValueError,KeyError) as error:return JSONResponse({'detail':str(error)},status_code=409)
@@ -64,6 +65,6 @@ async def change_mirage(request:Request,key:int,action:str,db:Session=Depends(ge
         if action=='convert':
             payload=verify(data['token'],'mirage')
             if payload['id']!=key:raise ValueError('Підтвердження належить іншому Міражу.')
-            mirage.convert(db,payload,data.get('confirmed')=='on');return {'ok':True}
+            mirage.convert(db,payload,data.get('confirmed')=='on',actor_id=personal_actor(request,db));return {'ok':True}
         raise ValueError('Невідома дія.')
     except (ValueError,KeyError) as error:return JSONResponse({'detail':str(error)},status_code=409)

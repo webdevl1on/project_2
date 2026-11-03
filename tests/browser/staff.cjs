@@ -57,7 +57,7 @@ module.exports=async({context,base,adminToken})=>{
         await scenario('history shows retained source and explicit atomic version closure',async()=>{
             await page.getByRole('link',{name:'Історія штату',exact:true}).click();
             assert.ok((await page.locator('body').innerText()).includes('Історичні призначення'));
-            assert.equal(await page.locator('form[action$="/correct"] [name="assigned_from"]').count(),4);
+            assert.equal(await page.locator('[data-history-edit]').count(),4);
             await context.request.post(base+'/admin/login',{form:{token:adminToken}});await page.goto(base+'/admin/staff');
             const section=page.locator('details').filter({has:page.locator('summary',{hasText:'Явно закрити'})});
             await section.locator('summary').click();

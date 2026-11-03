@@ -2,7 +2,7 @@
 from datetime import date
 import pytest
 from sqlalchemy import select,func
-from app.models import Person,PersonEvent,StaffVersion,EventType,EventSubtype
+from app.models import Person,PersonEvent,StaffVersion,EventType,EventSubtype,PersonAssignment
 from app.services import event_views,person_events
 from app.services.staff_service import StaffService
 from app.services.service_person_create import ServicePersonCreate
@@ -29,7 +29,8 @@ def prepare_snapshot(factory):
         db.commit();ids=[p.position_id for p in positions]
         StaffService.create_assignment(db,people[0],ids[0],date(2026,1,1),date(2026,10,9))
         StaffService.create_assignment(db,people[0],ids[2],date(2026,10,10))
-        StaffService.create_assignment(db,people[2],ids[3],date(2026,11,10))
+        # A pre-existing future row: new official writes are now limited to tomorrow.
+        db.add(PersonAssignment(person_id=people[2],staff_position_id=ids[3],assigned_from=date(2026,11,10)));db.commit()
         StaffService.create_assignment(db,people[3],ids[1],date(2026,6,1),date(2026,6,30))
         StaffService.create_assignment(db,people[4],ids[4],date(2026,10,10))
         vacation=db.scalar(select(EventType).where(EventType.event_type=='VACATION')).event_type_id

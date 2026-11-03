@@ -62,6 +62,9 @@ class PersonAssignment(SystemTimestamps, Base):
     release_order_date: Mapped[date | None] = mapped_column(Date)
     completion_reason: Mapped[str | None] = mapped_column(String(30))
     completion_note: Mapped[str | None] = mapped_column(String(1000))
+    annulled_at: Mapped[datetime | None] = mapped_column(DateTime)
+    annulment_reason: Mapped[str | None] = mapped_column(String(2000))
+    annulled_by: Mapped[int | None] = mapped_column(ForeignKey('users.id'))
 
     @validates("assignment_order_date", "release_order_date")
     def validate_order_date(self, key, value):
@@ -73,6 +76,7 @@ class PersonAssignment(SystemTimestamps, Base):
     person_position_id = synonym("id")
     position_id = synonym("staff_position_id")
     __table_args__ = (CheckConstraint("assigned_to IS NULL OR assigned_to >= assigned_from"),
+                      CheckConstraint("(annulled_at IS NULL AND annulment_reason IS NULL AND annulled_by IS NULL) OR (annulled_at IS NOT NULL AND annulment_reason IS NOT NULL AND length(trim(annulment_reason)) BETWEEN 1 AND 2000)", name='assignment_annulment_reason'),
                       Index("ix_assignment_person_period", "person_id", "assigned_from", "assigned_to"),
                       Index("ix_assignment_position_period", "staff_position_id", "assigned_from", "assigned_to"))
 
@@ -91,18 +95,18 @@ _VERSION_GUARD = """
  ) THEN RAISE(ABORT,'staff version periods overlap') END;
  SELECT CASE WHEN EXISTS (
    SELECT 1 FROM person_assignments a JOIN positions p ON p.position_id=a.staff_position_id
-   WHERE p.staff_version_id=NEW.id AND (a.assigned_from<NEW.valid_from OR
+   WHERE p.staff_version_id=NEW.id AND a.annulled_at IS NULL AND (a.assigned_from<NEW.valid_from OR
      (NEW.valid_to IS NOT NULL AND (a.assigned_to IS NULL OR a.assigned_to>NEW.valid_to)))
  ) THEN RAISE(ABORT,'assignments outside version period') END;
 """
 _ASSIGNMENT_GUARD = """
- SELECT CASE WHEN NOT EXISTS (
+ SELECT CASE WHEN NEW.annulled_at IS NULL AND NOT EXISTS (
    SELECT 1 FROM positions p JOIN staff_versions v ON v.id=p.staff_version_id
    WHERE p.position_id=NEW.staff_position_id AND NEW.assigned_from>=v.valid_from
    AND (v.valid_to IS NULL OR (NEW.assigned_to IS NOT NULL AND NEW.assigned_to<=v.valid_to))
  ) THEN RAISE(ABORT,'assignment outside version period') END;
- SELECT CASE WHEN EXISTS (
-   SELECT 1 FROM person_assignments a WHERE a.id != NEW.id
+ SELECT CASE WHEN NEW.annulled_at IS NULL AND EXISTS (
+   SELECT 1 FROM person_assignments a WHERE a.id != NEW.id AND a.annulled_at IS NULL
    AND (a.person_id=NEW.person_id OR a.staff_position_id=NEW.staff_position_id)
    AND a.assigned_from<=coalesce(NEW.assigned_to,'9999-12-31')
    AND NEW.assigned_from<=coalesce(a.assigned_to,'9999-12-31')

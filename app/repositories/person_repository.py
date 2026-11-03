@@ -145,6 +145,6 @@ class ProfileRepository:
     @staticmethod
     def assignments(db,person_id,on=None):
         from app.models.staff import StaffVersion
-        query=db.query(PersonAssignment,Position,StaffVersion).select_from(PersonAssignment).join(Position,Position.position_id==PersonAssignment.position_id).join(StaffVersion,StaffVersion.id==Position.staff_version_id).filter(PersonAssignment.person_id==person_id)
+        query=db.query(PersonAssignment,Position,StaffVersion).select_from(PersonAssignment).join(Position,Position.position_id==PersonAssignment.position_id).join(StaffVersion,StaffVersion.id==Position.staff_version_id).filter(PersonAssignment.person_id==person_id,PersonAssignment.annulled_at.is_(None))
         if on is not None: query=query.filter(active(PersonAssignment,'assigned_from','assigned_to',on),active(StaffVersion,'valid_from','valid_to',on))
         return query.order_by(PersonAssignment.assigned_from.desc(),PersonAssignment.id.desc()).all()

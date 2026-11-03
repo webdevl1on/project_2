@@ -1,0 +1,5 @@
+{% for item in audit_entries %}
+<section class="border-bottom mb-3 pb-2"><h3 class="h6">{{ format_system_timestamp(item.entry.occurred_at) }} · {{ item.actor }} · {{ item.operation }}</h3>
+{% if item.entry.reason %}<p>{{ item.entry.reason }}</p>{% endif %}
+<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Поле</th><th>Попереднє значення</th><th>Нове значення</th></tr></thead><tbody>{% for label,before,after in item.changes %}<tr><th>{{ label }}</th><td>{{ before if before is not none else '—' }}</td><td>{{ after if after is not none else '—' }}</td></tr>{% endfor %}</tbody></table></div></section>
+{% else %}<p>Операцій ще не зафіксовано. Для старих призначень історичне авторство не вигадується.</p>{% endfor %}

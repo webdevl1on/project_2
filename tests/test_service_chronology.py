@@ -140,6 +140,7 @@ def old_service_database(tmp_path):
     engine.dispose()
     with sqlite3.connect(path) as db:
         db.execute('DROP TABLE person_position_mirages')
+        db.execute('DROP TRIGGER assignment_annulled_guard')
         db.execute('DROP TRIGGER exact_assignment_orders_insert');db.execute('DROP TRIGGER exact_assignment_orders_update')
         for table,names in ADDED_COLUMNS.items():
             for name in sorted(names):db.execute(f'ALTER TABLE {table} DROP COLUMN {name}')
