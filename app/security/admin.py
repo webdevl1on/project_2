@@ -1,5 +1,6 @@
 """Administration belongs to a verified personal admin session, never a token."""
 import hmac
+from app.account_policy import has_role
 from fastapi import HTTPException, Request
 
 
@@ -14,7 +15,7 @@ def require_admin(request: Request):
     user=getattr(request.state,'authenticated_user',None)
     session=getattr(request.state,'personal_session',None)
     if user is None or session is None:raise HTTPException(401,'Потрібен персональний вхід.')
-    if user.role!='admin':raise HTTPException(403,'Потрібні права адміністратора.')
+    if not has_role(user,('admin',)):raise HTTPException(403,'Потрібні права адміністратора.')
     return AdminOwner(f'user:{user.id}:session:{session.token_hash}',session.csrf_token)
 
 

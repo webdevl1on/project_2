@@ -1,12 +1,12 @@
 # Архітектура project_2
 
-Карта коду гілки `testing`. Актуальний код має пріоритет; стан реалізації та результати перевірок наведені в [CURRENT_STATE.md](CURRENT_STATE.md).
+Карта коду гілки `testing` та поточного Security 1.2 у `feature/security`. Актуальний код має пріоритет; стан реалізації та результати перевірок наведені в [CURRENT_STATE.md](CURRENT_STATE.md).
 
 ## Зберігання та міграції
 
 PostgreSQL — цільова БД; `Settings` вимагає явні PROJECT2_ENV/DATABASE_URL і розділяє project2_prod/dev/ci та файлові каталоги. Sync psycopg 3, сесія на запит, помилка → rollback/close, завершення → dispose. Startup лише перевіряє Alembic head і спеціальні об'єкти. `Base.metadata.create_all`, sqlite3/PRAGMA та старі migrate_*.py залишені лише в legacy SQLite-інструментах; SQLite fallback відсутній.
 
-`migrations/versions/0001_postgresql.py` застосовує заморожені SQL-снапшоти: 48 предметних таблиць, partial UNIQUE, три EXCLUDE для включених періодів, 32 guard-тригери, Unicode/address/date функції. Metadata — поточна структура ORM; спеціальні об'єкти додатково перевіряє `database/postgresql.py`. Ревізія 0002_event_completion додала planned_end/completion_confirmed та SERVICE-підтипи; 0003_event_corrections додала анулювання й історію виправлень; 0004_event_catalog оновлює DAY_OFF/VLK без нових таблиць; поточний head 0005_assignment_history додає анулювання й аудит призначень. Заморожені 0001/0002 не змінено. Нові PostgreSQL-зміни потребують Alembic, явного upgrade і backup, без startup-міграцій.
+`migrations/versions/0001_postgresql.py` застосовує заморожені SQL-снапшоти: 48 предметних таблиць, partial UNIQUE, три EXCLUDE для включених періодів, 32 guard-тригери, Unicode/address/date функції. Metadata — поточна структура ORM; спеціальні об'єкти додатково перевіряє `database/postgresql.py`. Ревізія 0002_event_completion додала planned_end/completion_confirmed та SERVICE-підтипи; 0003_event_corrections додала анулювання й історію виправлень; 0004_event_catalog оновлює DAY_OFF/VLK без нових таблиць; 0005_assignment_history додає анулювання й аудит призначень; поточний head 0006_account_management — Master/Admin та аудит керування користувачами. Заморожені 0001/0002 не змінено. Нові PostgreSQL-зміни потребують Alembic, явного upgrade і backup, без startup-міграцій.
 
 `locking.locked_get` використовує FOR UPDATE лише всередині PostgreSQL write unit; Person/документ/версія та медичні записи блокуються локально, з повторним читанням revision. Repository не commit. Усі пов'язані зміни лишаються в одній service-транзакції; SQLSTATE deadlock/serialization/lock timeout дає контрольовану відмову без автоматичного retry. Детальні інваріанти, карта SQLite-залежностей, Windows-конфігурація, обмеження авторизації й backup/restore — [POSTGRESQL_SETUP.md](POSTGRESQL_SETUP.md).
 
@@ -17,6 +17,7 @@ PostgreSQL — цільова БД; `Settings` вимагає явні PROJECT2_
 | Завдання | Основні файли |
 | --- | --- |
 | Базовий захист усіх HTTP-маршрутів | `docs/SECURITY.md`, `app/security/application.py`, `accounts.py`, `admin.py`, `app/routers/accounts.py`, `app/main.py`, `app/templates/login.html`, `app/static/js/security_session.js` |
+| Керування користувачами / Master | `app/account_policy.py`, `app/models/accounts.py`, `app/repositories/account_repository.py`, `app/services/accounts.py`, `account_management.py`, `promote_master.py`, `app/routers/account_management.py`, `app/templates/admin/user*.html`, `account_audit.html`, `app/templates/account_password.html`, `app/static/js/account_management.js`, `migrations/versions/0006_account_management.py` |
 | Журнал і стан події на дату | `docs/EVENT_CORRECTIONS.md`, `app/models/event_correction.py`, `app/services/event_corrections.py`, `docs/EVENT_CONTROL.md`, `app/services/event_rules.py`, `app/static/js/journal_controls.js`, `docs/EVENT_VIEWS.md`, `app/event_display.py`, `app/services/event_views.py`, `app/routers/event_journal.py`, `app/templates/event_journal.html`, `app/static/js/event_journal.js`, `app/static/css/event_views.css` |
 | Події зі штатки | `docs/PERSON_EVENTS.md`, `app/routers/person_events.py`, `app/services/person_events.py`, `app/services/service_for_person_event.py`, `app/repositories/event_repository.py`, `app/templates/components/person_events.html`, `app/static/js/person_events.js` |
 | PostgreSQL, Alembic, конфігурація й засівання | `docs/POSTGRESQL_SETUP.md`, `app/database/settings.py`, `db.py`, `locking.py`, `postgresql.py`, `migrations/`, `app/services/seed_postgresql.py` |
@@ -104,6 +105,7 @@ flowchart LR
 | `reference_book.py` / `Position` | `positions` | Посада конкретного StaffVersion, унікальна пара staff_version_id/position_number; реквізити, системні UTC-поля, revision. Колекція persons містить історичні PersonAssignment. |
 | `staff.py` / `StaffStructure`, `StaffVersion` | `staff_structures`, `staff_versions` | Структура та її непересічні точні періоди; версія має власні Position. |
 | `staff.py` / `PersonAssignment` | `person_assignments` | Єдине джерело історичних і поточних призначень; person_id, staff_position_id, assigned_from/to, UTC-поля, revision. |
+| `accounts.py` / `User`, `UserSession`, `AccountAudit` | `users`, `user_sessions`, `account_audit` | Персональні Master/Admin/Editor/Viewer, сесії та append-only журнал змін облікових записів; ID/логін незмінні. |
 | `person_positions.py` / `PersonPosition` | Немає окремої таблиці | Deprecated alias PersonAssignment; друге джерело поточного стану не створюється. |
 | `name_cases.py` / `NameDictionary` | `name_dictionaries` | Три типи ПІБ, явна стать, нормалізований ключ, оригінальні сім форм, is_verified, UTC та revision. Унікальна трійка kind/sex/normalized_key. |
 | `name_cases.py` / `PersonNameCases` | `person_name_cases` | FK конкретного PersonName, частина ПІБ, знімок слова/статі, nullable форми, is_verified, UTC/revision. Видалення саме цього ПІБ каскадно видаляє його форми. |
@@ -422,7 +424,7 @@ PersonEventCorrection — окремий append-only журнал операці
 
 ## Аудит і логічне анулювання штатних призначень
 
-Поточний Alembic head — **0005_assignment_history**. `PersonAssignment` отримав nullable `annulled_at/annulment_reason/annulled_by`; `AssignmentAudit` у `models/assignment_audit.py` має FK на призначення/реального User, точний UTC та before/after. Це журнал операцій, не друга таблиця поточного стану. Адитивна міграція змінює predicates двох assignment EXCLUDE/guards, додає незмінюваність аудиту та захист анульованих реквізитів; старі дані не переписуються.
+Етап історії призначень додав ревізію **0005_assignment_history**; поточний head — **0006_account_management**. `PersonAssignment` отримав nullable `annulled_at/annulment_reason/annulled_by`; `AssignmentAudit` у `models/assignment_audit.py` має FK на призначення/реального User, точний UTC та before/after. Це журнал операцій, не друга таблиця поточного стану. Адитивна міграція змінює predicates двох assignment EXCLUDE/guards, додає незмінюваність аудиту та захист анульованих реквізитів; старі дані не переписуються.
 
 `StaffService` повторно використано для create/edit/orders/complete/transfer/annul/restore та закриття версії; аудит записується в тому самому write_unit (`services/assignment_audit.py`). `security.accounts.personal_actor` отримує тільки реальну cookie-сесію або NULL, без підміни службовим автором відкритого режиму. `mirage.convert` передає того самого автора; HTTP body його не визначає. Перевірка нового/зміненого офіційного початку централізована: сьогодні Europe/Kyiv + 1, без зміни старого майбутнього початку.
 
@@ -434,3 +436,12 @@ PersonEventCorrection — окремий append-only журнал операці
 `main.py` реєструє `application_access` як глобальну FastAPI-залежність усіх предметних роутерів. `security/application.py` визначає закриту за замовчуванням політику, вузький перелік public login, admin URL і безпечне повернення. `security/accounts.current_user` повторно використовує User/UserSession/accounts.authenticate, транспорт, CSRF і Origin; стан кешується тільки на request. `security/admin.py` вимагає персонального admin, прив’язує preview до реальної сесії. Нових моделей, ролей або міграцій немає.
 
 `login.html/login.js` — персональний вхід, `security_session.js` — same-origin CSRF для старих fetch, оновлення токена після повторного входу, повідомлення про закінчення сесії та logout. `templating.security_context` і приховані поля забезпечують також звичайні HTML POST без JS. Усі повні шаблони підключають спільний security component; імпортовані form-макроси отримують контекст. OpenAPI/Swagger/ReDoc захищені, предметні відповіді — no-store/Vary Cookie. Усі винятки, ролі та межі 1.1 — [SECURITY.md](SECURITY.md).
+
+
+## Security 1.2: керування обліковими записами
+
+`routers/account_management.py → services/accounts.py / account_management.py → AccountRepository → User/UserSession/AccountAudit`. Маршрути `/admin/users` охоплюють список/створення/картку/зміну/блокування/скидання/сесії/аудит; `/account/password` та `/auth/password` — власний пароль для всіх ролей. Jinja `admin/users`, `user_new`, `user_detail`, `account_audit`, `account_password` і `account_management.js` повторно використовують навігацію й security_session, без нової системи авторизації. DTO/знімки аудиту мають явний білий перелік полів.
+
+`account_policy.py` централізує Master > Admin, коди ролей/операцій та ознаку персонального облікового запису. Наявні document/medical/profile сервіси автоматично отримують ті самі права Master через authorize; document_ui також розпізнає Master. Admin не змінює Master. Єдиний Master — partial UNIQUE; мінімум один окремий активний персональний Admin перевіряють сервіс і guards, з явним перехідним винятком початкового підвищення. CLI `services/promote_master.py` вимагає ID, пароль та підтвердження, не змінює користувачів під час startup.
+
+`accounts.account_write` повторно використовує service_transaction: одна атомарна зміна User/сесій/аудиту; PostgreSQL advisory xact lock поточної схеми та блокування цільового рядка, SQLite BEGIN IMMEDIATE. Та сама синхронізація захищає login/logout від гонки з відкликанням сесій. AccountAudit append-only, FK на реального автора або NULL для bootstrap, дозволені before/after, точний UTC. Міграція **0006_account_management** після 0005 адитивна, без автоматичного Master, фальшивого аудиту чи зміни кадрових таблиць. Startup перевіряє нову схему; робочі БД автоматично не оновлюються. Контракти, CLI та ручна перевірка — [SECURITY.md](SECURITY.md#security-12--masteradmin-та-керування-користувачами).

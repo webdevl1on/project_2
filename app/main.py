@@ -77,3 +77,6 @@ def protected_docs(request: Request):
 def protected_redoc():
     from fastapi.openapi.docs import get_redoc_html
     return get_redoc_html(openapi_url='/openapi.json',title='project_2 API')
+
+from app.routers import account_management
+app.include_router(account_management.router)

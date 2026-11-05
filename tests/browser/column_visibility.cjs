@@ -81,7 +81,7 @@ async function main() {
             return rawPost(url,options);
         };
         await signIn();
-        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "events", "journal", "event_lifecycle", "event_corrections", "journal_snapshot", "history_forms", "assignment_history", "security", "name_cases", "geography", "contacts", "personnel", "service_bases", "documents", "workspace", "medical", "injury_vlk", "vlk_workflow"];
+        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "events", "journal", "event_lifecycle", "event_corrections", "journal_snapshot", "history_forms", "assignment_history", "security", "account_management", "name_cases", "geography", "contacts", "personnel", "service_bases", "documents", "workspace", "medical", "injury_vlk", "vlk_workflow"];
         if (process.env.COLUMN_STAGE) {
             assert.ok([...suites,'dev_auth','open_access','profile_dates','document_ui','document_workflow','additional_records'].includes(process.env.COLUMN_STAGE));
             await require(`./${process.env.COLUMN_STAGE}.cjs`)({ context, base, adminToken });

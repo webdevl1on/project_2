@@ -256,3 +256,18 @@ pg_restore -h 127.0.0.1 -p 55432 -U project2_ci -d project2_ci -W --no-owner --n
 ## Security 1.1
 
 Персональна автентифікація обов’язкова без залежності від значення старого PROJECT2_AUTH_ENABLED. Рекомендоване явне значення — 1. Production за відсутньої змінної теж захищений; явний 0 або старий dev bypass=1 відхиляються конфігурацією. Ніяких автоматичних користувачів, reset чи міграцій цей етап не виконує. HTTPS залишається обов’язковим для LAN/зовнішніх адрес; PROJECT2_AUTH_ALLOW_LOCAL_HTTP=1 дозволяє тільки прямий loopback з персональним паролем/CSRF. Повний опис та Windows-перевірка — [SECURITY.md](SECURITY.md).
+
+
+## Security 1.2 — оновлення до 0006_account_management
+
+Поточний head — `0006_account_management` після `0005_assignment_history`. Адитивна міграція розширює CHECK `users.role` значенням master, додає partial UNIQUE `one_master`, CHECK активного персонального Master, таблицю account_audit/FK/index/check та append-only/account-policy triggers. Старі користувачі, хеші, ID, ролі й сесії зберігаються. Жоден користувач не підвищується автоматично; минулий аудит не вигадується. Guards відхиляють зміну ID/логіна, видалення User, демоцію/вимкнення Master та втрату останнього активного персонального Admin. Advisory lock має спільний із сервісом ключ поточної схеми.
+
+Після перевірки конфігурації цільової development БД, backup звичайним pg_dump і перевірки можливості відновлення виконайте вручну з кореня репозиторію:
+
+```powershell
+python -m alembic current
+python -m alembic upgrade head
+python -c "from app.database.db import engine; from app.database.schema_check import require_current_schema; require_current_schema(engine); print('Schema OK')"
+```
+
+Startup схему не мігрує; reset або metadata.create_all для оновлення PostgreSQL не потрібні. Ці команди не запускалися на project2_dev/project2_prod в межах реалізації. Випробування міграції/конкурентності виконуються тільки у випадкових ізольованих схемах project2_ci. Downgrade заборонений через втрату аудиту/захисту Master; повернення — перевірений backup в окремій БД. Подальше явне призначення вже наявного Admin як Master — [SECURITY.md](SECURITY.md#явне-призначення-наявного-admin-як-master), без створення нового облікового запису.

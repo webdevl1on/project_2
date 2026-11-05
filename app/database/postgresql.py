@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 from sqlalchemy import inspect,text
 
-REVISION='0005_assignment_history'
+REVISION='0006_account_management'
 
 
 def require_postgresql_schema(engine):
@@ -19,8 +19,8 @@ def require_postgresql_schema(engine):
         missing.extend(table.name+'.'+c.name for c in table.columns if c.name not in actual)
     root=Path(__file__).resolve().parents[2]/'migrations/sql'
     guard_sql=(root/'initial_guards.sql').read_text()
-    expected_triggers=set(re.findall(r'CREATE TRIGGER (\w+)',guard_sql)) | {'assignment_audit_no_update','assignment_audit_no_delete','assignment_annulled_guard','event_correction_no_update','event_correction_no_delete','person_event_no_delete','person_event_annulled_immutable'}
-    expected_constraints=set(re.findall(r'ALTER TABLE (\w+) ADD CONSTRAINT (\w+)',guard_sql)) | {('person_assignments','assignment_annulment_reason'),('assignment_audit','assignment_audit_operation')}
+    expected_triggers=set(re.findall(r'CREATE TRIGGER (\w+)',guard_sql)) | {'account_audit_no_update','account_audit_no_delete','users_no_insert_master','users_policy_update','users_no_delete','assignment_audit_no_update','assignment_audit_no_delete','assignment_annulled_guard','event_correction_no_update','event_correction_no_delete','person_event_no_delete','person_event_annulled_immutable'}
+    expected_constraints=set(re.findall(r'ALTER TABLE (\w+) ADD CONSTRAINT (\w+)',guard_sql)) | {('users','users_role_allowed'),('users','master_personal_active'),('account_audit','account_audit_operation'),('person_assignments','assignment_annulment_reason'),('assignment_audit','assignment_audit_operation')}
     with engine.connect() as db:
         if set(db.scalars(text('SELECT version_num FROM alembic_version')))!={REVISION}:missing.append('Alembic revision')
         triggers=set(db.scalars(text("SELECT t.tgname FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=current_schema() AND NOT t.tgisinternal AND t.tgenabled!='D'")))
@@ -30,6 +30,9 @@ def require_postgresql_schema(engine):
         for name in ('person_period_exclusion','position_period_exclusion'):
             predicate=db.scalar(text("SELECT pg_get_expr(i.indpred,i.indrelid) FROM pg_constraint k JOIN pg_index i ON i.indexrelid=k.conindid JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=current_schema() AND c.relname='person_assignments' AND k.conname=:name"),{'name':name})
             if not predicate or 'annulled_at IS NULL' not in predicate:missing.append('active-only exclusion:'+name)
+        master_index=db.execute(text("SELECT i.indisunique,pg_get_expr(i.indpred,i.indrelid) FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=current_schema() AND c.relname='one_master'")).first()
+        if not master_index or not master_index[0] or 'master' not in (master_index[1] or ''):
+            missing.append('unique Master index:one_master')
         functions=set(db.scalars(text('SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname=current_schema()')))
         missing.extend('function:'+name for name in {'project2_components','project2_strip','project2_norm','project2_typed','unicode_contains','formatted_address','project2_date_match'}-functions)
         for table in Base.metadata.sorted_tables:

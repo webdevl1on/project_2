@@ -80,6 +80,18 @@ def reset_fixture():
     return {"ok":True}
 
 
+@app.post('/_column-test/account-master')
+def account_master_fixture():
+    # Synthetic, test-server-only equivalent of the explicit CLI promotion.
+    from sqlalchemy import select
+    from app.models import User
+    from app.services import accounts
+    with Session() as db:
+        user=db.scalar(select(User).where(User.username=='browser-admin'))
+        accounts.promote_master(db,user.id,os.environ['PROJECT2_ADMIN_TOKEN'],confirmed=True)
+        return {'id':user.id}
+
+
 def memory_db():
     with Session() as db:
         yield db

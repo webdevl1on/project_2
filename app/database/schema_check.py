@@ -34,7 +34,7 @@ def require_current_schema(engine):
         missing.append("застаріла фізична person_positions — підготуйте нову БД без другого джерела призначень")
     if engine.dialect.name == "sqlite" and not missing:
         from sqlalchemy import text
-        required = required_sqlite_triggers() | {"assignment_audit_no_update", "assignment_audit_no_delete", "assignment_annulled_guard", "exact_assignment_orders_insert","exact_assignment_orders_update", 'exact_service_basis_insert', 'exact_service_basis_update'}
+        required = required_sqlite_triggers() | {'account_audit_no_update','account_audit_no_delete','users_no_delete','users_no_insert_master','users_policy_update', "assignment_audit_no_update", "assignment_audit_no_delete", "assignment_annulled_guard", "exact_assignment_orders_insert","exact_assignment_orders_update", 'exact_service_basis_insert', 'exact_service_basis_update'}
         from app.models.documents import GUARD_NAMES
         required |= GUARD_NAMES
         from app.models.medical import GUARDS
