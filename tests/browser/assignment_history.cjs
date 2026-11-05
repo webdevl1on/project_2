@@ -16,9 +16,9 @@ module.exports=async({context,base,adminToken})=>{
   await scenario('all positions including vacancy start collapsed; number/full-name search stays in URL',async()=>{
    assert.equal(await page.locator('[data-position-id]').count(),3);assert.equal(await page.locator('[data-position-id][open]').count(),0);
    assert.equal(await page.locator('[data-person-picker]').count(),1);
-   await page.locator('input[type=search][name=q]').fill('30');await page.getByRole('button',{name:'Показати',exact:true}).click();assert.equal(await page.locator('[data-position-id]').count(),1);assert.match(page.url(),/q=30/);
+   await page.locator('input[type=search][name=q]').fill('30');await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Показати',exact:true}).click()]);assert.equal(await page.locator('[data-position-id]').count(),1);assert.match(page.url(),/q=30/);
    await page.reload();assert.equal(await page.locator('input[type=search][name=q]').inputValue(),'30');
-   await page.locator('input[type=search][name=q]').fill('БЕЗПІЛОТНИХ');await page.getByRole('button',{name:'Показати',exact:true}).click();assert.equal(await page.locator('[data-position-id]').count(),1);
+   await page.locator('input[type=search][name=q]').fill('БЕЗПІЛОТНИХ');await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Показати',exact:true}).click()]);assert.equal(await page.locator('[data-position-id]').count(),1);
    await page.goto(base+'/staff/history');
   });
   let archived,current;
@@ -60,11 +60,11 @@ module.exports=async({context,base,adminToken})=>{
   await scenario('restore conflict keeps open form and current occupant; history shows operations and real field differences',async()=>{
    await position(3).locator('[data-annulled-group] > summary').click();await changeState(current,'restore');await state.locator('[type=submit]').click();await state.locator('[data-history-form-error]').filter({hasText:'перетинаються'}).waitFor();assert.equal(await state.isVisible(),true);
    await state.locator('[data-bs-dismiss=modal]').click();await state.waitFor({state:'hidden'});
-   await page.locator(`[data-history-audit="${current}"]`).click();const audit=page.locator('#history-audit');await audit.waitFor({state:'visible'});await audit.locator('table').first().waitFor();assert.match(await audit.innerText(),/Автор невідомий/);assert.match(await audit.innerText(),/Відновлення/);assert.match(await audit.innerText(),/Анулювання/);assert.match(await audit.innerText(),/01.06.2026/);
+   await page.locator(`[data-history-audit="${current}"]`).click();const audit=page.locator('#history-audit');await audit.waitFor({state:'visible'});await audit.locator('table').first().waitFor();assert.match(await audit.innerText(),/Браузерний тестовий адміністратор/);assert.match(await audit.innerText(),/Відновлення/);assert.match(await audit.innerText(),/Анулювання/);assert.match(await audit.innerText(),/01.06.2026/);
    await audit.locator('[data-bs-dismiss=modal]').click();await audit.waitFor({state:'hidden'});
   });
   await scenario('version selection refreshes the complete list without leaking positions from another version',async()=>{
-   await context.request.post(base+'/admin/login',{form:{token:adminToken}});
+   await context.request.post(base+'/auth/login',{data:{username:'browser-admin',password:adminToken}});
    await page.goto(base+'/admin/staff');await page.getByRole('button',{name:'Завантажити штатну структуру',exact:true}).click();
    const importer=page.locator('#staff-import-modal');
    await importer.locator('[name=file]').setInputFiles(require('node:path').resolve(__dirname,'../../reference_data.xlsx'));

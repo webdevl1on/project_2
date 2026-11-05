@@ -14,6 +14,9 @@ class AccountRepository:
     def count(db): return db.scalar(select(func.count()).select_from(User))
 
     @staticmethod
+    def bootstrap_accounts(db): return list(db.scalars(select(User)))
+
+    @staticmethod
     def session(db, digest): return db.get(UserSession, digest)
 
     @staticmethod

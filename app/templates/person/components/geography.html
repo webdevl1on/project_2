@@ -1,4 +1,4 @@
-{% from "components/geography_type.html" import type_input %}
+{% from "components/geography_type.html" import type_input with context %}
 {% for block, record in geo_blocks.items() %}
 {% if block != 'correspondence' %}
 <section class="card mb-3" data-geo-block="{{ block }}">
@@ -12,7 +12,7 @@
 {% if record %}<p>Перевірка: {{ {'matched':'Підтверджено довідником','mismatch':'Є невідповідність','unknown':'Не підтверджено'}[record.validation_status] }}</p>{% endif %}
 <details {% if geo_edit_block == block %}open{% endif %}><summary>Редагувати</summary>
 {% set draft = geo_draft if geo_edit_block == block and geo_draft else record %}
-<form data-geo-form data-geo-meaningful="{{ (birth_components if block == 'birthplace' else address_components)|join(',') }}" data-geo-empty-message="{{ empty_geo_messages['birthplace' if block == 'birthplace' else 'address'] }}" data-block="{{ block }}" method="post" action="/persons/{{ person_id }}/geography/{{ block }}">
+<form data-geo-form data-geo-meaningful="{{ (birth_components if block == 'birthplace' else address_components)|join(',') }}" data-geo-empty-message="{{ empty_geo_messages['birthplace' if block == 'birthplace' else 'address'] }}" data-block="{{ block }}" method="post" action="/persons/{{ person_id }}/geography/{{ block }}"><input type="hidden" name="csrf" value="{{ security_csrf|default('') }}">
 <input type="hidden" name="record_id" value="{{ draft.record_id if geo_draft and geo_edit_block == block else record.id if record else '' }}">
 <input type="hidden" name="revision" value="{{ draft.revision if draft else '' }}">
 <div class="row g-2">

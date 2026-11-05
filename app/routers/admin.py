@@ -1,13 +1,11 @@
 """Protected dictionary administration; business and SQL live below HTTP."""
-import hmac
 from urllib.parse import urlencode
 from fastapi import APIRouter, Request, Depends, Form, File, UploadFile, HTTPException
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 from app.database.db import get_db
 from app.name_cases import CASES, NAME_PARTS, SEXES, IMPORT_HEADERS
-from app.security.admin import (require_admin, configured_token, check_transport, new_session,
-                                csrf_token, check_csrf, dev_admin_open, COOKIE, TTL)
+from app.security.admin import require_admin, csrf_token, check_csrf
 from app.services import name_cases, name_dictionary_import, dictionary_previews
 from app.templating import templates
 
@@ -20,40 +18,23 @@ def render(request, name, owner=None, status=200, **context):
         "sexes": SEXES, "csrf": csrf_token(owner) if owner else "", **context})
 
 
-@router.get("/login")
+@router.get('/login')
 def login_page(request: Request):
-    if dev_admin_open(request):
-        return RedirectResponse("/admin", 303)
-    if configured_token():
-        check_transport(request)
-    return render(request, "admin/login.html", enabled=bool(configured_token()))
+    return RedirectResponse('/admin',303)
 
 
-@router.post("/login")
-def login(request: Request, token: str = Form("")):
-    if dev_admin_open(request):
-        return RedirectResponse("/admin", 303)
-    expected = configured_token()
-    if expected is None:
-        raise HTTPException(503, "Адміністрування вимкнено.")
-    check_transport(request)
-    origin = request.headers.get("origin")
-    if origin and origin.rstrip("/") != str(request.base_url).rstrip("/"):
-        raise HTTPException(403, "Вхід дозволено лише з цієї сторінки.")
-    if not hmac.compare_digest(token.encode(), expected.encode()):
-        return render(request, "admin/login.html", status=401, enabled=True, error="Неправильний адміністративний токен.")
-    response = RedirectResponse("/admin", 303)
-    response.set_cookie(COOKIE, new_session(), max_age=TTL, httponly=True,
-                        secure=request.url.scheme == "https", samesite="strict", path="/admin")
-    response.headers["Cache-Control"] = "no-store"
-    return response
+@router.post('/login')
+def login(request: Request):
+    raise HTTPException(403,'Спільний адміністративний токен більше не надає доступу. Використайте персональний вхід.')
 
 
-@router.post("/logout")
-def logout(csrf: str = Form(""), owner: str = Depends(require_admin)):
-    check_csrf(owner, csrf)
-    response = RedirectResponse("/admin/login", 303)
-    response.delete_cookie(COOKIE, path="/admin")
+@router.post('/logout')
+def logout(request: Request, db:Session=Depends(get_db)):
+    from app.services import accounts
+    from app.security.accounts import COOKIE
+    accounts.logout(db,request.cookies[COOKIE])
+    response=RedirectResponse('/auth/login?return_to=/admin',303)
+    response.delete_cookie(COOKIE,path='/')
     return response
 
 

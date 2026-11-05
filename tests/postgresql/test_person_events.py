@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from datetime import date
 import pytest
-from fastapi.testclient import TestClient
+from tests.http_auth import AuthenticatedClient as TestClient
 from sqlalchemy import select, func, event
 from app.models import Person, PersonEvent, EventType, EventSubtype, Position, StaffVersion, PersonAssignment, PersonServiceHistory
 from app.database.db import get_db

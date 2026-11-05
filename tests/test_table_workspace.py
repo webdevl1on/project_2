@@ -14,7 +14,9 @@ def test_people_configuration_is_independent_and_reuses_catalog_labels():
 
 
 def test_people_page_has_shared_controls_empty_table_and_real_navigation(client):
-    browser,_=client
+    browser,secret=client
+    from tests.test_name_cases import login
+    browser.headers['X-CSRF-Token']=login(browser,secret)
     page=browser.get('/persons?sort_by=birth_year&direction=desc')
     assert page.status_code==200
     assert 'id="persons" data-column-table' in page.text

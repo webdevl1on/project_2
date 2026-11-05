@@ -97,7 +97,8 @@ def test_official_start_bound_service_and_http(data,offset):
         def override():yield db
         app.dependency_overrides[get_db]=override
         try:
-            with TestClient(app) as client:
+            from tests.http_auth import AuthenticatedClient
+            with AuthenticatedClient(app) as client:
                 result=client.post('/staff/assignments/create',data={'person_id':people[0].person_id,'position_id':positions[1].position_id,'assigned_from':start.isoformat()},headers={'Accept':'application/json'})
                 assert result.status_code==409 and 'завтра' in result.json()['detail']
         finally:app.dependency_overrides.clear()
@@ -192,26 +193,27 @@ def test_two_personal_authors_body_spoof_ignored_and_anonymous_null(data):
     db,_,_,positions,people=data
     a=accounts.create_user(db,'author_a','Автор А','synthetic-password','admin')
     b=accounts.create_user(db,'author_b','Автор Б','synthetic-password','editor',actor_id=a)
-    token_a,_=accounts.login(db,'author_a','synthetic-password');token_b,_=accounts.login(db,'author_b','synthetic-password')
+    token_a,csrf_a=accounts.login(db,'author_a','synthetic-password');token_b,csrf_b=accounts.login(db,'author_b','synthetic-password')
     def override():yield db
     app.dependency_overrides[get_db]=override
     try:
-        with TestClient(app) as client:
-            client.cookies.set('project2_user',token_a)
+        with TestClient(app,base_url='https://testserver') as client:
+            client.cookies.set('project2_user',token_a);client.headers['X-CSRF-Token']=csrf_a
             result=client.post('/staff/assignments/create',data={'person_id':people[0].person_id,'position_id':positions[1].position_id,'assigned_from':'2026-06-01','actor_user_id':b},follow_redirects=False)
             assert result.status_code==303
             record=db.query(PersonAssignment).one();key=record.id
-            client.cookies.set('project2_user',token_b)
+            client.cookies.clear();client.cookies.set('project2_user',token_b);client.headers['X-CSRF-Token']=csrf_b
             result=client.post(f'/personnel/assignments/{key}/orders',data={'revision':record.revision,'assignment_order_number':'125','actor_user_id':a})
             assert result.status_code==200
             client.cookies.clear()
             result=client.post(f'/personnel/assignments/{key}/orders',data={'revision':record.revision,'assignment_order_number':'125/1','actor_user_id':a})
-            assert result.status_code==200
+            assert result.status_code==401
             audits=db.query(AssignmentAudit).order_by(AssignmentAudit.id).all()
-            assert [x.actor_user_id for x in audits]==[a,b,None]
-            assert audits[2].before['assignment_order_number']=='125'
+            assert [x.actor_user_id for x in audits]==[a,b]
+            assert audits[1].after['assignment_order_number']=='125'
+            client.cookies.set('project2_user',token_a)
             view=client.get(f'/staff/assignments/{key}/audit')
-            assert 'Автор А' in view.text and 'Автор Б' in view.text and 'Автор невідомий' in view.text
+            assert 'Автор А' in view.text and 'Автор Б' in view.text and 'Автор невідомий' not in view.text
             assert '01.06.2026' in view.text
             page=html.fromstring(client.get('/staff/history').text)
             assert len(page.xpath('//*[@data-person-picker]'))==1

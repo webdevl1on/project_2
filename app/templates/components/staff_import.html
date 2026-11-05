@@ -1,7 +1,7 @@
 <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#staff-import-modal">Завантажити штатну структуру</button>
 <div class="modal fade" id="staff-import-modal" tabindex="-1" aria-labelledby="staff-import-title" aria-hidden="true">
 <div class="modal-dialog"><div class="modal-content">
-<form method="post" action="/staff/import/preview" enctype="multipart/form-data">
+<form method="post" action="/staff/import/preview" enctype="multipart/form-data"><input type="hidden" name="csrf" value="{{ security_csrf|default('') }}">
 <div class="modal-header"><h2 class="modal-title fs-5" id="staff-import-title">Завантажити штатну структуру</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрити"></button></div>
 <div class="modal-body">
 <label class="form-label d-block">Структура<select name="structure_id" class="form-select">

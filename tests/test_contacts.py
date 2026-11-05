@@ -98,7 +98,9 @@ def test_profile_is_unambiguous_and_does_not_invent_service(factory):
 
 
 def test_http_errors_and_fragment_contract(client,factory):
-    browser,_=client
+    browser,secret=client
+    from tests.test_name_cases import login
+    browser.headers['X-CSRF-Token']=login(browser,secret)
     with factory() as db:pid=person(db)
     error=browser.post(f'/persons/{pid}/contacts',data={'contact_type':'email','value':'broken','label':'Чернетка'})
     assert error.status_code==400 and error.json()['field']=='value'

@@ -2,7 +2,7 @@
 from datetime import date
 import pytest
 from sqlalchemy import select, func, event
-from fastapi.testclient import TestClient
+from tests.http_auth import AuthenticatedClient as TestClient
 from app.models import Person, PersonEvent, EventType, EventSubtype
 from app.models.medical import PersonnelTask
 from app.services import person_events as editor, event_views, event_rules, service_for_person_event as core

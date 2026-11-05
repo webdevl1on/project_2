@@ -39,7 +39,7 @@
     function open(row){if(opened&&opened!==row)collapse(opened);editor(row).hidden=false;row.classList.add('assignment-editing');button(row).setAttribute('aria-expanded','true');opened=row;}
     table.querySelectorAll('[data-assignment-editor]').forEach(node=>{
         const row=node.closest('tr'),snapshots=new Map();
-        const values=form=>JSON.stringify([...new FormData(form)].filter(([key])=>key!=='token'));
+        const values=form=>JSON.stringify([...new FormData(form)].filter(([key])=>!['token','csrf'].includes(key)));
         node.querySelectorAll('form').forEach(form=>snapshots.set(form,values(form)));
         const dirty=()=>{const changed=[...snapshots].some(([form,value])=>values(form)!==value);row.dataset.assignmentDirty=String(changed);row.querySelector('[data-assignment-draft]').hidden=!changed;};
         for(const event of ['input','change','personpicked'])node.addEventListener(event,dirty);
@@ -50,7 +50,7 @@
                 form.reset();const original=new Map(JSON.parse(snapshots.get(form)));
                 // Hidden inputs reflect .value into their defaultValue, unlike text/date inputs.
                 // Restore their original snapshot explicitly (and discard prepared tokens).
-                [...form.elements].filter(input=>input.type==='hidden').forEach(input=>input.value=original.get(input.name)||'');
+                [...form.elements].filter(input=>input.type==='hidden'&&input.name!=='csrf').forEach(input=>input.value=original.get(input.name)||'');
             });
             node.querySelectorAll('[data-assignment-status],[data-personnel-message]').forEach(status=>status.textContent='');
             queueMicrotask(()=>{dirty();collapse(row);opened=null;});

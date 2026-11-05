@@ -1,6 +1,6 @@
 {% macro basis_form(record=none) %}
 {% set prefix='basis-' ~ (record.id if record else 'new') %}
-<form data-personnel-form data-service-basis-form method="post" action="/persons/{{ person_id }}/service-bases{{ '/' ~ record.id if record else '' }}">
+<form data-personnel-form data-service-basis-form method="post" action="/persons/{{ person_id }}/service-bases{{ '/' ~ record.id if record else '' }}"><input type="hidden" name="csrf" value="{{ security_csrf|default('') }}">
 {% if record %}<input type="hidden" name="revision" value="{{ record.revision }}">{% endif %}
 <label class="form-label" for="{{ prefix }}-type">Вид служби</label>
 <select id="{{ prefix }}-type" name="service_type" class="form-select" required><option value="">Оберіть вид служби</option>{% for key,label in service_basis_types.items() %}<option value="{{ key }}" {{ 'selected' if record and record.service_type==key else '' }}>{{ label }}</option>{% endfor %}</select>

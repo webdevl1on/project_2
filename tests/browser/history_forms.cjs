@@ -46,7 +46,7 @@ module.exports=async({context,base,adminToken})=>{
             await form.locator('[data-history-form-error]').filter({hasText:'змінився'}).waitFor();
             assert.deepEqual(await values(form),draft);assert.equal(await section.isVisible(),true);assert.equal(navigations,0);
         });
-        await context.request.post(base+'/admin/login',{form:{token:adminToken}});await page.goto(base+'/admin/staff');navigations=0;
+        await context.request.post(base+'/auth/login',{data:{username:'browser-admin',password:adminToken}});await page.goto(base+'/admin/staff');navigations=0;
         await scenario('position and version refusals retain drafts; successful correction updates data',async()=>{
             const version=page.locator('form[action$="/correct"]').filter({has:page.locator('[name="valid_from"]')});
             await version.locator('..').locator(':scope > summary').click();

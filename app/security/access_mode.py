@@ -1,6 +1,5 @@
-"""Temporary product-wide access switch; existing security remains available."""
-import os
+"""Personal authentication is mandatory; historical switches cannot disable it."""
 
 
 def open_access():
-    return os.environ.get('PROJECT2_AUTH_ENABLED','0') != '1'
+    return False

@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, Request
+from app.security.application import application_access
 from fastapi.staticfiles import StaticFiles
 
 from app.config import BASE_DIR
@@ -10,7 +11,7 @@ from app.routers import person_positions
 
 
 from app.database.maintenance import application_lifespan
-app = FastAPI(lifespan=application_lifespan)
+app = FastAPI(lifespan=application_lifespan, dependencies=[Depends(application_access)], docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 app.include_router(persons.router)
@@ -45,3 +46,34 @@ from app.routers import person_events
 app.include_router(person_events.router)
 from app.routers import event_journal
 app.include_router(event_journal.router)
+
+
+@app.middleware('http')
+async def private_responses(request: Request, call_next):
+    response=await call_next(request)
+    if not request.url.path.startswith('/static/'):
+        if 'no-store' not in response.headers.get('Cache-Control','').lower():response.headers['Cache-Control']='no-store'
+        vary={value.strip() for value in response.headers.get('Vary','').split(',') if value.strip()}
+        vary.add('Cookie');response.headers['Vary']=', '.join(sorted(vary))
+    return response
+
+
+@app.get('/openapi.json', include_in_schema=False)
+def protected_openapi():
+    return app.openapi()
+
+
+@app.get('/docs', include_in_schema=False)
+def protected_docs(request: Request):
+    from fastapi.openapi.docs import get_swagger_ui_html
+    from fastapi.responses import HTMLResponse
+    from html import escape
+    html=get_swagger_ui_html(openapi_url='/openapi.json',title='project_2 API').body.decode()
+    extra=f'<meta name="project2-csrf" content="{escape(request.state.csrf_token)}"><script src="/static/js/security_session.js"></script>'
+    return HTMLResponse(html.replace('</head>',extra+'</head>'))
+
+
+@app.get('/redoc', include_in_schema=False)
+def protected_redoc():
+    from fastapi.openapi.docs import get_redoc_html
+    return get_redoc_html(openapi_url='/openapi.json',title='project_2 API')

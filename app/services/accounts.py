@@ -39,7 +39,7 @@ def authorize(db, user_id, roles=('admin', 'editor', 'viewer')):
     return user
 
 
-def create_user(db, username, display_name, password, role='viewer', *, actor_id=None):
+def create_user(db, username, display_name, password, role='viewer', *, actor_id=None, allow_legacy_bootstrap=False):
     if not isinstance(username,str) or not isinstance(display_name,str): raise ValueError('Логін та ім’я повинні бути текстом.')
     username = (username or '').strip().casefold()
     if not re.fullmatch(r'[a-z0-9_.-]{3,100}', username):
@@ -49,7 +49,15 @@ def create_user(db, username, display_name, password, role='viewer', *, actor_id
     encoded = password_hash(password)
     with service_transaction(db, immediate=True):
         if actor_id is None:
-            if Repo.count(db) or role != 'admin': raise PermissionError('Початкове створення дозволено тільки для першого адміністратора.')
+            existing=Repo.bootstrap_accounts(db)
+            # CLI-only opt-in: preserve the exact legacy technical identities.
+            def technical(user):
+                known={'project2-open-access':('admin','Спільний автор — авторизацію вимкнено','open-access-only$'),
+                       'project2-dev-local':('editor','Локальна розробка (тестовий автор)','dev-only$')}
+                expected=known.get(user.username)
+                return expected and (user.role,user.display_name)==expected[:2] and user.password_hash.startswith(expected[2])
+            if role!='admin' or (existing and not (allow_legacy_bootstrap and all(technical(user) for user in existing))):
+                raise PermissionError('Початкове створення дозволено тільки для першого персонального адміністратора. Для незмінених технічних записів є явний CLI-параметр --allow-legacy-technical-accounts.')
         else: authorize(db, actor_id, ('admin',))
         if Repo.by_name(db, username): raise ValueError('Логін уже зайнятий.')
         user = Repo.add(db, User(username=username, display_name=display_name.strip(), password_hash=encoded, role=role))

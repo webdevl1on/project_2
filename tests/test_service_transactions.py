@@ -1,6 +1,6 @@
 """Real SQLite regression coverage for service ownership and composition."""
 import pytest
-from fastapi.testclient import TestClient
+from tests.http_auth import AuthenticatedClient as TestClient
 from sqlalchemy import create_engine, select, func, event
 from sqlalchemy.orm import sessionmaker
 

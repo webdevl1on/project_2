@@ -1,4 +1,4 @@
-{% from 'components/value_filter.html' import value_filter %}
+{% from 'components/value_filter.html' import value_filter with context %}
 {% macro journal_header(column,journal) %}
 {% set key=column.key %}
 {% set filter_key=column.get('filter_key') %}

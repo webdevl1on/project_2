@@ -214,7 +214,9 @@ def test_order_dates_reject_partial_values_in_raw_sql(store):
 
 
 def test_cross_page_http_orders_mutate_the_original_assignment(client,factory):
-    browser,_=client
+    browser,secret=client
+    from tests.test_name_cases import login
+    browser.headers['X-CSRF-Token']=login(browser,secret)
     with factory() as db:
         _,versions,positions,people=setup(db)
         pid=people[0].person_id;version=versions[1].id

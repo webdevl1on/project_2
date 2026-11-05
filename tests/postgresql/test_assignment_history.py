@@ -102,26 +102,27 @@ def test_postgresql_two_real_cookie_authors_and_unknown_actor(pg_factory,monkeyp
         pid,pos=people[0].person_id,positions[1].position_id
         a=accounts.create_user(db,'author_one','Автор один','synthetic-password','admin')
         b=accounts.create_user(db,'author_two','Автор два','synthetic-password','editor',actor_id=a)
-        first,_=accounts.login(db,'author_one','synthetic-password');second,_=accounts.login(db,'author_two','synthetic-password')
+        first,csrf_a=accounts.login(db,'author_one','synthetic-password');second,csrf_b=accounts.login(db,'author_two','synthetic-password')
     def override():
         with pg_factory() as db:yield db
     app.dependency_overrides[get_db]=override
     try:
-        with TestClient(app) as client:
-            client.cookies.set('project2_user',first)
+        with TestClient(app,base_url='https://testserver') as client:
+            client.cookies.set('project2_user',first);client.headers['X-CSRF-Token']=csrf_a
             result=client.post('/staff/assignments/create',data={'person_id':pid,'position_id':pos,'assigned_from':'2026-06-01','actor_user_id':b},follow_redirects=False)
             assert result.status_code==303
             with pg_factory() as db:row=db.scalar(select(PersonAssignment));key,rev=row.id,row.revision
-            client.cookies.set('project2_user',second)
+            client.cookies.clear();client.cookies.set('project2_user',second);client.headers['X-CSRF-Token']=csrf_b
             assert client.post(f'/personnel/assignments/{key}/orders',data={'revision':rev,'assignment_order_number':'125','actor_user_id':a}).status_code==200
             with pg_factory() as db:rev=db.get(PersonAssignment,key).revision
             client.cookies.clear()
-            assert client.post(f'/personnel/assignments/{key}/orders',data={'revision':rev,'assignment_order_number':'125/1','actor_user_id':a}).status_code==200
+            assert client.post(f'/personnel/assignments/{key}/orders',data={'revision':rev,'assignment_order_number':'125/1','actor_user_id':a}).status_code==401
+            client.cookies.set('project2_user',first)
             content=client.get(f'/staff/assignments/{key}/audit').text
-            assert all(name in content for name in ['Автор один','Автор два','Автор невідомий'])
+            assert all(name in content for name in ['Автор один','Автор два'])
     finally:app.dependency_overrides.clear()
     with pg_factory() as db:
-        assert [r.actor_user_id for r in db.scalars(select(AssignmentAudit).order_by(AssignmentAudit.id))]==[a,b,None]
+        assert [r.actor_user_id for r in db.scalars(select(AssignmentAudit).order_by(AssignmentAudit.id))]==[a,b]
 
 
 def test_postgresql_official_future_boundary_and_unlimited_order_dates(pg_factory,monkeypatch):

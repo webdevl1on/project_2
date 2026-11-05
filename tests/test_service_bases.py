@@ -131,7 +131,9 @@ def test_failed_save_rolls_back_archiving_previous_current(factory):
 def test_storage_refusal_returns_error_without_losing_current_basis(client, factory, monkeypatch):
     from sqlalchemy.exc import OperationalError
     from app.repositories.service_basis_repository import ServiceBasisRepository
-    browser, _ = client
+    browser, secret = client
+    from tests.test_name_cases import login
+    browser.headers['X-CSRF-Token']=login(browser,secret)
     with factory() as db:
         pid = person(db); key = bases.save(db, pid, {'service_type': 'mobilization', 'is_current': 'on'})
     def refuse(*args): raise OperationalError('synthetic', {}, Exception('refused'))
@@ -230,7 +232,8 @@ def test_http_admin_protection_csrf_preview_confirm_and_profile(client, factory)
         assert browser.get(path, follow_redirects=False).status_code == 401
     assert browser.post('/admin/tcc/import/preview', files={'file': ('tcc.xlsx', workbook([office()]))}).status_code == 401
     assert browser.post('/admin/tcc/new', data=office()).status_code == 401
-    browser.post('/admin/login', data={'token': secret})
+    from tests.test_name_cases import login
+    login(browser,secret)
     from lxml import html
     csrf = html.fromstring(browser.get('/admin').text).xpath('//input[@name="csrf"]/@value')[0]
     assert browser.post('/admin/tcc/new', data=office()).status_code == 403
@@ -243,6 +246,7 @@ def test_http_admin_protection_csrf_preview_confirm_and_profile(client, factory)
         pid = person(db)
         db.add(PersonServiceHistory(person_id=pid, service_type='contract', is_active=True)); db.commit()
     assert 'Вид служби: Не зазначено' in browser.get(f'/person_full_info/{pid}').text
+    browser.headers['X-CSRF-Token']=csrf
     response = browser.post(f'/persons/{pid}/service-bases', data={'service_type': 'contract', 'is_current': 'on', 'contract_start_date': '2025-03'})
     assert response.status_code == 409 and 'повна календарна' in response.json()['detail']
     assert browser.post(f'/persons/{pid}/service-bases', data={'service_type': 'contract', 'is_current': 'on'}).status_code == 200

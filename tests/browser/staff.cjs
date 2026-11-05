@@ -58,7 +58,7 @@ module.exports=async({context,base,adminToken})=>{
             await page.getByRole('link',{name:'Історія штату',exact:true}).click();
             assert.ok((await page.locator('body').innerText()).includes('Історичні призначення'));
             assert.equal(await page.locator('[data-history-edit]').count(),4);
-            await context.request.post(base+'/admin/login',{form:{token:adminToken}});await page.goto(base+'/admin/staff');
+            await context.request.post(base+'/auth/login',{data:{username:'browser-admin',password:adminToken}});await page.goto(base+'/admin/staff');
             const section=page.locator('details').filter({has:page.locator('summary',{hasText:'Явно закрити'})});
             await section.locator('summary').click();
             const today=await page.evaluate(()=>new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Kyiv'}));
@@ -70,7 +70,7 @@ module.exports=async({context,base,adminToken})=>{
         await scenario('Excel upload previews only positions, confirmation imports a vacant version; replay conflicts',async()=>{
             await page.goto(base+'/person-positions');
             assert.equal(await page.locator('#staff-import-modal').count(),0);
-            await context.request.post(base+'/admin/login',{form:{token:adminToken}});await page.goto(base+'/admin/staff');
+            await context.request.post(base+'/auth/login',{data:{username:'browser-admin',password:adminToken}});await page.goto(base+'/admin/staff');
             await page.getByRole('button',{name:'Завантажити штатну структуру',exact:true}).click();
             const modal=page.locator('#staff-import-modal');
             await modal.locator('[name=current]').check();assert.equal(await modal.locator('[name=valid_to]').isDisabled(),true);await modal.locator('[name=current]').uncheck();assert.equal(await modal.locator('[name=valid_to]').isDisabled(),false);
@@ -84,6 +84,7 @@ module.exports=async({context,base,adminToken})=>{
             const token=await page.locator('[name="token"]').inputValue();
             await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Підтвердити завантаження'}).click()]);
             assert.equal(new URL(page.url()).pathname,'/admin/staff');await page.getByRole('link',{name:'Відкрити штатку',exact:true}).click();
+            await table.locator('tbody tr').first().waitFor();
             assert.equal(await table.locator('tbody tr').count(),10);
             assert.deepEqual(await table.locator('[data-person-value]').evaluateAll(nodes=>nodes.map(node=>node.value)),Array(10).fill(''));
             assert.deepEqual(await table.locator('[data-person-value]').evaluateAll(nodes=>nodes.map(node=>node.value)),Array(10).fill(''));

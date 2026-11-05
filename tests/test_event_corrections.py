@@ -1,7 +1,7 @@
 """Intentional corrections and preserved annulments on isolated synthetic data."""
 from datetime import date
 import pytest
-from fastapi.testclient import TestClient
+from tests.http_auth import AuthenticatedClient as TestClient
 from sqlalchemy import select, func, event, text
 from app.models import PersonEvent, PersonEventCorrection, User, UserSession
 from app.services import person_events as editor, event_views
@@ -112,7 +112,7 @@ def test_http_cannot_forge_actor_or_delete_and_records_authenticated_actor(lifec
     factory,pid,kinds,_=lifecycle
     with factory() as db:
         user=User(username='event-test',display_name='Тестовий автор',password_hash=password_hash('synthetic-password'),role='editor');db.add(user);db.commit();actor=user.id
-        token,_=login(db,'event-test','synthetic-password')
+        token,csrf=login(db,'event-test','synthetic-password')
         key=add(db,lifecycle);original=record(db,pid,key)
     def session():
         with factory() as db:yield db
@@ -122,7 +122,7 @@ def test_http_cannot_forge_actor_or_delete_and_records_authenticated_actor(lifec
             base=f'/persons/{pid}/events/{key}'
             assert client.delete(base).status_code==405
             assert client.post(base,data={**original,'event_type_id':kinds['SERVICE']}).status_code==422
-            client.cookies.set('project2_user',token)
+            client.cookies.clear();client.cookies.set('project2_user',token);client.headers['X-CSRF-Token']=csrf
             response=client.post(base,data={**original,'event_type_id':kinds['SERVICE'],'confirm_type_change':'1','actor_id':99999})
             assert response.status_code==200
             current=client.get(f'/persons/{pid}/events').json()['events'][0]

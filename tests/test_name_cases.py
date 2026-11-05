@@ -307,9 +307,18 @@ def client(factory, monkeypatch):
 
 
 def login(client, token):
-    assert client.post("/admin/login", data={"token": token}, follow_redirects=False).status_code == 303
-    page = client.get("/admin")
-    return html.fromstring(page.text).xpath('//input[@name="csrf"]/@value')[0]
+    from app.services import accounts
+    from app.models import User
+    dependency=client.app.dependency_overrides[get_db]()
+    db=next(dependency)
+    try:
+        if db.scalar(select(User).where(User.username=='fixture-admin')) is None:
+            actor=db.scalar(select(User.id).where(User.role=='admin'))
+            accounts.create_user(db,'fixture-admin','Тестовий адміністратор',token,'admin',actor_id=actor)
+    finally:dependency.close()
+    response=client.post('/auth/login',json={'username':'fixture-admin','password':token})
+    assert response.status_code==200,response.text
+    return response.json()['csrf_token']
 
 
 def test_admin_denies_mutations_without_login_or_csrf_and_is_disabled_by_default(client, monkeypatch):
@@ -323,14 +332,15 @@ def test_admin_denies_mutations_without_login_or_csrf_and_is_disabled_by_default
     assert client.post("/admin/dictionaries/new", data={**dictionary_data(), "csrf": "чужий"}).status_code == 403
     assert client.post("/admin/logout", data={"csrf": csrf}, follow_redirects=False).status_code == 303
     monkeypatch.delenv("PROJECT2_ADMIN_TOKEN")
-    assert client.post("/admin/dictionaries/new", data={}).status_code == 503
+    assert client.post("/admin/dictionaries/new", data={}).status_code == 401
 
 
 def test_admin_cookie_transport_and_manual_editor(client):
     client, token = client
-    response = client.post("/admin/login", data={"token": token}, follow_redirects=False)
+    login(client,token)
+    response = client.post('/auth/login',json={'username':'fixture-admin','password':token})
     cookie = response.headers["set-cookie"]
-    assert "HttpOnly" in cookie and "Secure" in cookie and "SameSite=strict" in cookie and "Path=/admin" in cookie
+    assert "HttpOnly" in cookie and "Secure" in cookie and "SameSite=strict" in cookie and "Path=/" in cookie
     csrf = html.fromstring(client.get("/admin").text).xpath('//input[@name="csrf"]/@value')[0]
     response = client.post("/admin/dictionaries/new", data={**dictionary_data(), "csrf": csrf, "is_verified": "on"})
     assert response.status_code == 200 and "Тестослав" in response.text
@@ -362,7 +372,8 @@ def test_admin_excel_preview_confirm_and_replay(client, factory):
 
 
 def test_creation_error_retains_all_fields_and_success_has_two_destinations(client, factory):
-    client, _ = client
+    client, token = client
+    client.headers['X-CSRF-Token']=login(client,token)
     values = person_data(birth_day="31", birth_month="2", surname_genitive="Тестенка", name_dative="Тестославу")
     response = client.post("/persons/new", data=values)
     assert response.status_code == 400
@@ -401,105 +412,26 @@ def test_admin_editor_stale_revision_retains_draft_and_does_not_overwrite(client
         assert db.get(NameDictionary, key).genitive == "Актуального"
 
 
-def test_admin_session_tampering_expiry_and_token_rotation_are_rejected(client, monkeypatch):
-    client, token = client
-    login(client, token)
-    client.cookies.set("project2_admin", "tampered", domain="testserver.local", path="/admin")
-    assert client.get("/admin/dictionaries").status_code == 401
-    client.cookies.clear()
-    import app.security.admin as admin
-    expires = str(int(admin.time.time()) - 1)
-    client.cookies.set("project2_admin", admin.signed(expires+":"+secrets.token_hex(32), "session"),
-                       domain="testserver.local", path="/admin")
-    assert client.get("/admin/dictionaries").status_code == 401
-    client.cookies.clear(); login(client, token)
-    monkeypatch.setenv("PROJECT2_ADMIN_TOKEN", secrets.token_urlsafe(32))
-    assert client.get("/admin/dictionaries").status_code == 401
+def test_legacy_admin_cookie_and_switch_cannot_grant_personal_access(client,monkeypatch):
+    browser,token=client
+    browser.cookies.set('project2_admin','tampered',path='/admin')
+    for setting in ('PROJECT2_DEV_ADMIN_OPEN','PROJECT2_DEV_AUTH_BYPASS'):
+        monkeypatch.setenv(setting,'1')
+    assert browser.get('/admin/dictionaries').status_code==401
+    csrf=login(browser,token)
+    assert browser.get('/admin/dictionaries').status_code==200
+    assert browser.post('/admin/dictionaries/new',data=dictionary_data()).status_code==403
+    assert browser.post('/admin/dictionaries/new',data={**dictionary_data(),'csrf':csrf}).status_code==200
 
 
-def test_dev_admin_local_all_operations_without_credentials(client, factory, monkeypatch):
-    protected, _ = client
-    monkeypatch.setenv("PROJECT2_DEV_ADMIN_OPEN", "1")
-    monkeypatch.delenv("PROJECT2_ADMIN_TOKEN")
-    with TestClient(protected.app, base_url="http://localhost", client=("127.0.0.1", 50000)) as local:
-        assert local.get("/admin").status_code == 200
-        assert local.get("/admin/login", follow_redirects=False).headers["location"] == "/admin"
-        assert local.post("/admin/login", data={}).status_code == 200
-        assert not local.cookies
-        assert local.get("/admin/dictionaries/template.xlsx").content[:2] == b"PK"
-        assert local.get("/admin/dictionaries/new").status_code == 200
-        created = local.post("/admin/dictionaries/new", data=dictionary_data())
-        assert created.status_code == 200
-        edit_url = html.fromstring(created.text).xpath('//a[contains(@href,"/edit")]/@href')[0]
-        revision = html.fromstring(local.get(edit_url).text).xpath('//input[@name="revision"]/@value')[0]
-        assert local.post(edit_url, data={**dictionary_data(), "revision": revision}).status_code == 200
-        content = workbook([("names_male", dictionary_data(base="Іншослав"))])
-        preview = local.post("/admin/dictionaries/import/preview", files={"file": ("names.xlsx", content)})
-        assert preview.status_code == 200
-        preview_token = html.fromstring(preview.text).xpath('//input[@name="token"]/@value')[0]
-        saved = local.post("/admin/dictionaries/import/confirm", data={"token": preview_token, "reviewed": "true"})
-        assert saved.status_code == 200 and "Імпорт завершено" in saved.text
-        with factory() as db:
-            assert count(db, NameDictionary) == 2
-        assert local.post("/admin/logout").status_code == 200
-        monkeypatch.delenv("PROJECT2_DEV_ADMIN_OPEN")
-        assert local.get("/admin").status_code == 503
-        assert local.post("/admin/dictionaries/new", data={}).status_code == 503
-
-
-@pytest.mark.parametrize("host,peer,headers", [
-    ("localhost", "192.168.1.10", {}),
-    ("localhost", "203.0.113.10", {}),
-    ("192.168.1.5", "127.0.0.1", {}),
-    ("203.0.113.5", "127.0.0.1", {}),
-    ("example.com", "127.0.0.1", {}),
-    ("localhost", "127.0.0.1", {"X-Forwarded-For": "127.0.0.1"}),
-    ("localhost", "127.0.0.1", {"Forwarded": "for=127.0.0.1"}),
-    ("localhost", "127.0.0.1", {"X-Real-IP": "127.0.0.1"}),
-    ("localhost", "127.0.0.1", {"Origin": "https://example.com"}),
-    ("localhost", "127.0.0.1", {"Sec-Fetch-Site": "cross-site"}),
-])
-def test_dev_admin_rejects_nonlocal_and_forwarded_requests(client, monkeypatch, host, peer, headers):
-    protected, _ = client
-    monkeypatch.setenv("PROJECT2_DEV_ADMIN_OPEN", "1")
-    monkeypatch.delenv("PROJECT2_ADMIN_TOKEN")
-    with TestClient(protected.app, base_url="http://" + host, client=(peer, 50000), headers=headers) as remote:
-        assert remote.get("/admin").status_code == 503
-        assert remote.get("/admin/dictionaries/template.xlsx").status_code == 503
-        assert remote.post("/admin/dictionaries/new", data={}).status_code == 503
-        assert remote.post("/admin/dictionaries/import/confirm", data={}).status_code == 503
-
-
-@pytest.mark.parametrize("host,peer", [("127.0.0.1", "127.0.0.1"), ("localhost", "::1"), ("[::1]", "::1")])
-def test_dev_admin_accepts_ipv4_and_ipv6_loopback(client, monkeypatch, host, peer):
-    protected, _ = client
-    monkeypatch.setenv("PROJECT2_DEV_ADMIN_OPEN", "1")
-    monkeypatch.delenv("PROJECT2_ADMIN_TOKEN")
-    # Host header exercises IPv6 parsing without TestClient's IPv6-netloc bug.
-    with TestClient(protected.app, base_url="http://localhost", headers={"Host": host}, client=(peer, 50000)) as local:
-        assert local.get("/admin").status_code == 200
-
-
-@pytest.mark.parametrize("flag", [None, "0", "true"])
-def test_dev_admin_disabled_retains_local_auth_and_csrf(client, monkeypatch, flag):
-    protected, token = client
-    if flag is not None:
-        monkeypatch.setenv("PROJECT2_DEV_ADMIN_OPEN", flag)
-    with TestClient(protected.app, base_url="http://localhost", client=("127.0.0.1", 50000)) as local:
-        assert local.get("/admin").status_code == 403  # Original HTTPS requirement.
-        monkeypatch.setenv("PROJECT2_ADMIN_ALLOW_HTTP", "1")
-        assert local.get("/admin/dictionaries").status_code == 401
-        login(local, token)
-        assert local.post("/admin/dictionaries/new", data=dictionary_data()).status_code == 403
-
-
-def test_dev_switch_retains_full_remote_token_and_csrf_protection(client, monkeypatch):
-    remote, token = client
-    monkeypatch.setenv("PROJECT2_DEV_ADMIN_OPEN", "1")
-    assert remote.get("/admin/dictionaries").status_code == 401
-    csrf = login(remote, token)
-    assert remote.post("/admin/dictionaries/new", data=dictionary_data()).status_code == 403
-    assert remote.post("/admin/dictionaries/new", data={**dictionary_data(), "csrf": csrf}).status_code == 200
+@pytest.mark.parametrize('host,peer', [('localhost','127.0.0.1'),('localhost','::1'),('192.168.1.5','192.168.1.6')])
+def test_dev_admin_never_skips_personal_session(client,monkeypatch,host,peer):
+    browser,_=client
+    monkeypatch.setenv('PROJECT2_DEV_ADMIN_OPEN','1')
+    monkeypatch.setenv('PROJECT2_AUTH_ALLOW_LOCAL_HTTP','1')
+    with TestClient(browser.app,base_url='http://'+host,client=(peer,50000)) as anonymous:
+        assert anonymous.get('/admin').status_code in (401,403)
+        assert anonymous.post('/admin/dictionaries/new',data={}).status_code in (401,403)
 
 
 def test_explicit_personal_edit_marks_complete_forms_verified_and_missing_forms_unknown(factory):

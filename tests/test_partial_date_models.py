@@ -3,7 +3,7 @@
 from datetime import date
 from itertools import product
 
-from fastapi.testclient import TestClient
+from tests.http_auth import AuthenticatedClient as TestClient
 import pytest
 from sqlalchemy import create_engine, Date, DateTime, Integer, event, func, inspect, select
 from sqlalchemy.orm import sessionmaker

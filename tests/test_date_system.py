@@ -3,7 +3,7 @@ from calendar import monthrange
 from itertools import permutations, product
 import json
 
-from fastapi.testclient import TestClient
+from tests.http_auth import AuthenticatedClient as TestClient
 import pytest
 from sqlalchemy import create_engine, Date, DateTime, select
 from sqlalchemy.orm import sessionmaker

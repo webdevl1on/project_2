@@ -95,7 +95,9 @@ def test_history_is_atomic_and_stale_draft_cannot_overwrite(factory):
 
 
 def test_ui_error_preserves_all_components_and_full_form(client,factory):
-    browser,_=client
+    browser,secret=client
+    from tests.test_name_cases import login
+    browser.headers['X-CSRF-Token']=login(browser,secret)
     with factory() as db: pid=person(db)
     response=browser.post(f'/persons/{pid}/geography/registration',data={'country':'Україна','postal_code':'123','house':'01А/3'})
     assert response.status_code==400 and 'value="01А/3"' in response.text and 'value="123"' in response.text
@@ -201,7 +203,9 @@ def test_empty_replacement_preserves_revision_and_history(factory):
 
 
 def test_direct_http_empty_save_is_rejected_without_archiving(client,factory):
-    browser,_=client
+    browser,secret=client
+    from tests.test_name_cases import login
+    browser.headers['X-CSRF-Token']=login(browser,secret)
     with factory() as db:
         pid=person(db);service.save(db,pid,'registration',{'house':'01А/2'});row=current(db,pid)
         values={'record_id':str(row.id),'revision':str(row.revision),'note':'Лише примітка'}

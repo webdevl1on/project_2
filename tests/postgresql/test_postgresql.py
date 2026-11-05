@@ -192,7 +192,7 @@ def test_geo_hierarchy_alias_soft_validation_and_large_prefix_search(pg_factory)
 
 
 def test_concurrent_http_assignments_and_same_person_two_positions(pg_factory):
-    from fastapi.testclient import TestClient
+    from tests.http_auth import AuthenticatedClient as TestClient
     from app.main import app
     from app.database.db import get_db
     from tests.test_person_positions import make_position

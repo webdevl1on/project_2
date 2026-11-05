@@ -7,7 +7,7 @@ module.exports=async({context,base,adminToken})=>{
  const edit=async id=>{const card=p().locator(`[data-medical-record="${id}"]`);const details=card.locator('[data-exam-card]');if(!await details.evaluate(n=>n.open))await details.locator(':scope > summary').click();await card.getByRole('button',{name:'Редагувати',exact:true}).click();};
  try{
   await context.request.post(base+'/_column-test/documents/setup');await page.goto(base+'/person_full_info/1#exams');
-  const login=p().locator('[data-medical-auth]');await login.locator('[name=username]').fill('doc-admin');await login.locator('[name=password]').fill(adminToken);await login.locator('button').click();await p().locator('[data-medical-content]').waitFor({state:'visible'});
+  await p().locator('[data-medical-content]').waitFor({state:'visible'});
   await fresh();assert.equal(await f().locator('[name=status] option[value=INTERRUPTED]').evaluate(n=>n.disabled),true);
   assert.equal(await f().locator('[data-exact-date-for=issued_on]').isVisible(),false);await f().locator('[name=basis_note]').fill('Захворювання');await save();
   assert.equal(await p().locator('[data-medical-editor]').evaluate(n=>n.open),false);assert.equal(await f().locator('[name=basis_note]').inputValue(),'');assert.equal(await f().getAttribute('data-key'),null);

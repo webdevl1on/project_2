@@ -1,5 +1,6 @@
 from datetime import date as D
-from fastapi.testclient import TestClient
+from fastapi.testclient import TestClient as AnonymousClient
+from tests.http_auth import AuthenticatedClient as TestClient
 from lxml import html
 from app.main import app
 from app.database.db import get_db
@@ -57,5 +58,5 @@ def test_admin_staff_retains_admin_access(store,monkeypatch):
     def db():yield store
     app.dependency_overrides[get_db]=db
     try:
-        with TestClient(app) as client:assert client.get('/admin/staff').status_code in (401,503)
+        with AnonymousClient(app,base_url='https://testserver') as client:assert client.get('/admin/staff').status_code in (401,503)
     finally:app.dependency_overrides.clear()

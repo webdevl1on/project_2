@@ -1,4 +1,4 @@
-{% from 'components/table_copy.html' import table_copy_tools %}
+{% from 'components/table_copy.html' import table_copy_tools with context %}
 {% macro column_tree(config, prefix) %}
 <div class="column-visibility-tree">
     {% for group in config.groups %}

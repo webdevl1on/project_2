@@ -19,7 +19,7 @@ module.exports = async ({context, base, adminToken}) => {
         await scenario('TCC administration uses existing login and CSRF protection', async () => {
             assert.equal((await context.request.get(base+'/admin/tcc')).status(),401);
             assert.equal((await context.request.post(base+'/admin/tcc/new', {form:{official_name:'Заборонений'}})).status(),401);
-            await page.goto(base+'/admin/login'); await page.locator('#token').fill(adminToken);
+            await page.goto(base+'/auth/login?return_to=/admin'); await page.locator('[name=username]').fill('browser-admin');await page.locator('[name=password]').fill(adminToken);
             await Promise.all([page.waitForURL(base+'/admin'), page.getByRole('button',{name:'Увійти',exact:true}).click()]);
             assert.ok(await page.getByRole('heading', {name:'Довідник ТЦК та СП'}).isVisible());
             assert.equal((await context.request.post(base+'/admin/tcc/new',{form:{official_name:'Без CSRF'}})).status(),403);

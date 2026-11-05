@@ -3,7 +3,7 @@ from datetime import date, datetime
 from urllib.parse import urlencode, parse_qs
 
 import pytest
-from fastapi.testclient import TestClient
+from tests.http_auth import AuthenticatedClient as TestClient
 from sqlalchemy import create_engine, event, inspect
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool

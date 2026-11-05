@@ -16,6 +16,7 @@ PostgreSQL — цільова БД; `Settings` вимагає явні PROJECT2_
 
 | Завдання | Основні файли |
 | --- | --- |
+| Базовий захист усіх HTTP-маршрутів | `docs/SECURITY.md`, `app/security/application.py`, `accounts.py`, `admin.py`, `app/routers/accounts.py`, `app/main.py`, `app/templates/login.html`, `app/static/js/security_session.js` |
 | Журнал і стан події на дату | `docs/EVENT_CORRECTIONS.md`, `app/models/event_correction.py`, `app/services/event_corrections.py`, `docs/EVENT_CONTROL.md`, `app/services/event_rules.py`, `app/static/js/journal_controls.js`, `docs/EVENT_VIEWS.md`, `app/event_display.py`, `app/services/event_views.py`, `app/routers/event_journal.py`, `app/templates/event_journal.html`, `app/static/js/event_journal.js`, `app/static/css/event_views.css` |
 | Події зі штатки | `docs/PERSON_EVENTS.md`, `app/routers/person_events.py`, `app/services/person_events.py`, `app/services/service_for_person_event.py`, `app/repositories/event_repository.py`, `app/templates/components/person_events.html`, `app/static/js/person_events.js` |
 | PostgreSQL, Alembic, конфігурація й засівання | `docs/POSTGRESQL_SETUP.md`, `app/database/settings.py`, `db.py`, `locking.py`, `postgresql.py`, `migrations/`, `app/services/seed_postgresql.py` |
@@ -136,7 +137,7 @@ flowchart LR
 
 Нова person_create.html використовує компоненти name_case_fields.html, date_input.html і name_cases.js. Після створення — person_created.html з двома переходами; person_form.html збережено для базового редагування. Особисті відмінки редагує person_name_cases.html через посилання конкретного запису історії.
 
-Повної системи користувачів/ролей немає. За замовчуванням словниковий /admin потребує PROJECT2_ADMIN_TOKEN: підписана cookie, HTTPS і CSRF; без секрету операції вимкнені. Виняток для розробки — PROJECT2_DEV_ADMIN_OPEN=1: app/security/admin.py дозволяє обійти вхід і CSRF тільки при прямому loopback-з'єднанні та Host localhost/127.0.0.1/::1, без forwarded-заголовків і стороннього Origin/cross-site. Решта запитів використовує звичайний захист. Окремий внутрішній тип локального owner дозволяє тим самим роутерам працювати без секрету; імпортні preview/confirm і бізнес-правила незмінні. Публічний lookup тільки читає перевірені дані. app/service_basis.py — незалежні стандартні формулювання служби для майбутніх колонок, без запису в історію служби.
+Усі кадрові маршрути потребують чинної UserSession; /admin та структурні операції — персональної ролі admin. Спільний admin-token та dev bypass не надають доступу. Словниковий lookup теж захищений. Деталі — [SECURITY.md](SECURITY.md). app/service_basis.py лишається незалежним довідником формулювань служби.
 
 ### Валідація й дати
 
@@ -339,7 +340,7 @@ reset.py — CLI, services/seed_bootstrap.py — порядок/preflight/пер
 
 [DOCUMENTS.md](DOCUMENTS.md) — сім документальних моделей, незалежні presence/completeness/copies, ручний статус із fingerprint/reason, приватні файли та append-only аудит. Router documents → services/documents/document_files → DocumentRepository; document_transaction з BEGIN IMMEDIATE зберігає зміну разом з аудитом. DocumentStorage відокремлений від SQL, компенсаційно прибирає файли після звичайних помилок; crash-recovery та GUI ще не реалізовані. Passport залишається canonical через унікальний FK у PersonDocument; Person.tax_number — єдине джерело поточного номера, журнал містить лише необхідні історичні знімки. Наявні таблиці/поля паспортів, PersonEvent, HistoryModel і кадрові правила не змінено.
 
-models/accounts.py, services/accounts.py, AccountRepository і security/accounts.py — окрема загальносистемна інфраструктура User/UserSession з персональною cookie, scrypt, ролями, CSRF, строком сесії та logout. Новий /auth і документальний API не використовують dev-admin bypass. Це ще не глобальна авторизація старих сторінок; спільний /admin залишається окремим. Явна migrate_documents з backup додає тільки нові таблиці/guards і оболонки існуючих документів; startup не оновлює БД. Загальна вкладка документів і GUI входу у медичних розділах реалізовані; авторизоване редагування canonical РНОКПП з глобальним аудитом — наступний етап.
+models/accounts.py, services/accounts.py, AccountRepository і security/accounts.py — окрема загальносистемна інфраструктура User/UserSession з персональною cookie, scrypt, ролями, CSRF, строком сесії та logout. Новий /auth і документальний API не використовують dev-admin bypass. Security 1.1 застосовує цю саму перевірку до всіх старих сторінок/API та персонального /admin. Явна migrate_documents з backup додає тільки нові таблиці/guards і оболонки існуючих документів; startup не оновлює БД. Загальна вкладка документів і GUI входу у медичних розділах реалізовані; авторизоване редагування canonical РНОКПП з глобальним аудитом — наступний етап.
 
 ## ВЛК, поранення, нагородження, ДНК та завдання
 
@@ -351,13 +352,11 @@ MedicalDocumentLink пов’язує конкретний факт із чин�
 
 Каталог має 76 інформаційних полів: 21 нове типово приховане. `medical_table.py` надає дозволені скалярні агрегати без множення рядків. Точні нові дати використовують DateBinding.exact й чинне форматування; попередні ключі, каскад, пресети, сортування/копіювання/Undo збережені. ORM PersonAssignment, StaffService, PersonServiceHistory, PersonEvent та HistoryModel не перебудовувалися. Старі міграції виключають нові таблиці зі своїх історичних контрактів, а schema_check повідомляє про явну migrate_medical.
 
-Локальний opt-in персональних API: services/dev_auth.py — явна CLI-ініціалізація окремого тестового editor; security/accounts.py — перевірки loopback/Host/proxy/Origin, фактичної тестової БД й CSRF без парольної сесії. /auth/me повертає dev_auth_bypass для медичного UI. database/db.py обирає наявний test/dev-файл лише за явних PROJECT2_DEV_AUTH_BYPASS=1 та PROJECT2_DEV_AUTH_DATABASE; без них штатне підключення/авторизація збережені. Облікові записи, аудит, моделі та бізнес-сервіси не переписані. Правила й команди — [DOCUMENTS.md](DOCUMENTS.md#локальний-тестовий-режим-без-введення-пароля).
+Історичні dev-auth/open-access механізми більше не підключені до HTTP-автентифікації; конфігурація БД не перемикається ними.
 
 ## Тимчасовий загальний вільний доступ
 
-`security/access_mode.py` централізує перемикач: без PROJECT2_AUTH_ENABLED=1 застосунок відкритий. current_user повертає справжнього спільного адміністратора з services/open_access.py; require_admin використовує чинного спеціального owner для доступу/preview без токена та CSRF. Роутери, сервіси, репозиторії, моделі, сесії, ролі, схема SQLite й аудит збережені. Перший запит, що потребує автора, ідемпотентно створює лише службовий User; наявних користувачів і предметні записи не переписує. Подальші операції виконуються через чинні сервіси від його імені. Персонального визначення автора в цьому режимі немає.
-
-/auth/me повертає open_access=true, admin та порожній csrf_token; GUI приховує вхід і показує попередження. API документів, копій та адмінімпорту доступні без входу незалежно від Host/мережі, але валідація даних, preview/confirm, revision, транзакції та перевірки належності документів залишилися. PROJECT2_AUTH_ENABLED=1 повертає попередній захист; тоді також можна застосовувати збережені локальні dev-перемикачі. У загальному відкритому режимі старий PROJECT2_DEV_AUTH_DATABASE не перемикає підключення: використовується штатна project2.db.
+Цей попередній режим скасовано Security 1.1. `open_access()` завжди False; відсутній/нульовий AUTH_ENABLED та старі dev/admin flags не відкривають даних і не створюють спільного автора. User/UserSession та історичні записи збережені. Поточна архітектура — [SECURITY.md](SECURITY.md).
 
 ## Рішення ВЛК після поранення
 
@@ -428,3 +427,10 @@ PersonEventCorrection — окремий append-only журнал операці
 `StaffService` повторно використано для create/edit/orders/complete/transfer/annul/restore та закриття версії; аудит записується в тому самому write_unit (`services/assignment_audit.py`). `security.accounts.personal_actor` отримує тільки реальну cookie-сесію або NULL, без підміни службовим автором відкритого режиму. `mirage.convert` передає того самого автора; HTTP body його не визначає. Перевірка нового/зміненого офіційного початку централізована: сьогодні Europe/Kyiv + 1, без зміни старого майбутнього початку.
 
 `StaffRepository` читає всі посади/історію пакетно; `staff_read.history_context` групує поточні, архівні, майбутні та анульовані записи, фільтрує номер/назви casefold. Спільний `active` та читання кадрових періодів виключають анульовані записи, зокрема для штатки/анкети/журналу подій. `staff_read.assignment_audit_context` готує різницю полів із пакетним join User. `/staff/history`, `staff_history.js/css` використовують один редактор, Person Picker, ProfileDates і чинний `staff_history_forms.js`; помилки не замінюють DOM форми. Деталі — [STAFF_HISTORY.md](STAFF_HISTORY.md#історія-за-посадами-анулювання-та-аудит-2026-11-03).
+
+
+## Security 1.1: базовий захист усього застосунку
+
+`main.py` реєструє `application_access` як глобальну FastAPI-залежність усіх предметних роутерів. `security/application.py` визначає закриту за замовчуванням політику, вузький перелік public login, admin URL і безпечне повернення. `security/accounts.current_user` повторно використовує User/UserSession/accounts.authenticate, транспорт, CSRF і Origin; стан кешується тільки на request. `security/admin.py` вимагає персонального admin, прив’язує preview до реальної сесії. Нових моделей, ролей або міграцій немає.
+
+`login.html/login.js` — персональний вхід, `security_session.js` — same-origin CSRF для старих fetch, оновлення токена після повторного входу, повідомлення про закінчення сесії та logout. `templating.security_context` і приховані поля забезпечують також звичайні HTML POST без JS. Усі повні шаблони підключають спільний security component; імпортовані form-макроси отримують контекст. OpenAPI/Swagger/ReDoc захищені, предметні відповіді — no-store/Vary Cookie. Усі винятки, ролі та межі 1.1 — [SECURITY.md](SECURITY.md).

@@ -1,9 +1,9 @@
 const assert=require('node:assert/strict');
 module.exports=async({context,base,adminToken})=>{
  const page=await context.newPage(), errors=[];page.on('pageerror',e=>errors.push(e.message));
- await context.clearCookies();
+
  try {
-  await context.request.post(base+'/_column-test/documents/setup');
+  const setup=await(await context.request.post(base+'/_column-test/documents/setup')).json();await context.clearCookies();
   await page.goto(base+'/person_full_info/3');
   const run=async(path,data,csrf)=>page.evaluate(async({path,data,csrf})=>{
    const response=await fetch(path,{method:data===undefined?'GET':'POST',headers:{'Content-Type':'application/json',...(csrf?{'X-CSRF-Token':csrf}:{})},body:data===undefined?undefined:JSON.stringify(data)});
@@ -30,7 +30,7 @@ module.exports=async({context,base,adminToken})=>{
   const after=(await run('/persons/3/documents?code=other')).data.documents.find(r=>r.id===record.id);
   assert.equal(after.automatic_status,'FILLED');assert.equal(after.effective_status,'NOT_FILLED');assert.equal(after.values.number,'0001');
   const journal=(await run('/persons/3/documents/audit')).data.entries;
-  assert.ok(journal.some(e=>e.operation==='override'&&e.actor_id===1&&e.reason==='Тестова ручна перевірка'));
+  assert.ok(journal.some(e=>e.operation==='override'&&e.actor_id===setup.user_id&&e.reason==='Тестова ручна перевірка'));
   assert.equal((await run('/auth/logout',{},csrf)).status,200);
   assert.equal((await context.request.get(base+`/persons/3/documents/files/${upload.data.id}`)).status(),401);
   assert.deepEqual(errors,[]);

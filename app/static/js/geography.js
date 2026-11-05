@@ -111,10 +111,10 @@
         if (!event.target.closest('[data-copy-registration]')) return;
         const source = root.querySelector('[data-block="registration"]');
         const target = event.target.closest('form');
-        if ([...target.elements].some(input => !['revision','record_id'].includes(input.name) && input.value) && !window.confirm('Замінити введені компоненти фактичної адреси?')) return;
+        if ([...target.elements].some(input => !['revision','record_id','csrf'].includes(input.name) && input.value) && !window.confirm('Замінити введені компоненти фактичної адреси?')) return;
         order.forEach(kind => invalidate(target, kind));
         for (const input of source.elements) {
-            if (input.name && !['revision','record_id'].includes(input.name) && target.elements[input.name]) target.elements[input.name].value = input.value;
+            if (input.name && !['revision','record_id','csrf'].includes(input.name) && target.elements[input.name]) target.elements[input.name].value = input.value;
         }
         clearError(target); refresh(target);
     });

@@ -5,7 +5,6 @@ from fastapi import Request, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database.db import get_db
 from app.services import accounts
-from app.security.access_mode import open_access
 
 COOKIE = 'project2_user'
 
@@ -13,6 +12,8 @@ COOKIE = 'project2_user'
 def personal_actor(request, db):
     """Optional verified personal session; never attribute the open-mode identity."""
     check_origin(request)
+    user=getattr(request.state,'authenticated_user',None)
+    if user is not None:return user.id
     try:
         return accounts.authenticate(db, request.cookies.get(COOKIE, ''))[0].id
     except PermissionError:
@@ -32,45 +33,30 @@ def secure_transport(request):
     from ipaddress import ip_address
     try: local = request.client and ip_address(request.client.host).is_loopback
     except ValueError: local = False
-    forwarded = any(k == 'forwarded' or k.startswith('x-forwarded-') or k == 'x-real-ip' for k in request.headers)
+    forwarded = any(k == 'forwarded' or k.startswith('x-forwarded-') or k in ('x-real-ip','via','cf-connecting-ip','true-client-ip') for k in request.headers)
     if os.environ.get('PROJECT2_AUTH_ALLOW_LOCAL_HTTP') != '1' or not local or request.url.hostname not in ('localhost','127.0.0.1','::1') or forwarded:
         raise HTTPException(403, 'Персональний вхід потребує HTTPS; локальний HTTP вмикається окремо.')
 
 
 def dev_request(request):
-    if os.environ.get('PROJECT2_DEV_AUTH_BYPASS')!='1':return False
-    from ipaddress import ip_address
-    try:local=request.client and ip_address(request.client.host).is_loopback
-    except ValueError:local=False
-    proxy=any(k=='forwarded' or k.startswith('x-forwarded-') or k in ('x-real-ip','via','cf-connecting-ip','true-client-ip') for k in request.headers)
-    if not local or request.url.hostname not in ('localhost','127.0.0.1','::1') or proxy:return False
-    check_origin(request)
-    if request.headers.get('sec-fetch-site') not in (None,'same-origin','none'):raise HTTPException(403,'Для режиму розробки потрібен прямий локальний запит.')
-    return True
+    # Retained compatibility name; neither legacy flag can bypass a session.
+    return False
 
 
-def current_user(request: Request, db: Session = Depends(get_db)):
-    if open_access():
-        from app.services.open_access import identity
-        try:user=identity(db)
-        except ValueError as error:raise HTTPException(503,str(error)) from error
-        request.state.open_access=True
-        return user
-    if dev_request(request):
-        from app.services import dev_auth
-        try:user=dev_auth.identity(db)
-        except ValueError as error:raise HTTPException(503,str(error)) from error
-        token=dev_auth.csrf(user)
-        if request.method not in ('GET','HEAD','OPTIONS') and not hmac.compare_digest(request.headers.get('x-csrf-token',''),token):
-            raise HTTPException(403,'Неправильний CSRF-токен.')
-        request.state.dev_auth_bypass=True
-        request.state.dev_csrf=token
-        return user
+async def current_user(request: Request, db: Session = Depends(get_db)):
+    if getattr(request.state, 'authenticated_user', None) is not None:
+        return request.state.authenticated_user
     secure_transport(request)
     try: user, session = accounts.authenticate(db, request.cookies.get(COOKIE, ''))
-    except PermissionError as error: raise HTTPException(401, str(error)) from error
+    except PermissionError as error: raise HTTPException(401, str(error), headers={'Cache-Control':'no-store'}) from error
     if request.method not in ('GET','HEAD','OPTIONS'):
         check_origin(request)
-        if not hmac.compare_digest(request.headers.get('x-csrf-token',''), session.csrf_token):
+        supplied=request.headers.get('x-csrf-token')
+        if supplied is None and request.headers.get('content-type','').split(';')[0] in ('application/x-www-form-urlencoded','multipart/form-data'):
+            supplied=(await request.form()).get('csrf','')
+        if not isinstance(supplied,str) or not hmac.compare_digest(supplied.encode(), session.csrf_token.encode()):
             raise HTTPException(403, 'Неправильний CSRF-токен.')
+    request.state.authenticated_user=user
+    request.state.personal_session=session
+    request.state.csrf_token=session.csrf_token
     return user

@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.exc import IntegrityError
-from fastapi.testclient import TestClient
+from tests.http_auth import AuthenticatedClient as TestClient
 from app.database.base import Base
 from app.database.db import get_db
 from app.models import StaffStructure, StaffVersion, PersonAssignment, Position, Person, PersonName, PersonRank, PersonEvent, EventType

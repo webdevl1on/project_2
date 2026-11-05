@@ -44,7 +44,7 @@
                             </div>
                             <div class="modal-body">
                                 <form data-profile-history-form method="post" action="/person_name/{{names.person_name_id}}/update"
-                                    class="row g-3">
+                                    class="row g-3"><input type="hidden" name="csrf" value="{{ security_csrf|default('') }}">
                                     <div class="col-md-6">
                                         <label for="surname">Прізвище *</label>
                                         <input id="surname" name="surname" required value="{{names.surname}}">
@@ -87,7 +87,7 @@
                 {% if names.is_active %}
                 <span class="badge bg-success">Активний</span>
                 {% else %}
-                <form data-profile-history-form method="post" action="/person_name/{{ names.person_name_id }}/make_active">
+                <form data-profile-history-form method="post" action="/person_name/{{ names.person_name_id }}/make_active"><input type="hidden" name="csrf" value="{{ security_csrf|default('') }}">
                     <button class="btn btn-sm btn-success">
                         Зробити активним
                     </button>
@@ -110,7 +110,7 @@
                             </div>
                             <div class="modal-body">
                                 <form data-profile-history-form method="post" class="row g-3"
-                                    action="/person_name/{{ names.person_name_id }}/delete">
+                                    action="/person_name/{{ names.person_name_id }}/delete"><input type="hidden" name="csrf" value="{{ security_csrf|default('') }}">
                                     <input type="text" name="confirmation" placeholder="Введіть DELETE" required>
                                     <div class="modal-footer">
                                         <button type="button" class="btn btn-secondary"

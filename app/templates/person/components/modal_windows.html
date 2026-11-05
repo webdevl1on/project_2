@@ -1,4 +1,4 @@
-{% from "components/date_input.html" import date_input %}
+{% from "components/date_input.html" import date_input with context %}
 <!-- Modal for new name-->
 <div class="modal fade" id="addNewName" tabindex="-1" aria-labelledby="addNewNameLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -8,7 +8,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form data-profile-history-form method="post" class="row g-3" action="/person_name/add_new/{{person_id}}">
+                <form data-profile-history-form method="post" class="row g-3" action="/person_name/add_new/{{person_id}}"><input type="hidden" name="csrf" value="{{ security_csrf|default('') }}">
                     <div class="col-md-6">
                         <label for="surname">Прізвище *</label>
                         <input id="surname" name="surname" required>
@@ -53,7 +53,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <form data-profile-history-form method="post" class="row g-3" action="/person_ranks/add_rank/{{person_id}}">
+                <form data-profile-history-form method="post" class="row g-3" action="/person_ranks/add_rank/{{person_id}}"><input type="hidden" name="csrf" value="{{ security_csrf|default('') }}">
                     <div class="col-md-6">
                         <label for="rank_id">Звання *</label>
                         <select id="rank_id" name="rank_id" required class="form-select">

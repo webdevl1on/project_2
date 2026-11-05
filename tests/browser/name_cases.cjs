@@ -21,14 +21,15 @@ module.exports = async ({context, base, adminToken}) => {
         return execFileSync(process.env.PYTHON || 'python3', ['-c', script]);
     }
     let personUrl, personalUrl;
+    await context.clearCookies();
     try {
         await scenario('admin operations and downloads require login; GUI login enables a protected session', async () => {
             assert.equal((await context.request.post(base+'/admin/dictionaries/new',{form:{}})).status(),401);
             assert.equal((await context.request.get(base+'/admin/dictionaries/template.xlsx')).status(),401);
-            await page.goto(base+'/admin/login'); await page.locator('#token').fill(adminToken);
+            await page.goto(base+'/auth/login?return_to=/admin'); await page.locator('[name=username]').fill('browser-admin');await page.locator('[name=password]').fill(adminToken);
             await Promise.all([page.waitForURL(base+'/admin'),page.getByRole('button',{name:'Увійти',exact:true}).click()]);
             assert.equal(await page.getByRole('heading',{name:'Словники відмінків'}).isVisible(),true);
-            const cookie = (await context.cookies()).find(cookie=>cookie.name==='project2_admin');
+            const cookie = (await context.cookies()).find(cookie=>cookie.name==='project2_user');
             assert.equal(cookie.httpOnly,true); assert.equal(cookie.sameSite,'Strict');
             assert.equal((await context.request.post(base+'/admin/dictionaries/new',{form:{}})).status(),403);
         });
@@ -118,7 +119,7 @@ module.exports = async ({context, base, adminToken}) => {
             assert.equal(await page.locator('[data-count="skipped"]').innerText(),'1');
             assert.equal((await lookup('Іншеімя')).found,false);
             await page.locator('#reviewed').check();
-            const token=await page.locator('[name="token"]').inputValue(), csrfValue=await page.locator('[name="csrf"]').inputValue();
+            const token=await page.locator('[name="token"]').inputValue(), csrfValue=await page.locator('form[action*="/import/confirm"] [name="csrf"]').first().inputValue();
             await Promise.all([page.waitForURL(url=>url.pathname==='/admin'),page.getByRole('button',{name:'Підтвердити імпорт'}).click()]);
             assert.equal((await lookup('Тестослав')).forms.genitive,'Тестослава');
             assert.equal((await lookup('Іншеімя')).found,true);
@@ -130,7 +131,7 @@ module.exports = async ({context, base, adminToken}) => {
             await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Перевірити файл'}).click()]);
             assert.equal(await page.locator('[data-count="updated"]').innerText(),'1');
             await page.locator('#reviewed').check();
-            const token=await page.locator('[name="token"]').inputValue(), csrfValue=await page.locator('[name="csrf"]').inputValue();
+            const token=await page.locator('[name="token"]').inputValue(), csrfValue=await page.locator('form[action*="/import/confirm"] [name="csrf"]').first().inputValue();
             assert.equal((await context.request.post(base+'/admin/dictionaries/import/confirm',{form:{token,csrf:csrfValue,reviewed:'true'}})).status(),409);
             await page.locator('#confirm_updates').check();
             await Promise.all([page.waitForURL(url=>url.pathname==='/admin'),page.getByRole('button',{name:'Підтвердити імпорт'}).click()]);
@@ -147,7 +148,7 @@ module.exports = async ({context, base, adminToken}) => {
             assert.equal(await page.getByRole('button',{name:'Підтвердити імпорт'}).count(),0);
             assert.match(await page.locator('body').innerText(),/names_male, рядок 5/);
             await page.goto(base+'/admin');
-            await Promise.all([page.waitForURL(base+'/admin/login'),page.getByRole('button',{name:'Вийти з адміністрування'}).click()]);
+            await Promise.all([page.waitForURL(url=>url.pathname==='/auth/login'),page.getByRole('button',{name:'Вийти з адміністрування'}).click()]);
             assert.equal((await context.request.post(base+'/admin/dictionaries/new',{form:{}})).status(),401);
             assert.deepEqual(errors,[]);
         });

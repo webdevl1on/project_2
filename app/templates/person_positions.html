@@ -1,9 +1,9 @@
-{% from 'components/value_filter.html' import value_filter %}
-{% from 'components/event_badge.html' import event_badge, event_legend %}
-{% from 'components/assignment_operations.html' import orders,release,mirage_actions %}
-{% from "components/person_picker.html" import person_picker %}
-{% from "components/date_filter.html" import date_filter %}
-{% from "components/column_visibility.html" import column_visibility %}
+{% from 'components/value_filter.html' import value_filter with context %}
+{% from 'components/event_badge.html' import event_badge, event_legend with context %}
+{% from 'components/assignment_operations.html' import orders,release,mirage_actions with context %}
+{% from "components/person_picker.html" import person_picker with context %}
+{% from "components/date_filter.html" import date_filter with context %}
+{% from "components/column_visibility.html" import column_visibility with context %}
 {% set columns = table_columns.groups | map(attribute="columns") | sum(start=[]) %}
 <!DOCTYPE html>
 <html lang="uk">
@@ -18,7 +18,7 @@
     <link href="/static/css/person_picker.css" rel="stylesheet">
 <link href="/static/css/app_layout.css" rel="stylesheet">
 <link href="/static/css/event_views.css" rel="stylesheet">
-</head>
+{% include 'components/security_session.html' %}</head>
 <style>
     .table-container {
         min-height: 400px;
@@ -251,9 +251,9 @@
                             <div class="d-flex gap-2 mb-2"><button type="button" class="btn btn-sm btn-outline-secondary" data-assignment-close>Згорнути (чернетка збережеться)</button><button type="button" class="btn btn-sm btn-outline-danger" data-assignment-cancel>Скасувати зміни</button></div>
                             {% if item.assignment %}<p>Наказ призначення {{ item.assignment.assignment_order_number or 'Не зазначено' }} · {{ item.assignment.assignment_order_date or 'Дата невідома' }}</p><details data-staff-tools><summary>Накази та звільнення</summary>{{ orders(item.assignment) }}{{ release(item.assignment) }}</details>{% endif %}
                             {% for mirage in (mirages_by_position|default({})).get(item.position.position_id,[]) %}<div class="text-secondary border-start ps-2 my-2">♧ Міраж: {{ people_labels.get(mirage.person_id,'Без ПІБ') }} — очікує наказу. {{ mirage.note or '' }}{{ mirage_actions(mirage) }}</div>{% endfor %}
-                            <details><summary>Додати Міраж</summary><form data-personnel-form method="post" action="/personnel/mirages"><input type="hidden" name="position_id" value="{{ item.position.position_id }}"><label>Військовослужбовець<select class="form-select" name="person_id" required>{% for candidate in people %}<option value="{{ candidate.id }}">{{ candidate.rank }} {{ candidate.label }} · {{ candidate.birth }}</option>{% endfor %}</select></label><label>Примітка<input class="form-control" name="note" maxlength="1000"></label><button class="btn btn-outline-secondary">Додати попереднє закріплення</button></form></details>
+                            <details><summary>Додати Міраж</summary><form data-personnel-form method="post" action="/personnel/mirages"><input type="hidden" name="csrf" value="{{ security_csrf|default('') }}"><input type="hidden" name="position_id" value="{{ item.position.position_id }}"><label>Військовослужбовець<select class="form-select" name="person_id" required>{% for candidate in people %}<option value="{{ candidate.id }}">{{ candidate.rank }} {{ candidate.label }} · {{ candidate.birth }}</option>{% endfor %}</select></label><label>Примітка<input class="form-control" name="note" maxlength="1000"></label><button class="btn btn-outline-secondary">Додати попереднє закріплення</button></form></details>
                             <form method="post" action="/person-positions/assign"
-                                class="d-flex flex-wrap gap-2 person-assignment-form">
+                                class="d-flex flex-wrap gap-2 person-assignment-form"><input type="hidden" name="csrf" value="{{ security_csrf|default('') }}">
                                 <input type="hidden" name="position_id" value="{{ item.position.position_id }}">
                                 <input type="hidden" name="return_query" value="{{ active_query }}">
                                 <input type="hidden" name="token" value="">

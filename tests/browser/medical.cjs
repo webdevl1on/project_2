@@ -11,8 +11,9 @@ module.exports=async({context,base,adminToken})=>{
  const scenario=async(name,fn)=>{await fn();console.log('PASS medical: '+name);};
  try{
   await context.request.post(base+'/_column-test/documents/setup');await page.goto(base+'/person_full_info/1');
-  await scenario('personal GUI login guards medical records and preserves existing profile',async()=>{
-   await tab('injuries');const login=panel('injuries').locator('[data-medical-auth]');await login.locator('[name=username]').fill('doc-admin');await login.locator('[name=password]').fill(adminToken);await login.locator('button').click();await panel('injuries').locator('[data-medical-content]').waitFor({state:'visible'});
+  await scenario('personal session immediately opens medical data and preserves profile',async()=>{
+   await tab('injuries');await panel('injuries').locator('[data-medical-content]').waitFor({state:'visible'});
+   assert.equal(await panel('injuries').locator('[data-medical-auth]').isVisible(),false);
    assert.equal(await page.locator('#tab-service-history').count(),1);assert.equal(await page.locator('#tab-contacts').count(),1);
   });
   await scenario('injury independent of exams, automatic task exists once and linked sections work',async()=>{

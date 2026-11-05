@@ -69,6 +69,8 @@ def reset_data():
                     PersonEvent(person_id=people[1].person_id,event_type_id=old_sub.event_type_id,event_subtype_id=old_sub.event_subtype_id,date_start=date(2000,2,1),date_end=date(2000,2,2),duration=2,completion_confirmed=True)])
         db.commit()
 
+        from app.services.accounts import create_user
+        create_user(db,'browser-admin','Браузерний тестовий адміністратор',os.environ['PROJECT2_ADMIN_TOKEN'],'admin')
 
 reset_data()
 
@@ -144,10 +146,11 @@ def document_accounts():
     import os
     from app.services.accounts import create_user
     with Session() as db:
-        if os.environ.get('PROJECT2_DEV_AUTH_BYPASS')=='1':
-            from app.services.dev_auth import initialize
-            return {'user_id':initialize(db)}
-        key=create_user(db,'doc-admin','Тестовий адміністратор',os.environ['PROJECT2_ADMIN_TOKEN'],'admin')
+        from app.models import User
+        from sqlalchemy import select
+        actor=db.scalar(select(User.id).where(User.username=='browser-admin'))
+        existing=db.scalar(select(User.id).where(User.username=='doc-admin'))
+        key=existing or create_user(db,'doc-admin','Тестовий адміністратор',os.environ['PROJECT2_ADMIN_TOKEN'],'admin',actor_id=actor)
     return {'user_id':key,'person_id':3}
 
 

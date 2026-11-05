@@ -5,4 +5,5 @@
 {% for href,label,active in [('/persons','Люди',path.startswith('/persons') or path.startswith('/person_')),('/events','Журнал подій',path=='/events'),('/person-positions','Штатка',path=='/person-positions'),('/staff/history','Історія штату',path.startswith('/staff') and not staff_admin_path),('/admin','Адміністрування',path.startswith('/admin') or staff_admin_path)] %}
 <a href="{{ href }}" class="{{ 'active' if active else '' }}" {% if active %}aria-current="page"{% endif %}>{{ label }}</a>
 {% endfor %}
+{% if security_user is defined and security_user %}<span class="ms-auto small">{{ security_user.display_name }}</span><form method="post" action="/auth/logout" data-personal-logout><input type="hidden" name="csrf" value="{{ security_csrf }}"><button class="btn btn-sm btn-outline-secondary" type="submit">Вийти</button></form>{% endif %}
 </nav>

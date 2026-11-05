@@ -6,7 +6,7 @@ module.exports=async({context,base,adminToken})=>{
  const save=async k=>{if(k==='exams'){const f=panel(k).locator('[data-medical-form]'),s=await f.locator('[name=status]').inputValue();if(s==='PLANNED')await f.locator('[data-exact-date-for=planned_on]').fill('01.01.2026');if(s==='COMPLETED'){await f.locator('[data-exact-date-for=issued_on]').fill('03.01.2026');await f.locator('[name=number]').fill('001');await f.locator('[name=fitness]').selectOption('FIT');}}await panel(k).locator('[data-medical-form]').getByRole('button',{name:'Зберегти',exact:true}).click();await panel(k).locator('[data-medical-editor]').waitFor({state:'hidden'});await page.locator('[data-profile-toast]').filter({hasText:/Запис додано|Зміни збережено/}).waitFor();};
  try{
   await context.request.post(base+'/_column-test/documents/setup');await page.goto(base+'/person_full_info/1#injuries');
-  const login=panel('injuries').locator('[data-medical-auth]');await login.locator('[name=username]').fill('doc-admin');await login.locator('[name=password]').fill(adminToken);await login.locator('button').click();await panel('injuries').locator('[data-medical-content]').waitFor({state:'visible'});
+  await panel('injuries').locator('[data-medical-content]').waitFor({state:'visible'});
   await panel('injuries').locator('[data-medical-new]').click();
   assert.equal(await panel('injuries').locator('[name=exam_not_needed]').count(),0);
   await panel('injuries').locator('[name=description]').fill('Синтетичне поранення');await save('injuries');

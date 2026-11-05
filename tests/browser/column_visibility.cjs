@@ -49,7 +49,7 @@ async function main() {
         for (let attempt = 0; attempt < 100; attempt += 1) {
             if (server.exitCode !== null) throw new Error(serverOutput);
             try {
-                if ((await fetch(`${base}/person-positions`)).ok) { ready = true; break; }
+                if ((await fetch(`${base}/auth/login`)).ok) { ready = true; break; }
             } catch { /* Server is still starting. */ }
             await new Promise(resolve => setTimeout(resolve, 100));
         }
@@ -67,7 +67,21 @@ async function main() {
             const version = route.request().url().split("bootstrap@")[1].split("/")[0];
             return route.fulfill({ body: assets[`${version}/${file}`], contentType: file.endsWith(".js") ? "application/javascript" : "text/css" });
         });
-        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "events", "journal", "event_lifecycle", "event_corrections", "journal_snapshot", "history_forms", "assignment_history", "name_cases", "geography", "contacts", "personnel", "service_bases", "documents", "workspace", "medical", "injury_vlk", "vlk_workflow"];
+        async function signIn(){
+            const response=await context.request.post(base+'/auth/login',{data:{username:'browser-admin',password:adminToken}});
+            assert.equal(response.status(),200,await response.text());
+        }
+        const rawPost=context.request.post.bind(context.request);
+        context.request.post=async(url,options={})=>{
+            const target=new URL(url,base);
+            if(target.origin===base&&target.pathname!=='/auth/login'){
+                const me=await context.request.get(base+'/auth/me');
+                if(me.ok())options={...options,headers:{'X-CSRF-Token':(await me.json()).csrf_token,...options.headers}};
+            }
+            return rawPost(url,options);
+        };
+        await signIn();
+        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "events", "journal", "event_lifecycle", "event_corrections", "journal_snapshot", "history_forms", "assignment_history", "security", "name_cases", "geography", "contacts", "personnel", "service_bases", "documents", "workspace", "medical", "injury_vlk", "vlk_workflow"];
         if (process.env.COLUMN_STAGE) {
             assert.ok([...suites,'dev_auth','open_access','profile_dates','document_ui','document_workflow','additional_records'].includes(process.env.COLUMN_STAGE));
             await require(`./${process.env.COLUMN_STAGE}.cjs`)({ context, base, adminToken });
@@ -253,7 +267,7 @@ async function main() {
             assert.ok(box.x >= 0 && box.x + box.width <= 390);
             assert.deepEqual(errors, []);
         });
-        for (const suite of suites) { await context.clearCookies(); await context.request.post(base+"/_column-test/reset"); await require(`./${suite}.cjs`)({ context, base, adminToken }); }
+        for (const suite of suites) { await context.clearCookies(); await signIn(); await context.request.post(base+"/_column-test/reset"); await signIn(); await require(`./${suite}.cjs`)({ context, base, adminToken }); }
     } catch (error) {
         if(serverOutput.includes("Traceback"))console.error(serverOutput);
         throw error;

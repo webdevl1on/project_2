@@ -28,7 +28,7 @@ class Settings:
             if url.database!='project2_prod':raise ValueError('Production потребує project2_prod з окремим обліковим записом.')
             if not url.drivername.startswith('postgresql') or not url.host or not url.database or not url.username:raise ValueError('Production потребує явного PostgreSQL-підключення.')
             if len(os.environ.get('STAFF_SIGNING_KEY',''))<32:raise ValueError('Production потребує стабільного STAFF_SIGNING_KEY (32+ символів).')
-            if os.environ.get('PROJECT2_AUTH_ENABLED')!='1' or any(os.environ.get(k)=='1' for k in ('PROJECT2_DEV_AUTH_BYPASS','PROJECT2_DEV_ADMIN_OPEN')):raise ValueError('Production забороняє вимкнену авторизацію та dev bypass.')
+            if os.environ.get('PROJECT2_AUTH_ENABLED','1')!='1' or any(os.environ.get(k)=='1' for k in ('PROJECT2_DEV_AUTH_BYPASS','PROJECT2_DEV_ADMIN_OPEN')):raise ValueError('Production забороняє вимкнену авторизацію та dev bypass.')
         keys={'documents':'PROJECT2_DOCUMENT_STORAGE','photos':'PROJECT2_PHOTO_STORAGE','temporary':'PROJECT2_TEMP_STORAGE','exports':'PROJECT2_EXPORT_STORAGE','backups':'PROJECT2_BACKUP_STORAGE'}
         if mode=='production' and any(not os.environ.get(k) for k in keys.values()):raise ValueError('Production потребує всіх окремих файлових каталогів.')
         paths={name:Path(os.environ.get(key,f'data/{mode}/{name}')).resolve() for name,key in keys.items()}
