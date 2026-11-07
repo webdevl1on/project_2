@@ -1,3 +1,4 @@
+from tests.mfa_helpers import finish_http
 """Whole-application Security 1.1, with real sessions and isolated synthetic data."""
 from datetime import datetime,UTC,timedelta
 import re
@@ -32,7 +33,7 @@ def secure(tmp_path,monkeypatch):
 
 
 def login(client,role='editor'):
-    response=client.post('/auth/login',json={'username':'security_'+role,'password':'synthetic-password'})
+    response=finish_http(client,client.post('/auth/login',json={'username':'security_'+role,'password':'synthetic-password'}))
     assert response.status_code==200,response.text
     return response.json()['csrf_token']
 
@@ -86,7 +87,7 @@ def test_html_redirect_api_401_login_and_safe_return(secure):
     page=client.get(response.headers['location']);assert page.status_code==200 and 'Персональний вхід' in page.text
     assert '0123456789' not in page.text
     assert client.get('/events/data').status_code==401
-    response=client.post('/auth/login',json={'username':'security_editor','password':'synthetic-password','return_to':'/staff/history?version_id=1&q=27'})
+    response=finish_http(client,client.post('/auth/login',json={'username':'security_editor','password':'synthetic-password','return_to':'/staff/history?version_id=1&q=27'}))
     assert response.status_code==200 and response.json()['redirect_to']=='/staff/history?version_id=1&q=27'
     assert 'HttpOnly' in response.headers['set-cookie'] and 'Secure' in response.headers['set-cookie'] and 'SameSite=strict' in response.headers['set-cookie']
     assert client.get('/persons').status_code==200
@@ -104,7 +105,8 @@ def test_invalid_sessions_cannot_read_or_write(secure,condition):
     if condition=='tampered':client.cookies.clear();client.cookies.set('project2_user','forged')
     else:
         with factory() as db:
-            if condition=='expired':db.scalar(select(UserSession)).expires_at=datetime.now(UTC)-timedelta(seconds=1)
+            if condition=='expired':
+                row=db.scalar(select(UserSession));row.created_at=datetime.now(UTC)-timedelta(hours=2);row.last_activity=row.created_at;row.mfa_verified_at=row.created_at;row.expires_at=datetime.now(UTC)-timedelta(seconds=1)
             elif condition=='revoked':db.delete(db.scalar(select(UserSession)))
             else:db.get(User,ids['editor']).is_active=False
             db.commit()

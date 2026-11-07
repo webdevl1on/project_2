@@ -1,3 +1,4 @@
+from tests.mfa_helpers import finish_http
 """Synthetic additional records, isolated SQLite and the existing real audit actor."""
 from datetime import date
 import pytest
@@ -52,7 +53,7 @@ def test_additional_api_uses_current_authorization_and_csrf(client, prepared):
     browser, _ = client;pid=prepared[3]
     path=f'/persons/{pid}/profile-records/education'
     assert browser.get(path).status_code in (401,403)
-    logged=browser.post('/auth/login',json={'username':'admin','password':'test-password-123'}).json()
+    logged=finish_http(browser,browser.post('/auth/login',json={'username':'admin','password':'test-password-123'})).json()
     assert browser.get(path).status_code == 200
     body={'fields':{'level_code':'vocational'}}
     assert browser.post(path,json=body).status_code == 403

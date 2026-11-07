@@ -79,7 +79,13 @@ async def create(request:Request,user=Depends(current_user),db:Session=Depends(g
 @router.post('/admin/users/{key:int}/{action}')
 async def change(request:Request,key:int,action:str='edit',user=Depends(current_user),db:Session=Depends(get_db)):
     try:
-        data=await payload(request);rev=revision(data);reason=data.get('reason')
+        data=await payload(request);reason=data.get('reason')
+        if action=='reset-mfa':
+            if data.get('confirmed') is not True:raise ValueError('Підтвердьте перевірку особи.')
+            from app.services import mfa
+            mfa.recover(db,user.id,key,reason)
+            return {'ok':True,'redirect_to':f'/admin/users/{key}'}
+        rev=revision(data)
         if action=='edit':accounts.update_user(db,user.id,key,rev,display_name=data.get('display_name'),role=data.get('role'),reason=reason,confirmed=confirmed(data))
         elif action=='state':
             if data.get('active') not in (True,False,'0','1','true','false'):raise ValueError('Вкажіть новий статус користувача.')

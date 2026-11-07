@@ -1,3 +1,4 @@
+from tests.mfa_helpers import finish_http
 """Actual PostgreSQL: whole-route denial and real personal-session regression."""
 from fastapi.testclient import TestClient
 from app.main import app
@@ -22,7 +23,7 @@ def test_postgresql_all_registered_routes_fail_closed_and_real_roles_work(pg_fac
                 path=re.sub(r'\{[^}]+\}','1',path)
                 response=client.request(method,path,json={} if method not in ('GET','HEAD') else None,follow_redirects=False)
                 assert response.status_code==401,(method,path,response.text)
-            response=client.post('/auth/login',json={'username':'security-editor','password':'synthetic-password'})
+            response=finish_http(client,client.post('/auth/login',json={'username':'security-editor','password':'synthetic-password'}))
             assert response.status_code==200
             csrf=response.json()['csrf_token']
             for path in ['/persons','/person-positions','/staff/history','/events']:

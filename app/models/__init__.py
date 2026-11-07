@@ -55,3 +55,5 @@ from app.models.event_correction import PersonEventCorrection
 __all__ += ['PersonEventCorrection']
 from app.models.assignment_audit import AssignmentAudit
 __all__ += ['AssignmentAudit']
+from app.models.mfa import MfaKeyState,TotpFactor,Passkey,RecoveryCode,AuthFlow
+__all__ += ['MfaKeyState','TotpFactor','Passkey','RecoveryCode','AuthFlow']

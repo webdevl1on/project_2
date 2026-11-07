@@ -1,3 +1,4 @@
+from tests.mfa_helpers import finish_http
 """Synthetic words and isolated SQLite only; no production dictionary or people."""
 from io import BytesIO
 import secrets
@@ -316,7 +317,7 @@ def login(client, token):
             actor=db.scalar(select(User.id).where(User.role=='admin'))
             accounts.create_user(db,'fixture-admin','Тестовий адміністратор',token,'admin',actor_id=actor)
     finally:dependency.close()
-    response=client.post('/auth/login',json={'username':'fixture-admin','password':token})
+    response=finish_http(client,client.post('/auth/login',json={'username':'fixture-admin','password':token}))
     assert response.status_code==200,response.text
     return response.json()['csrf_token']
 
@@ -338,7 +339,7 @@ def test_admin_denies_mutations_without_login_or_csrf_and_is_disabled_by_default
 def test_admin_cookie_transport_and_manual_editor(client):
     client, token = client
     login(client,token)
-    response = client.post('/auth/login',json={'username':'fixture-admin','password':token})
+    response = finish_http(client,client.post('/auth/login',json={'username':'fixture-admin','password':token}))
     cookie = response.headers["set-cookie"]
     assert "HttpOnly" in cookie and "Secure" in cookie and "SameSite=strict" in cookie and "Path=/" in cookie
     csrf = html.fromstring(client.get("/admin").text).xpath('//input[@name="csrf"]/@value')[0]

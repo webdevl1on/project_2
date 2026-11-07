@@ -11,7 +11,10 @@ module.exports=async({context,base,adminToken})=>{
   const bad=await page.evaluate(async()=>{const r=await fetch('/staff/structures',{method:'POST',body:new URLSearchParams({code:'bad',name:'bad'}),headers:{'X-CSRF-Token':'wrong'}});return r.status;});assert.equal(bad,403);
   // Real legacy fetch has no local CSRF implementation; the shared wrapper supplies it.
   const created=await page.evaluate(async()=>{const r=await fetch('/staff/structures',{method:'POST',body:new URLSearchParams({code:'security-browser',name:'Тестова структура'})});return r.status;});assert.equal(created,200);
-  const renewed=await page.evaluate(async(password)=>{const before=document.querySelector('meta[name="project2-csrf"]').content;const r=await fetch('/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'browser-admin',password})});const data=await r.json();return {changed:before!==data.csrf_token,meta:document.querySelector('meta[name="project2-csrf"]').content===data.csrf_token,forms:[...document.querySelectorAll('form input[name=csrf]')].every(n=>n.value===data.csrf_token)};},adminToken);assert.deepEqual(renewed,{changed:true,meta:true,forms:true});
+  const oldToken=await page.locator('meta[name="project2-csrf"]').getAttribute('content');
+  await page.evaluate(async password=>fetch('/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'browser-admin',password})}),adminToken);
+  const pending=await require('./mfa_helpers.cjs').verify(context.request,base);
+  const renewed=await page.evaluate(async({csrf,oldToken})=>{const r=await fetch('/auth/mfa/finish',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:'{}'});const data=await r.json();return {changed:oldToken!==data.csrf_token,meta:document.querySelector('meta[name="project2-csrf"]').content===data.csrf_token,forms:[...document.querySelectorAll('form input[name=csrf]')].every(n=>n.value===data.csrf_token)};},{csrf:pending.csrf_token,oldToken});assert.deepEqual(renewed,{changed:true,meta:true,forms:true});
   console.log('PASS security: existing fetch callers gain valid CSRF, explicit wrong tokens fail and re-login refreshes native forms');
   await context.request.post(base+'/auth/users',{data:{username:'browser-viewer',display_name:'Тестовий спостерігач',role:'viewer',password:adminToken}});
   await context.request.post(base+'/auth/logout');
@@ -23,7 +26,7 @@ module.exports=async({context,base,adminToken})=>{
   console.log('PASS security: logout revokes the personal session and denies protected reads');
   const native=await context.browser().newContext({javaScriptEnabled:false});
   try{
-   const login=await native.request.post(base+'/auth/login',{data:{username:'browser-admin',password:adminToken}});assert.equal(login.status(),200);
+   const login=await native.request.post(base+'/auth/login',{data:{username:'browser-admin',password:adminToken}});assert.equal(login.status(),200);await require('./mfa_helpers.cjs').complete(native.request,base);
    const formPage=await native.newPage();await formPage.goto(base+'/admin/staff');const form=formPage.locator('form[action="/staff/structures"]');
    await form.locator('..').locator(':scope > summary').click();await form.locator('[name=code]').fill('security-no-js');await form.locator('[name=name]').fill('Нативна тестова форма');
    assert.ok(await form.locator('[name=csrf]').first().inputValue());await Promise.all([formPage.waitForNavigation(),form.locator('button').click()]);assert.match(await formPage.locator('body').innerText(),/Структуру створено/);

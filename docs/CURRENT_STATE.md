@@ -1,6 +1,6 @@
 # Поточний стан project_2
 
-Поточна політика безпеки — **Security 1.1 + 1.2: обов’язкова персональна автентифікація та керування Master/Admin**. Старі open-access/dev-admin режими скасовані; історичні описи нижче не є інструкціями їх увімкнення. Деталі й запуск — [SECURITY.md](SECURITY.md).
+Поточна політика безпеки — **Security 1.1–1.3: обов’язкова MFA, Master/Admin та сесії 15 хв / 8 год**. Старі open-access/dev-admin режими скасовані; історичні описи нижче не є інструкціями їх увімкнення. Деталі й запуск — [SECURITY.md](SECURITY.md).
 
 ## PostgreSQL: поточний стан переходу (2026-11-01)
 
@@ -626,3 +626,18 @@ AccountAudit атомарний зі зміною User/сесій, містит�
 Новий поточний head — **0006_account_management**, адитивно після 0005. Робочі БД, реальні користувачі й testing не змінювалися, commit/push/merge/reset не виконувалися. Потрібні backup та ручне alembic upgrade head; потім, за потреби, явна команда promote_master з підтвердженим ID наявного користувача. Деталі — [SECURITY.md](SECURITY.md), [POSTGRESQL_SETUP.md](POSTGRESQL_SETUP.md). Security 1.3, 2FA, ACL, делегування, передавання Master та відновлення його втраченого пароля залишені поза цим етапом.
 
 Фінальні перевірки Security 1.2: `python -m pytest tests/ -q` — **1016 passed / 65 PostgreSQL skipped**; окремий повний PostgreSQL 17 набір тільки project2_ci — **65 passed**; Node — **56 passed**; повний Chromium — **184 успішні сценарії**, зокрема 8 нових керування користувачами. Додатково пройшли цільові HTTP/CLI, права Master у документальних/медичних сервісах, облік прострочених сесій, Python/JS syntax, всі Jinja-шаблони, один Alembic head 0006 та diff check. Два попередні deprecation-попередження залишилися. Точні команди, повний перелік 33 змінених/нових файлів та межі перевірок — [SECURITY.md](SECURITY.md#фактично-виконані-перевірки-security-12).
+
+
+## Security 1.3 — MFA та захист сесій (2026-11-07)
+
+Реалізовано двоетапний вхід: пароль створює тільки обмежений п’ятихвилинний AuthFlow у БД; повна UserSession — лише після підтвердження TOTP/Passkey або одноразового резервного коду. Усі персональні ролі, включно з чинним Master, проходять MFA без винятків. Старі password-only сесії з NULL mfa_verified_at відхиляються. Початкове налаштування не відкриває предметних даних і не змінює ID/роль/пароль.
+
+Додано TotpFactor/Passkey/RecoveryCode/AuthFlow/MfaKeyState, FK/index/CHECK, зашифрований TOTP зі стабільним зовнішнім Fernet key ring, QR/ручний секрет, перевірку кодом перед активацією, replay guard та lockout. WebAuthn бібліотека перевіряє challenge/origin/RP/signature/presence/обов’язковий UV/лічильник; кілька ключів, перейменування/відкликання. 10 випадкових резервних кодів показуються один раз, зберігаються лише digest, одноразові та замінюються тільки явно. Підтверджена заміна втраченого TOTP можлива після резервного входу без Passkey.
+
+UserSession має точні UTC created_at/last_activity/expires_at/mfa_verified_at та несекретний випадковий ID. Idle — 15 хвилин конкретної сесії, абсолютна межа — 8 годин, fresh MFA — 5 хвилин для критичних дій. Фонові GET/refresh/polling не оновлюють last_activity; погоджений GUI надсилає activity тільки на trusted взаємодію, а локальний таймер лише попереджає. Власні сесії доступні у навігації; можна завершити одну іншу чи всі інші, не отримуючи токенів/хешів.
+
+AccountAudit розширено без дублювання механізму. MFA/коди/сесії та аудит атомарні; примусове відкликання також анулює незавершені входи. Fresh-MFA адміністративне recovery документує перевірку особи, відкликає фактори/коди/flow/сесії та вимагає нового налаштування. Admin не скидає Master; серверне відновлення Master — явна локальна Administrator/root CLI із поточним паролем, причиною й підтвердженням, без emergency endpoint/token.
+
+Новий head **0007_mfa_sessions** після 0006, попередні ревізії не змінені. Робочі БД/користувачі й testing не змінювалися, commit/push/merge/reset не виконувалися. Перед ручним upgrade потрібні backup БД, постійні MFA-ключі та їх окремий backup, точні RP/origins, нові залежності; після upgrade — явне mfa_keys --initialize. Startup перевіряє marker/config, не мігрує й не генерує ключ. Деталі, ротація, локальна перевірка й межі — [SECURITY.md](SECURITY.md), [POSTGRESQL_SETUP.md](POSTGRESQL_SETUP.md).
+
+Фінальні фактичні перевірки 1.3: **1060 Python passed / 71 PostgreSQL skipped**, окремий PostgreSQL 17 тільки project2_ci — **71 passed**, Node — **57 passed**, повний Chromium — **187 успішних сценаріїв**. Після відокремлення HTTP від сервісів власних сесій повторено 34 MFA-тести, включно з межею freshness для flow керування факторами. Реальні WebAuthn підписи/UV підтверджені Python crypto та Chromium CTAP2 virtual authenticator; фізичні Windows Hello/Android/USB-ключі, Windows OS-права, інші браузери й зовнішній deployment не перевірені. Час перевірений керованим clock; два попередні deprecation-попередження залишилися. Повний перелік файлів, команди, ключі й межі — [SECURITY.md](SECURITY.md#результати-перевірок-security-13).

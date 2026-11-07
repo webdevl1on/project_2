@@ -1,3 +1,4 @@
+from tests.mfa_helpers import finish_http
 """Medical facts use synthetic people, isolated SQLite and private temporary files."""
 from datetime import date
 import sqlite3
@@ -266,7 +267,7 @@ def test_protected_api_rejects_anonymous_csrf_and_viewer_writes(client,prepared,
     monkeypatch.setenv('PROJECT2_AUTH_ALLOW_LOCAL_HTTP','1')
     monkeypatch.setenv('PROJECT2_DEV_ADMIN_OPEN','1')
     assert browser.get(f'/persons/{pid}/medical').status_code==401
-    login=browser.post('/auth/login',json={'username':'viewer','password':'test-password-123'})
+    login=finish_http(browser,browser.post('/auth/login',json={'username':'viewer','password':'test-password-123'}))
     csrf=login.json()['csrf_token']
     assert browser.get(f'/persons/{pid}/medical').status_code==200
     assert browser.post(f'/persons/{pid}/medical/injuries',json={'fields':{}}).status_code==403

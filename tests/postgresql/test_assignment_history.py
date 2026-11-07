@@ -1,3 +1,4 @@
+from tests.mfa_helpers import login as mfa_login
 """Actual PostgreSQL 17: additive migration, exclusion predicates, audit races."""
 from datetime import date as D
 from concurrent.futures import ThreadPoolExecutor
@@ -102,7 +103,7 @@ def test_postgresql_two_real_cookie_authors_and_unknown_actor(pg_factory,monkeyp
         pid,pos=people[0].person_id,positions[1].position_id
         a=accounts.create_user(db,'author_one','Автор один','synthetic-password','admin')
         b=accounts.create_user(db,'author_two','Автор два','synthetic-password','editor',actor_id=a)
-        first,csrf_a=accounts.login(db,'author_one','synthetic-password');second,csrf_b=accounts.login(db,'author_two','synthetic-password')
+        first,csrf_a=mfa_login(db,'author_one','synthetic-password');second,csrf_b=mfa_login(db,'author_two','synthetic-password')
     def override():
         with pg_factory() as db:yield db
     app.dependency_overrides[get_db]=override

@@ -19,10 +19,11 @@ async def login(request: Request, db: Session = Depends(get_db)):
     try:data = await request.json()
     except ValueError:raise HTTPException(400,'Неправильний JSON.') from None
     if not isinstance(data, dict): raise HTTPException(400, 'Потрібен об’єкт JSON.')
-    try: token, csrf = accounts.login(db, data.get('username'), data.get('password'))
+    from app.services import mfa
+    try: token, csrf = mfa.begin(db, data.get('username'), data.get('password'),safe_return(data.get('return_to')))
     except PermissionError as error: raise HTTPException(401, str(error)) from error
-    response = JSONResponse({'ok': True, 'csrf_token': csrf, 'redirect_to':safe_return(data.get('return_to'))}, headers={'Cache-Control':'no-store'})
-    response.set_cookie(COOKIE, token, httponly=True, secure=request.url.scheme=='https', samesite='strict', max_age=28800, path='/')
+    response = JSONResponse({'ok': True, 'csrf_token': csrf, 'redirect_to':'/auth/mfa'}, headers={'Cache-Control':'no-store'})
+    response.set_cookie('project2_pending', token, httponly=True, secure=request.url.scheme=='https', samesite='strict', max_age=300, path='/')
     return response
 
 

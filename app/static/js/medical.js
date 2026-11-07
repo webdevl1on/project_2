@@ -87,7 +87,7 @@
  async function load(){state=await request(base);render();}
  for(const panel of panels){
   panel.querySelector('[data-task-history]')?.addEventListener('change',render);
-  panel.querySelector('[data-medical-auth]').addEventListener('submit',async event=>{event.preventDefault();const form=event.target;try{const result=await request('/auth/login',{username:form.username.value,password:form.password.value});csrf=result.csrf_token;form.password.value='';const me=await request('/auth/me');role=me.role;await load();message(panel,'Вхід виконано.');}catch(error){message(panel,error.message,true);}});
+  panel.querySelector('[data-medical-auth]').addEventListener('submit',async event=>{event.preventDefault();const form=event.target;try{const result=await request('/auth/login',{username:form.username.value,password:form.password.value});form.password.value='';if(result.redirect_to==='/auth/mfa'){location.assign(result.redirect_to);return;}csrf=result.csrf_token;const me=await request('/auth/me');role=me.role;await load();message(panel,'Вхід виконано.');}catch(error){message(panel,error.message,true);}});
   panel.querySelector('[name=status]')?.addEventListener('change',()=>configureExam(panel));
   configureExam(panel);
   panel.querySelector('[data-medical-new]').addEventListener('click',()=>{message(panel,'');edit(panel,null);});

@@ -42,7 +42,7 @@ module.exports=async({context,base,adminToken})=>{
   // A second live browser session is revoked on disable, and stays revoked on enable.
   const other=await context.browser().newContext();
   try{
-   assert.equal((await other.request.post(base+'/auth/login',{data:{username:'account-editor',password}})).status(),200);
+   assert.equal((await other.request.post(base+'/auth/login',{data:{username:'account-editor',password}})).status(),200);await require('./mfa_helpers.cjs').complete(other.request,base);
    await page.goto(base+`/admin/users/${editor}`);
    await page.getByText('Вимкнути користувача',{exact:true}).click();form=page.locator('form[action$="/state"]');await form.locator('[name=confirmed]').check();await submit(form);
    assert.equal((await other.request.get(base+'/auth/me')).status(),401);assert.match(await page.locator('body').innerText(),/Вимкнений адміністратором/);

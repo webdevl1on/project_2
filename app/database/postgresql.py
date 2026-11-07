@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 from sqlalchemy import inspect,text
 
-REVISION='0006_account_management'
+REVISION='0007_mfa_sessions'
 
 
 def require_postgresql_schema(engine):
@@ -20,7 +20,7 @@ def require_postgresql_schema(engine):
     root=Path(__file__).resolve().parents[2]/'migrations/sql'
     guard_sql=(root/'initial_guards.sql').read_text()
     expected_triggers=set(re.findall(r'CREATE TRIGGER (\w+)',guard_sql)) | {'account_audit_no_update','account_audit_no_delete','users_no_insert_master','users_policy_update','users_no_delete','assignment_audit_no_update','assignment_audit_no_delete','assignment_annulled_guard','event_correction_no_update','event_correction_no_delete','person_event_no_delete','person_event_annulled_immutable'}
-    expected_constraints=set(re.findall(r'ALTER TABLE (\w+) ADD CONSTRAINT (\w+)',guard_sql)) | {('users','users_role_allowed'),('users','master_personal_active'),('account_audit','account_audit_operation'),('person_assignments','assignment_annulment_reason'),('assignment_audit','assignment_audit_operation')}
+    expected_constraints=set(re.findall(r'ALTER TABLE (\w+) ADD CONSTRAINT (\w+)',guard_sql)) | {('user_sessions','session_mfa_times'),('auth_flows','auth_flow_kind'),('auth_flows','auth_flow_attempts'),('mfa_key_state','one_mfa_key_state'),('users','users_role_allowed'),('users','master_personal_active'),('account_audit','account_audit_operation'),('person_assignments','assignment_annulment_reason'),('assignment_audit','assignment_audit_operation')}
     with engine.connect() as db:
         if set(db.scalars(text('SELECT version_num FROM alembic_version')))!={REVISION}:missing.append('Alembic revision')
         triggers=set(db.scalars(text("SELECT t.tgname FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=current_schema() AND NOT t.tgisinternal AND t.tgenabled!='D'")))

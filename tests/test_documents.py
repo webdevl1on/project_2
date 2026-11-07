@@ -1,3 +1,5 @@
+from tests.mfa_helpers import finish_http
+from tests.mfa_helpers import login as mfa_login
 """Isolated infrastructure tests; no real files or personnel."""
 from datetime import date, datetime, UTC, timedelta
 import sqlite3
@@ -35,8 +37,8 @@ def test_accounts_are_personal_passwords_hashed_sessions_revocable(factory,prepa
         with pytest.raises(PermissionError):accounts.create_user(db,'second','Другий','test-password-123','admin')
         with pytest.raises(PermissionError):accounts.create_user(db,'unauthorized','Чужий','test-password-123',actor_id=viewer)
         with pytest.raises(ValueError):accounts.create_user(db,'weak','Тест','short',actor_id=admin)
-        with pytest.raises(PermissionError):accounts.login(db,'admin','incorrect')
-        token,csrf=accounts.login(db,'admin','test-password-123')
+        with pytest.raises(PermissionError):mfa_login(db,'admin','incorrect')
+        token,csrf=mfa_login(db,'admin','test-password-123')
         user,session=accounts.authenticate(db,token)
         assert user.id==admin and session.token_hash!=token and len(csrf)==64
         accounts.logout(db,token)
@@ -47,14 +49,14 @@ def test_failed_login_lock_and_expired_session(factory,prepared):
     admin,editor,viewer,pid,_=prepared
     with factory() as db:
         for _ in range(5):
-            with pytest.raises(PermissionError):accounts.login(db,'admin','wrong')
+            with pytest.raises(PermissionError):mfa_login(db,'admin','wrong')
         assert db.get(User,admin).locked_until is not None
-        with pytest.raises(PermissionError):accounts.login(db,'admin','test-password-123')
+        with pytest.raises(PermissionError):mfa_login(db,'admin','test-password-123')
         db.get(User,admin).locked_until=datetime.now(UTC)-timedelta(minutes=1);db.commit()
-        token,_=accounts.login(db,'admin','test-password-123')
-        session=db.get(UserSession,accounts.digest_token(token));session.expires_at=datetime.now(UTC)-timedelta(seconds=1);db.commit()
+        token,_=mfa_login(db,'admin','test-password-123')
+        session=db.get(UserSession,accounts.digest_token(token));session.created_at=datetime.now(UTC)-timedelta(hours=2);session.last_activity=session.created_at;session.mfa_verified_at=session.created_at;session.expires_at=datetime.now(UTC)-timedelta(seconds=1);db.commit()
         with pytest.raises(PermissionError):accounts.authenticate(db,token)
-        token,_=accounts.login(db,'editor','test-password-123')
+        token,_=mfa_login(db,'editor','test-password-123')
         db.get(User,editor).is_active=False;db.commit()
         with pytest.raises(PermissionError):accounts.authenticate(db,token)
 
@@ -236,7 +238,7 @@ def test_protected_json_api_ignores_legacy_admin_bypass(client,factory,prepared,
     monkeypatch.setenv('PROJECT2_DEV_ADMIN_OPEN','1')
     monkeypatch.setenv('PROJECT2_DOCUMENT_STORAGE',str(tmp_path/'private'))
     assert browser.get(f'/persons/{pid}/documents').status_code==401
-    login=browser.post('/auth/login',json={'username':'editor','password':'test-password-123'})
+    login=finish_http(browser,browser.post('/auth/login',json={'username':'editor','password':'test-password-123'}))
     assert login.status_code==200 and 'HttpOnly' in login.headers['set-cookie'] and 'Secure' in login.headers['set-cookie']
     csrf=login.json()['csrf_token']
     assert browser.post(f'/persons/{pid}/documents',json={'type':'other','details':{}}).status_code==403

@@ -1,3 +1,4 @@
+from tests.mfa_helpers import finish_http
 """Explicit regression client: real synthetic user, login cookie and CSRF.
 
 Never imported by app/. Requires a test DB dependency override; no runtime bypass.
@@ -28,6 +29,6 @@ class AuthenticatedClient(TestClient):
                 insert=pg_insert if url.get_backend_name()=='postgresql' else sqlite_insert
                 db.execute(insert(User).values(username='regression-client',display_name='Тестовий користувач регресії',role='admin',password_hash=accounts.password_hash('synthetic-regression-password')).on_conflict_do_nothing(index_elements=['username']));db.commit()
         finally:dependency.close()
-        response=super().post('/auth/login',json={'username':'regression-client','password':'synthetic-regression-password'})
+        response=finish_http(self,super().post('/auth/login',json={'username':'regression-client','password':'synthetic-regression-password'}))
         if response.status_code!=200:raise AssertionError(response.text)
         self.headers['X-CSRF-Token']=response.json()['csrf_token']

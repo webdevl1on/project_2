@@ -48,11 +48,14 @@ class AccountRepository:
 
     @staticmethod
     def revoke_sessions(db,key):
+        from app.models.mfa import AuthFlow
+        db.execute(delete(AuthFlow).where(AuthFlow.user_id==key))
         return db.execute(delete(UserSession).where(UserSession.user_id==key)).rowcount
 
     @staticmethod
     def session_count(db,key):
-        return db.scalar(select(func.count()).select_from(UserSession).where(UserSession.user_id==key,UserSession.expires_at>datetime.now(UTC)))
+        from app.services.mfa import now,IDLE
+        return db.scalar(select(func.count()).select_from(UserSession).where(UserSession.user_id==key,UserSession.expires_at>now(),UserSession.mfa_verified_at.is_not(None),UserSession.last_activity>now()-IDLE))
 
     @staticmethod
     def audit(db,key=None,offset=0):

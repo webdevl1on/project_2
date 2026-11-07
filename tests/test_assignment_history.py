@@ -1,3 +1,4 @@
+from tests.mfa_helpers import login as mfa_login
 """Assignment history, author attribution and rollback on isolated SQLite."""
 from datetime import date as D, timedelta
 import pytest
@@ -193,7 +194,7 @@ def test_two_personal_authors_body_spoof_ignored_and_anonymous_null(data):
     db,_,_,positions,people=data
     a=accounts.create_user(db,'author_a','Автор А','synthetic-password','admin')
     b=accounts.create_user(db,'author_b','Автор Б','synthetic-password','editor',actor_id=a)
-    token_a,csrf_a=accounts.login(db,'author_a','synthetic-password');token_b,csrf_b=accounts.login(db,'author_b','synthetic-password')
+    token_a,csrf_a=mfa_login(db,'author_a','synthetic-password');token_b,csrf_b=mfa_login(db,'author_b','synthetic-password')
     def override():yield db
     app.dependency_overrides[get_db]=override
     try:

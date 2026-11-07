@@ -13,3 +13,5 @@ def personal(user):
 
 def has_role(user, roles):
     return bool(user and (user.role in roles or user.role=='master' and 'admin' in roles))
+
+OPERATIONS.update({'mfa_enroll':'Налаштування MFA','factor_add':'Додавання / перейменування фактора','factor_remove':'Видалення фактора','backup_use':'Використання резервного коду','backup_generate':'Нові резервні коди','mfa_recover':'Відновлення MFA','mfa_reauth':'Повторне підтвердження MFA'})

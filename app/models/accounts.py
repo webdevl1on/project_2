@@ -29,6 +29,11 @@ class UserSession(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), index=True)
     csrf_token: Mapped[str] = mapped_column(String(64))
     expires_at: Mapped[datetime] = mapped_column(DateTime)
+    public_id: Mapped[str | None] = mapped_column(String(32),unique=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_activity: Mapped[datetime | None] = mapped_column(DateTime)
+    mfa_verified_at: Mapped[datetime | None] = mapped_column(DateTime)
+    __table_args__=(CheckConstraint("mfa_verified_at IS NULL OR (public_id IS NOT NULL AND created_at IS NOT NULL AND last_activity IS NOT NULL AND last_activity>=created_at AND mfa_verified_at>=created_at AND mfa_verified_at<expires_at AND expires_at>created_at)",name='session_mfa_times'),)
 
 
 class AccountAudit(Base):
@@ -41,7 +46,7 @@ class AccountAudit(Base):
     before: Mapped[dict] = mapped_column(JSON)
     after: Mapped[dict] = mapped_column(JSON)
     reason: Mapped[str | None] = mapped_column(String(2000))
-    __table_args__=(CheckConstraint("operation IN ('create','edit','role_change','block','unblock','password_reset','password_change','sessions_revoke','promote_master')",name='account_audit_operation'),)
+    __table_args__=(CheckConstraint("operation IN ('create','edit','role_change','block','unblock','password_reset','password_change','sessions_revoke','promote_master','mfa_enroll','factor_add','factor_remove','backup_use','backup_generate','mfa_recover','mfa_reauth')",name='account_audit_operation'),)
 
 
 @event.listens_for(Base.metadata,'after_create')

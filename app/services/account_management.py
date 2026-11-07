@@ -33,7 +33,7 @@ def audit_page(db,actor_id,key=None,page=1):
     accounts.authorize(db,actor_id,('admin',))
     page=max(1,page)
     fields={'id':'ID','username':'Логін','display_name':'Відображуване ім’я','role':'Роль','is_active':'Активний','revision':'Версія запису',
-            'password_changed':'Пароль змінено','revoked_sessions':'Відкликано сесій'}
+            'factor_kind':'Вид фактора','factor_id':'ID фактора','renamed':'Перейменовано','password_changed':'Пароль змінено','revoked_sessions':'Відкликано сесій'}
     def value(field,item):
         if field=='role':return ROLES.get(item,item)
         if type(item) is bool:return 'Так' if item else 'Ні'

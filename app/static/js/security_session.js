@@ -19,9 +19,10 @@
    init={...init,headers};
   }
   const response=await original(input,init);
-  if(local&&url.pathname==='/auth/login'&&response.ok){
+  if(local&&url.pathname==='/auth/mfa/finish'&&response.ok){
    try{const data=await response.clone().json();if(data.csrf_token){const meta=document.querySelector('meta[name="project2-csrf"]');if(meta)meta.content=data.csrf_token;document.querySelectorAll('form input[name=csrf]').forEach(input=>{input.value=data.csrf_token;input.defaultValue=data.csrf_token;});}}catch{}
   }
+  if(local&&response.status===403){try{const detail=(await response.clone().json()).detail;if(typeof detail==='string'&&detail.startsWith('MFA_REAUTH_REQUIRED')&&!document.getElementById('mfa-reauth-needed')){const box=document.createElement('div');box.id='mfa-reauth-needed';box.className='alert alert-warning';box.append('Потрібне свіже підтвердження особи. ');const link=document.createElement('a');link.href='/account/security';link.textContent='Підтвердити пароль і MFA';box.append(link);document.body.prepend(box);}}catch{}}
   if(local&&response.status===401&&url.pathname!='/auth/login')expired();
   return response;
  };
@@ -30,5 +31,14 @@
   try{const response=await fetch('/auth/logout',{method:'POST'});if(response.ok||response.status===401)location.assign('/auth/login');else expired();}catch{expired();}
  });
  window.addEventListener('pageshow',event=>{if(event.persisted)location.reload();});
+ // A trusted interaction triggers a bounded server update; polling itself never renews idle time.
+ if(typeof window.setInterval==='function'&&csrf()){
+  let idle=0,absolute=0,lastSent=0,warning=null;
+  const deadlines=data=>{if(data.idle_expires_at)idle=Date.parse(data.idle_expires_at);if(data.expires_at)absolute=Date.parse(data.expires_at);};
+  original('/auth/me').then(async r=>{if(r.ok)deadlines(await r.json());}).catch(()=>{});
+  document.addEventListener('pointerdown',activity,{passive:true});document.addEventListener('keydown',activity,{passive:true});
+  async function activity(event){if(!event.isTrusted||Date.now()-lastSent<60000)return;lastSent=Date.now();try{const r=await window.fetch('/account/activity',{method:'POST'});if(r.ok){deadlines(await r.json());warning?.remove();warning=null;}}catch{}}
+  window.setInterval(()=>{const remaining=Math.min(idle||Infinity,absolute||Infinity)-Date.now();if(remaining<=0)expired();else if(remaining<120000&&!warning){warning=document.createElement('div');warning.className='alert alert-warning';warning.setAttribute('role','alert');warning.textContent='Сесія незабаром завершиться. Дія на сторінці продовжить її лише в межах 8 годин.';document.body.prepend(warning);}},10000);
+ }
  window.Project2Session={expired};
 })();

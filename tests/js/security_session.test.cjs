@@ -22,6 +22,6 @@ test('Request objects retain method/body semantics and receive a same-origin tok
 
 test('personal re-login refreshes the page token and native form fields',async()=>{
  const {window,meta,fields}=client(()=>new Response(JSON.stringify({csrf_token:'renewed-token'}),{status:200}));
- await window.fetch('/auth/login',{method:'POST',body:'credentials'});
+ await window.fetch('/auth/mfa/finish',{method:'POST',body:'credentials'});
  assert.equal(meta.content,'renewed-token');assert.equal(fields[0].value,'renewed-token');
 });

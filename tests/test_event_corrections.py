@@ -108,7 +108,8 @@ def test_failed_audit_write_rolls_back_business_record(lifecycle,operation):
 
 def test_http_cannot_forge_actor_or_delete_and_records_authenticated_actor(lifecycle):
     from app.main import app
-    from app.services.accounts import password_hash, login
+    from app.services.accounts import password_hash
+    from tests.mfa_helpers import login
     factory,pid,kinds,_=lifecycle
     with factory() as db:
         user=User(username='event-test',display_name='Тестовий автор',password_hash=password_hash('synthetic-password'),role='editor');db.add(user);db.commit();actor=user.id

@@ -42,10 +42,18 @@ async def application_lifespan(app):
     try:
         if engine.dialect.name=='postgresql':
             require_current_schema(engine)
+            from sqlalchemy.orm import Session
+            from app.security.mfa_config import require_keys,relying_party
+            with Session(engine) as db:require_keys(db)
+            relying_party()
             yield
         else:
             with database_lease(DB_PATH,shared=True):
                 require_current_schema(engine)
+                from sqlalchemy.orm import Session
+                from app.security.mfa_config import require_keys,relying_party
+                with Session(engine) as db:require_keys(db)
+                relying_party()
                 yield
     finally:engine.dispose()
 

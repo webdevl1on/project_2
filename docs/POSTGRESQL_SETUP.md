@@ -260,7 +260,7 @@ pg_restore -h 127.0.0.1 -p 55432 -U project2_ci -d project2_ci -W --no-owner --n
 
 ## Security 1.2 — оновлення до 0006_account_management
 
-Поточний head — `0006_account_management` після `0005_assignment_history`. Адитивна міграція розширює CHECK `users.role` значенням master, додає partial UNIQUE `one_master`, CHECK активного персонального Master, таблицю account_audit/FK/index/check та append-only/account-policy triggers. Старі користувачі, хеші, ID, ролі й сесії зберігаються. Жоден користувач не підвищується автоматично; минулий аудит не вигадується. Guards відхиляють зміну ID/логіна, видалення User, демоцію/вимкнення Master та втрату останнього активного персонального Admin. Advisory lock має спільний із сервісом ключ поточної схеми.
+Ревізія етапу Security 1.2 — `0006_account_management` після `0005_assignment_history`. Адитивна міграція розширює CHECK `users.role` значенням master, додає partial UNIQUE `one_master`, CHECK активного персонального Master, таблицю account_audit/FK/index/check та append-only/account-policy triggers. Старі користувачі, хеші, ID, ролі й сесії зберігаються. Жоден користувач не підвищується автоматично; минулий аудит не вигадується. Guards відхиляють зміну ID/логіна, видалення User, демоцію/вимкнення Master та втрату останнього активного персонального Admin. Advisory lock має спільний із сервісом ключ поточної схеми.
 
 Після перевірки конфігурації цільової development БД, backup звичайним pg_dump і перевірки можливості відновлення виконайте вручну з кореня репозиторію:
 
@@ -271,3 +271,20 @@ python -c "from app.database.db import engine; from app.database.schema_check im
 ```
 
 Startup схему не мігрує; reset або metadata.create_all для оновлення PostgreSQL не потрібні. Ці команди не запускалися на project2_dev/project2_prod в межах реалізації. Випробування міграції/конкурентності виконуються тільки у випадкових ізольованих схемах project2_ci. Downgrade заборонений через втрату аудиту/захисту Master; повернення — перевірений backup в окремій БД. Подальше явне призначення вже наявного Admin як Master — [SECURITY.md](SECURITY.md#явне-призначення-наявного-admin-як-master), без створення нового облікового запису.
+
+## Security 1.3 — підготовка до 0007_mfa_sessions
+
+Робочі БД автоматично не мігруються. Після backup БД та перевірки відновлення підготуйте постійний MFA key ring у secret store/окремому `.env` і його незалежний backup, визначте точні WebAuthn RP ID/origins для всіх процесів. Нові залежності встановлюються з requirements.txt. Приклади config не містять робочих ключів.
+
+Зупиніть сервери й виконайте вручну в конфігурації свідомо вибраної development БД:
+
+```powershell
+python -m alembic current
+python -m alembic upgrade head
+python -m app.services.mfa_keys --initialize
+python -c "from app.database.db import engine; from app.database.schema_check import require_current_schema; require_current_schema(engine); print('Schema OK')"
+```
+
+Поточний head **0007_mfa_sessions**: п’ять нових MFA-таблиць, nullable метадані UserSession, UNIQUE публічного ID, FK/index/CHECK та розширення дозволених account_audit операцій. Старі User/ролі/паролі/аудит/сесії не видаляються; старі сесії з NULL підтвердженням MFA більше не авторизують. Існуючі Master/Admin налаштовують перший фактор після пароля; startup не блокує сам факт відсутності у них MFA, але перевіряє постійний ключ/marker/RP/config. Єдиний Master і мінімум окремого Admin зберігаються. Downgrade заборонений; повернення — backup в окремій БД з відповідним key ring. Reset не потрібний.
+
+Ініціалізація ключа не створює ні фактора, ні користувача. Ротація з усіма старими ключами й новим current key: `python -m app.services.mfa_keys --rotate`, атомарно та після зупинки серверів/backup. Деталі та явна локальна процедура відновлення Master — [SECURITY.md](SECURITY.md). PostgreSQL-тести використовують тільки project2_ci та випадкові схеми; development/production не змінюються.

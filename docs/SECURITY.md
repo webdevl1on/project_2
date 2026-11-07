@@ -1,6 +1,6 @@
-# Безпека — Security 1.1 та 1.2
+# Безпека — Security 1.1–1.3
 
-Поточний етап — Security 1.2 у `feature/security`, база — Security 1.1 (`abaed84`). Потрібна явна адитивна Alembic-міграція 0006; reset не потрібний. Нижче описано збережений базовий захист 1.1 та окремо нове керування користувачами 1.2.
+Поточний етап — Security 1.3 у `feature/security`, база — Security 1.2 (`d44ee79`). Потрібна явна адитивна міграція 0007 та постійні MFA-ключі; reset не потрібний. Нижче описано попередні 1.1/1.2 та поточну обов’язкову MFA 1.3.
 
 ## Виявлені прогалини та рішення
 
@@ -313,3 +313,164 @@ Baseline до змін: 962 Python passed / 55 PostgreSQL skipped. Остато�
 Окремо пройшли 192 Python перевірки HTTP/керування, 10 PostgreSQL перевірок нового модуля, 8 цільових Chromium сценаріїв і фінальна перевірка CLI. Додані регресії успішно перевіряють права Master на коригування документів, перегляд вилучених копій та медичний запис; прострочені сесії не входять до активного лічильника, але теж видаляються при відкликанні всіх сесій. Перевірено міграцію 0005→0006 зі збереженням старого ID/пароля без вигаданого аудиту, два конкурентні підвищення, конкурентні блокування/пониження (також прямим SQL), rollback при помилці аудиту, revision, CSRF/Origin, авторство й відсутність секретів у відповідях/знімках. Перевірка схеми відхиляє індекс Master без унікальності.
 
 Python/JS syntax, усі Jinja-шаблони, `alembic heads` (єдиний 0006), CLI `--help` та `git diff --check` пройшли. Два попередні deprecation-попередження FastAPI/Starlette залежностей залишилися; навантажувальні тести й інші браузери не запускалися. Тимчасовий PostgreSQL-контейнер зупинено після перевірок; випадкові CI-схеми видалені фікстурами. Робочі БД/користувачі, testing і HEAD не змінені; commit/push/merge/reset не виконувалися.
+
+## Security 1.3 — обов’язкова MFA та сесії 15 хв / 8 год
+
+У `feature/security` поверх d44ee79 повторно використано User/UserSession, AccountAudit, scrypt, current_user, CSRF/Origin/HTTPS та account_write. Password-only доступу, винятку для Master/LAN, нових службових користувачів або відкритої реєстрації немає. Опис 1.1/1.2 вище — попередні етапи; поточний вхід завжди двоетапний.
+
+### Двоетапний вхід і перехід
+
+`POST /auth/login` перевіряє пароль/lockout і видає тільки `project2_pending`: HttpOnly/SameSite=strict cookie на 5 хвилин. `AuthFlow` у БД прив’язаний до user_id, відбитка чинного password_hash, конкретного випадкового cookie та CSRF. Усі операції flow перевіряють transport/Origin/строк/одноразовість/спроби. Проміжний стан не є UserSession і не відкриває предметних сторінок, файлів чи адміністративних API.
+
+За відсутності фактора доступна тільки `/auth/mfa` для початкового налаштування. Користувач підтверджує TOTP або Passkey, отримує 10 резервних кодів і натискає завершення. Реєстрація першого фактора анулює інші незавершені спроби налаштування того самого користувача. За наявності MFA потрібен TOTP, Passkey або резервний код після пароля. Лише `POST /auth/mfa/finish` після перевірки фактора створює повну UserSession/cookie/CSRF й одноразово споживає flow. Зміна пароля або відкликання пов’язаної сесії робить flow недійсним.
+
+Старі сесії залишаються в БД із NULL mfa_verified_at та відхиляються. Існуючі Master/Admin/Editor/Viewer проходять той самий початковий процес; ID, роль, пароль та історія зберігаються. Немає пільгового періоду без MFA, автоактивації чи автоматичної зміни робочої БД.
+
+### Фактори та резервні коди
+
+- TOTP: `pyotp` RFC 6238, випадковий 160-бітний base32 секрет, SHA-1 / 6 цифр / 30 секунд, вікно ±1 крок. Збережений last_step забороняє повторне використання й приймання старішого коду. Активація лише після правильного коду; QR генерується локально `qrcode`/наявним Pillow, секрет доступний для ручного введення. Секрет у БД — Fernet ciphertext із key ID, ніколи plaintext.
+- Passkey: `webauthn` перевіряє реєстрацію/підпис assertion, challenge, RP ID, дозволений origin, presence, обов’язкову user verification, credential конкретного користувача й sign counter. Challenge у БД короткоживучий, одноразовий, також витрачається при невдалому підтвердженні. Сервер зберігає тільки credential ID/публічний ключ/лічильник/назву. Можна додати кілька ключів, перейменувати та відкликати. Видалення фактора відкликає всі сесії. Останній фактор видалити не можна — спочатку додається інший. Passwordless-входу немає.
+- Резервні коди: 10 випадкових 96-бітних кодів, у БД тільки SHA-256 від високoентропійного значення. Показуються лише у відповіді генерації; GUI дозволяє копіювання/завантаження й не зберігає їх у localStorage. Використання одноразове, після правильного пароля; новий набір анулює попередній. У налаштуваннях видно лише залишок. Після резервного входу UI рекомендує зареєструвати новий фактор.
+
+Невдалі MFA-спроби збільшують лічильник flow та чинний лічильник User: після п’яти — 5 хвилин блокування; правильний пароль самостійно цей лічильник не скидає. Crypto/input помилки не виводять вміст credential/кодів у повідомлення. Зміна фактора/кодів та AccountAudit атомарні, помилка аудиту відкочує зміну.
+
+### Конфігурація, backup та ротація ключів
+
+Обов’язкові налаштування з `.env` поза Git або спеціалізованого secret store:
+
+- `PROJECT2_MFA_KEYS` — JSON key ID → Fernet key; кожний key — base64 від 32 випадкових байтів.
+- `PROJECT2_MFA_CURRENT_KEY` — ID для нового шифрування; старі ID лишаються в ring до ротації всіх ciphertext.
+- `PROJECT2_WEBAUTHN_RP_ID` — явно задане DNS-ім’я без схеми/порту; локально `localhost`.
+- `PROJECT2_WEBAUTHN_ORIGINS` — JSON-масив точних origin зі схемою та портом. Локально, наприклад, `http://localhost:8001`; LAN/зовнішній доступ — HTTPS. RP ID та origins не беруться з довільного Host.
+
+Генерація ключа виконується адміністратором один раз у захищеному середовищі: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Збережіть значення у secret store/окремому `.env`, не в Git, чаті, логах чи командному аргументі. Зробіть незалежну зашифровану резервну копію key ring; самої копії БД недостатньо. Усі процеси сервера повинні мати однакові стабільні налаштування. Втрата ключів робить чинні TOTP-секрети нерозшифровуваними.
+
+Після backup БД та ручного `alembic upgrade head`, до запуску сервера: `python -m app.services.mfa_keys --initialize`. Це явний запис зашифрованого контрольного значення, не призначення фактора. Повторний initialize перевіряє наявний ключ. Startup тільки читає marker/схему/config і відмовляє за відсутності чи невідповідності key ring; випадковий ключ на кожний запуск не генерується.
+
+Ротація: зупиніть серверні процеси; збережіть backup БД і старого key ring; додайте новий key ID, залиште старі, змініть current ID; виконайте `python -m app.services.mfa_keys --rotate`. Операція атомарно розшифровує старими ключами та повторно шифрує marker/TOTP/незавершені setup-секрети поточним ключем. Відсутній старий ключ відкочує все. Після перевірки ротації, нового backup і всіх процесів зі спільною конфігурацією можна прибрати невикористані старі ключі. Для відновлення старого backup БД потрібен відповідний старий ring.
+
+### Сесії та повторне підтвердження
+
+UserSession має окремі created_at, last_activity, expires_at, mfa_verified_at та випадковий публічний ID. На кожному захищеному запиті сервер перевіряє 15 хвилин від last_activity й максимум 8 годин від created_at/абсолютного expires_at. Повторна MFA оновлює тільки час підтвердження, не створення чи абсолютний строк. Одна сесія не продовжує інші. Відкликання 1.2 залишається негайним.
+
+Звичайні GET/polling/refresh не змінюють last_activity. Спільний `security_session.js` реагує на trusted pointerdown/keydown, не частіше одного разу на хвилину надсилає `/account/activity` з cookie/CSRF. Оновлення серіалізоване, не відновлює вже прострочену сесію й не зсуває абсолютну межу. Локальний таймер показує попередження за 2 хвилини; сам таймер не надсилає heartbeat. Сервер не може криптографічно довести фізичну дію людини за звичайним HTTP-запитом: автентифікований клієнт може імітувати activity, але не перевищити абсолютні 8 годин. Погоджений GUI не підтримує сесію фоновим polling.
+
+Свіже підтвердження — останні 5 хвилин. Воно потрібне для власного пароля, додавання/видалення/перейменування факторів, нових резервних кодів, MFA recovery та всіх операцій керування користувачами. Централізований guard повертає 403 `MFA_REAUTH_REQUIRED`; на сторінці безпеки користувач повторно вводить пароль і підтверджує MFA. Старої восьмигодинної сесії недостатньо.
+
+### Сторінки й API 1.3
+
+- `/auth/mfa`: обмежений другим етапом flow; `/state`, POST `/totp/start`, `/totp/confirm`, `/prove`, `/passkey/options`, `/passkey/verify`, `/finish`. Це вузький pre-auth контур, не анонімний предметний API; кожний маршрут вимагає чинного pending cookie, усі POST — його CSRF та Origin.
+- `/account/security`: TOTP/Passkey, перейменування/відкликання, залишок та генерація резервних кодів, повторна перевірка особи. JSON `/state`; POST `/reauth`, `/add-factor`, `/backup`, `/remove`, `/rename`.
+- `/account/sessions`: власні сесії; GET `/data`, POST `/revoke` для однієї іншої або всіх інших. Поточна завершується чинним logout. У відповідях тільки випадковий публічний ID та точний UTC; token_hash/token/CSRF інших сесій не видаються.
+- `POST /account/activity`: продовження idle строку тільки чинної сесії.
+- `POST /admin/users/{id}/reset-mfa`: чинний account-management handler, fresh MFA, підтвердження перевірки особи й обов’язкова причина. Картка користувача має форму операції.
+
+### Відновлення
+
+Після правильного пароля резервний код замінює другий фактор один раз. Якщо втрачені всі фактори/коди, Master/Admin з власною свіжою MFA документує перевірку особи й явно підтверджує reset-mfa іншого персонального користувача. Його фактори, flow, коди й сесії відкликаються атомарно з аудитом; наступний пароль відкриває тільки обов’язкове нове налаштування. Пароль/роль/ID не змінюються. Адміністративне скидання власного MFA та MFA Master через HTTP заборонене.
+
+Для Master є тільки явна серверна команда з локальними правами Administrator/root: `python -m app.services.recover_master_mfa --user-id ID`. Вона перевіряє поточний пароль Master, вимагає документованого способу перевірки особи/причини та точного `RESET MFA MASTER ID`. Перед записом пароль перевіряється ще раз у транзакції. Audit має actor=NULL та пояснення локальної процедури, без фіктивної персональної сесії. Після скидання все одно потрібні правильний пароль та нове MFA; emergency token/прихованого HTTP endpoint немає. Процедура не відновлює забутий пароль Master і не замінює організаційну перевірку особи адміністратором ОС.
+
+### Моделі, транзакції та аудит
+
+Нові `TotpFactor`, `Passkey`, `RecoveryCode`, `AuthFlow`, `MfaKeyState` з FK/UNIQUE/CHECK та індексами. `routers/mfa.py → services/mfa.py → MfaRepository/AccountRepository → SQLAlchemy`. Налаштування crypto/RP — `security/mfa_config.py`; новий UI — `security_mfa.js`. Синхронізація — той самий account_write (PostgreSQL advisory xact lock поточної схеми, SQLite BEGIN IMMEDIATE), без локальної пам’яті для перевірки факторів/challenge. Metadata — поточна схема; `0007_mfa_sessions` містить заморожені визначення, не імпортує живі моделі.
+
+AccountAudit отримав mfa_enroll/factor_add/factor_remove/backup_use/backup_generate/mfa_recover/mfa_reauth. Зберігаються реальний user_id/actor, вид/ID фактора, безпечні реквізити, причина й точний UTC. Паролі, TOTP/QR, приватні ключі, резервні коди, повні challenge та session tokens не копіюються в аудит. Існуючі append-only guards залишаються. Це розширення аудиту облікових записів, не новий загальний журнал програми.
+
+### Локальна перевірка
+
+Після підготовки конфігурації/міграції/key initialization відкрийте **http://localhost:8001** лише з явним `PROJECT2_AUTH_ALLOW_LOCAL_HTTP=1`, або налаштований HTTPS origin. Введіть чинний пароль, додайте TOTP у Google/Microsoft Authenticator/Aegis через QR або вручну, підтвердьте код, збережіть резервні коди та завершіть вхід. Перевірте, що до завершення `/persons` недоступна. Для Passkey відкрийте «Безпека → Додати фактор» і виконайте системний діалог Windows Hello/Android/FIDO2; браузер мусить підтримувати WebAuthn та налаштований DNS origin. IP-адреса як RP ID не підтримується, перевірки origin/RP/UV не вимикаються.
+
+У «Мої сесії» увійдіть з другого браузера, завершіть його сесію й перевірте негайний 401; власна сесія збережеться. Без дій 15 хвилин сервер відмовить навіть за активного polling; після 8 годин — незалежно від взаємодії. Для тестів часу використано керований clock, а не реальне очікування.
+
+
+У разі втрати TOTP, але наявності резервного коду, можна увійти з паролем/кодом і в межах свіжого підтвердження вибрати «Додати фактор → Замінити TOTP». Старий секрет діє до підтвердження нового; підтвердження атомарно замінює його й завершує всі сесії/flow. Старі резервні коди не змінюються без явної генерації нового набору. Це дозволяє відновлення й у браузері без Passkey.
+
+
+### Результати перевірок Security 1.3
+
+Baseline до змін: 1016 Python passed / 65 PostgreSQL skipped. Фінальні фактичні запуски:
+
+| Набір | Успішні | Пропущені | Невдалі |
+| --- | ---: | ---: | ---: |
+| `python -m pytest tests/ -q` | 1060 | 71 PostgreSQL без окремого URL | 0 |
+| `PROJECT2_TEST_DATABASE_URL=…/project2_ci python -m pytest tests/postgresql/ -q`, PostgreSQL 17 | 71 | 0 | 0 |
+| `node --test tests/js/*.test.cjs` | 57 | 0 | 0 |
+| Повний Chromium `tests/browser/column_visibility.cjs` | 187 сценаріїв | 0 | 0 |
+
+Після перенесення власних сесій/activity із роутера до сервісу повторно пройшли 34 цільові MFA-тести, включно з межею freshness під час налаштування фактора. Реальне криптографічне підтвердження WebAuthn перевірено підписаними EC/P-256 credential/assertion у Python та Chromium CTAP2 virtual authenticator з обов’язковим UV. Перевірені погані origin/RP/challenge/UV/signature, повторні challenge/TOTP/резервні коди, конкурентні спроби у PostgreSQL, старі сесії/Master після міграції, окремі процеси сервера, ротація ключа, freshness/idle/absolute з керованим clock, rollback аудиту та регресії 1.1/1.2/предметних модулів. Регресійні клієнти проходять справжній другий фактор через явно підготовлені синтетичні MFA-фікстури; application bypass не додано.
+
+Не перевірялися фізичні Windows Hello/Android/USB-ключі, інші браузери, реальне очікування 15 хвилин/8 годин, Windows-права Administrator, навантаження та зовнішній HTTPS deployment. ОС-перевірку root і серверний recovery Master перевірено на синтетичних даних. Організаційне підтвердження особи оператором не автоматизоване. Відновлення забутого пароля Master не входить у цю процедуру. Два попередні deprecation-попередження FastAPI/Starlette залишилися.
+
+Python/JS syntax, усі Jinja-шаблони, єдиний Alembic head 0007 та diff check перевірені. Старі ревізії 0001–0006 не змінені. Робочі БД/ключі/користувачі, testing та HEAD не змінені; commit/push/merge/reset не виконувалися. Наступні етапи Security 1.4 не реалізовувалися.
+
+
+### Файли реалізації Security 1.3
+
+65 змінених/нових файлів; тести попередніх модулів адаптовано до реального другого фактора.
+
+- `.env.example`
+- `app/account_policy.py`
+- `app/database/maintenance.py`
+- `app/database/postgresql.py`
+- `app/main.py`
+- `app/models/__init__.py`
+- `app/models/accounts.py`
+- `app/repositories/account_repository.py`
+- `app/routers/account_management.py`
+- `app/routers/accounts.py`
+- `app/security/application.py`
+- `app/services/account_management.py`
+- `app/services/accounts.py`
+- `app/static/js/medical.js`
+- `app/static/js/security_session.js`
+- `app/templates/admin/user_detail.html`
+- `app/templates/components/app_navigation.html`
+- `config/development.env.example`
+- `config/production.env.example`
+- `config/testing.env.example`
+- `docs/ARCHITECTURE.md`
+- `docs/CURRENT_STATE.md`
+- `docs/POSTGRESQL_SETUP.md`
+- `docs/SECURITY.md`
+- `requirements.txt`
+- `tests/browser/account_management.cjs`
+- `tests/browser/column_visibility.cjs`
+- `tests/browser/documents.cjs`
+- `tests/browser/security.cjs`
+- `tests/browser/serve_column_visibility.py`
+- `tests/conftest.py`
+- `tests/http_auth.py`
+- `tests/js/security_session.test.cjs`
+- `tests/postgresql/conftest.py`
+- `tests/postgresql/test_account_management.py`
+- `tests/postgresql/test_application_security.py`
+- `tests/postgresql/test_assignment_history.py`
+- `tests/test_account_management.py`
+- `tests/test_application_security.py`
+- `tests/test_assignment_history.py`
+- `tests/test_document_ui.py`
+- `tests/test_document_workflow.py`
+- `tests/test_documents.py`
+- `tests/test_event_corrections.py`
+- `tests/test_medical.py`
+- `tests/test_name_cases.py`
+- `tests/test_profile_records.py`
+- `app/models/mfa.py`
+- `app/repositories/mfa_repository.py`
+- `app/routers/mfa.py`
+- `app/security/mfa_config.py`
+- `app/services/mfa.py`
+- `app/services/mfa_keys.py`
+- `app/services/recover_master_mfa.py`
+- `app/static/js/security_mfa.js`
+- `app/templates/account_security.html`
+- `app/templates/account_sessions.html`
+- `app/templates/mfa.html`
+- `migrations/versions/0007_mfa_sessions.py`
+- `tests/browser/mfa_helpers.cjs`
+- `tests/browser/security_mfa.cjs`
+- `tests/js/session_activity.test.cjs`
+- `tests/mfa_helpers.py`
+- `tests/postgresql/test_mfa.py`
+- `tests/test_mfa.py`

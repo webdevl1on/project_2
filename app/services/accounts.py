@@ -69,33 +69,14 @@ def create_user(db, username, display_name, password, role='viewer', *, actor_id
 
 
 def login(db, username, password):
-    if not isinstance(username,str): raise PermissionError('Неправильний логін або пароль.')
-    denied=False;token=csrf=None
-    with account_write(db):
-        user = Repo.by_name(db, (username or '').strip().casefold())
-        # Apply the same expensive operation for unknown logins.
-        encoded = user.password_hash if user else 'scrypt$' + '00'*16 + '$' + '00'*64
-        valid = verify_password(password, encoded)
-        locked=user and user.locked_until and user.locked_until.replace(tzinfo=UTC)>datetime.now(UTC)
-        if not valid or user is None or not user.is_active or locked:
-            denied=True
-            if user and user.is_active and not locked:
-                user.failed_attempts+=1
-                if user.failed_attempts>=5:
-                    user.locked_until=datetime.now(UTC)+timedelta(minutes=5);user.failed_attempts=0
-        else:
-            user.failed_attempts=0;user.locked_until=None
-            token = secrets.token_urlsafe(48); csrf = secrets.token_hex(32)
-            Repo.add(db, UserSession(token_hash=digest_token(token), user_id=user.id, csrf_token=csrf,
-                                     expires_at=datetime.now(UTC) + timedelta(hours=8)))
-    # Failed-attempt counters must commit, unlike a rejected business write.
-    if denied:raise PermissionError('Неправильний логін або пароль або тимчасове блокування входу.')
-    return token, csrf
+    from app.services.mfa import begin
+    return begin(db,username,password)
 
 
 def authenticate(db, token):
     session = Repo.session(db, digest_token(token)) if token and len(token) < 200 else None
-    if session is None or session.expires_at.replace(tzinfo=UTC) <= datetime.now(UTC):
+    from app.services.mfa import live
+    if not live(session):
         raise PermissionError('Потрібен персональний вхід.')
     user = authorize(db, session.user_id)
     return user, session
@@ -103,7 +84,7 @@ def authenticate(db, token):
 
 def session_info(db,token):
     user,session=authenticate(db,token)
-    return {'id':user.id,'username':user.username,'display_name':user.display_name,'role':user.role,'csrf_token':session.csrf_token}
+    return {'id':user.id,'username':user.username,'display_name':user.display_name,'role':user.role,'csrf_token':session.csrf_token,'idle_expires_at':(session.last_activity+timedelta(minutes=15)).isoformat()+'Z','expires_at':session.expires_at.isoformat()+'Z'}
 
 
 def logout(db, token):

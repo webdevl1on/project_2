@@ -10,11 +10,12 @@ from app.account_policy import has_role
 
 # Only the credential entry point is public. Static assets are a separate mount.
 PUBLIC_ROUTES = frozenset({('GET', '/auth/login'), ('POST', '/auth/login')})
+MFA_PATHS=frozenset({'/auth/mfa','/auth/mfa/state','/auth/mfa/totp/start','/auth/mfa/totp/confirm','/auth/mfa/prove','/auth/mfa/passkey/options','/auth/mfa/passkey/verify','/auth/mfa/finish'})
 SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS'})
 ADMIN_PREFIXES = ('/admin', '/staff/import', '/staff/structures', '/staff/versions', '/staff/positions')
 HTML_PATHS = frozenset({'/persons','/persons/new','/person-positions','/staff/history','/events',
     '/admin','/admin/login','/admin/staff','/admin/dictionaries','/admin/dictionaries/new',
-    '/admin/tcc','/admin/tcc/new','/admin/users','/admin/users/new','/admin/users/audit','/account/password','/docs','/redoc'})
+    '/admin/tcc','/admin/tcc/new','/admin/users','/admin/users/new','/admin/users/audit','/account/password','/account/security','/account/sessions','/docs','/redoc'})
 
 
 def html_page(path):
@@ -44,6 +45,10 @@ async def application_access(request: Request, db: Session = Depends(get_db)):
     # Use the router's decoded, mount-relative ASGI path for policy decisions.
     path=get_route_path(request.scope)
     if (request.method, path) in PUBLIC_ROUTES:return
+    if path in MFA_PATHS:
+        from app.routers.mfa import pending_request
+        await pending_request(request,db)
+        return
     try:
         user=await current_user(request,db)
     except HTTPException as error:
@@ -53,5 +58,9 @@ async def application_access(request: Request, db: Session = Depends(get_db)):
         raise
     if admin_path(path) or path=='/auth/users':
         if not has_role(user,('admin',)):raise HTTPException(403,'Потрібні права адміністратора.')
-    elif request.method not in SAFE_METHODS and path not in ('/auth/logout','/auth/password') and not has_role(user,('admin','editor')):
+    elif request.method not in SAFE_METHODS and path not in ('/auth/logout','/auth/password') and not path.startswith('/account/') and not has_role(user,('admin','editor')):
         raise HTTPException(403,'Потрібні права редактора.')
+
+    if request.method not in SAFE_METHODS and (path=='/auth/password' or path=='/auth/users' or path.startswith('/admin/users') or path.startswith('/account/security/')) and path!='/account/security/reauth':
+        from app.services.mfa import fresh
+        if not fresh(request.state.personal_session):raise HTTPException(403,'MFA_REAUTH_REQUIRED: повторно підтвердьте пароль і MFA на /account/security.')

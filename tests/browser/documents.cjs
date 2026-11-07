@@ -11,8 +11,11 @@ module.exports=async({context,base,adminToken})=>{
   },{path,data,csrf});
   assert.equal((await run('/persons/3/documents')).status,401);
   const login=await run('/auth/login',{username:'doc-admin',password:adminToken});assert.equal(login.status,200);
-  const csrf=login.data.csrf_token;
-  assert.equal((await run('/persons/3/documents',{type:'other',details:{number:'0001'}})).status,403);
+  assert.equal((await run('/persons/3/documents')).status,401);
+  await require('./mfa_helpers.cjs').verify(context.request,base);
+  const completed=await run('/auth/mfa/finish',{},login.data.csrf_token);assert.equal(completed.status,200);
+  const csrf=completed.data.csrf_token;
+  assert.equal((await run('/persons/3/documents',{type:'other',details:{number:'0001'}},'wrong')).status,403);
   const created=await run('/persons/3/documents',{type:'other',details:{number:'0001'}},csrf);assert.equal(created.status,200);
   console.log('PASS documents: personal browser login is required and CSRF protects writes');
   let list=(await run('/persons/3/documents?code=other')).data.documents, record=list.find(r=>r.id===created.data.id);

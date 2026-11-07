@@ -1,3 +1,4 @@
+from tests.mfa_helpers import login as mfa_login
 """Real PostgreSQL 17 migration and concurrent account invariant checks, CI only."""
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
@@ -33,10 +34,10 @@ def test_migration_preserves_users_credentials_and_does_not_invent_master_or_aud
     with pg_factory() as db:
         user=db.get(User,key)
         assert (user.username,user.display_name,user.password_hash,user.role)==('admin','master',encoded,'admin')
-        assert db.scalar(select(func.count()).select_from(AccountAudit))==0
+        assert db.scalar(select(func.count()).select_from(AccountAudit).where(AccountAudit.operation.in_(('create','edit','role_change','block','unblock','password_reset','password_change','sessions_revoke','promote_master'))))==0
         accounts.promote_master(db,key,PASSWORD,confirmed=True)
         assert user.id==key and user.password_hash==encoded and user.role=='master'
-        assert db.scalar(select(func.count()).select_from(AccountAudit))==1
+        assert db.scalar(select(func.count()).select_from(AccountAudit).where(AccountAudit.operation.in_(('create','edit','role_change','block','unblock','password_reset','password_change','sessions_revoke','promote_master'))))==1
 
 
 @pytest.mark.parametrize('action',['block','demote'])
@@ -53,7 +54,7 @@ def test_concurrent_admin_operations_preserve_one_active_admin(pg_factory,action
     with ThreadPoolExecutor(max_workers=2) as pool:assert sorted(pool.map(write,[a,b]))==['ok','rejected']
     with pg_factory() as db:
         assert accounts.Repo.active_admins(db)==1
-        assert db.scalar(select(func.count()).select_from(AccountAudit))==3
+        assert db.scalar(select(func.count()).select_from(AccountAudit).where(AccountAudit.operation.in_(('create','edit','role_change','block','unblock','password_reset','password_change','sessions_revoke','promote_master'))))==3
 
 
 @pytest.mark.parametrize('action',['is_active=false',"role='viewer'"])
@@ -80,7 +81,7 @@ def test_concurrent_promotions_only_one_master_and_one_promotion_audit(pg_factor
     with ThreadPoolExecutor(max_workers=2) as pool:assert sorted(pool.map(write,keys))==['ok','rejected']
     with pg_factory() as db:
         assert db.scalar(select(func.count()).select_from(User).where(User.role=='master'))==1
-        assert db.scalar(select(func.count()).select_from(AccountAudit).where(AccountAudit.operation=='promote_master'))==1
+        assert db.scalar(select(func.count()).select_from(AccountAudit).where(AccountAudit.operation.in_(('create','edit','role_change','block','unblock','password_reset','password_change','sessions_revoke','promote_master'))).where(AccountAudit.operation=='promote_master'))==1
         assert accounts.Repo.active_admins(db)==1
 
 
@@ -92,13 +93,13 @@ def test_postgresql_master_and_audit_guards_cannot_be_bypassed_with_sql(pg_facto
         with pytest.raises(DBAPIError),engine.begin() as db:db.execute(text(sql),{'master':master,'admin':admin})
     with pg_factory() as db:
         assert db.get(User,master).role=='master' and db.get(User,admin).is_active
-        assert db.scalar(select(func.count()).select_from(AccountAudit))==3
+        assert db.scalar(select(func.count()).select_from(AccountAudit).where(AccountAudit.operation.in_(('create','edit','role_change','block','unblock','password_reset','password_change','sessions_revoke','promote_master'))))==3
 
 
 def test_postgresql_audit_failure_rolls_back_password_and_all_session_revocations(pg_factory):
     a,b=setup(pg_factory)
     with pg_factory() as db:
-        first,_=accounts.login(db,'admin-b',PASSWORD);second,_=accounts.login(db,'admin-b',PASSWORD)
+        first,_=mfa_login(db,'admin-b',PASSWORD);second,_=mfa_login(db,'admin-b',PASSWORD)
         before=db.get(User,b).password_hash
         def fail(*args):raise RuntimeError('synthetic audit failure')
         event.listen(AccountAudit,'before_insert',fail)
@@ -107,7 +108,7 @@ def test_postgresql_audit_failure_rolls_back_password_and_all_session_revocation
         finally:event.remove(AccountAudit,'before_insert',fail)
         assert db.get(User,b).password_hash==before
         assert all(accounts.authenticate(db,token)[0].id==b for token in (first,second))
-        assert db.scalar(select(func.count()).select_from(AccountAudit))==2
+        assert db.scalar(select(func.count()).select_from(AccountAudit).where(AccountAudit.operation.in_(('create','edit','role_change','block','unblock','password_reset','password_change','sessions_revoke','promote_master'))))==2
 
 
 def test_postgresql_concurrent_revisions_and_actors_are_not_overwritten(pg_factory):

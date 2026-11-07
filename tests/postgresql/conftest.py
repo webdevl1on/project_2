@@ -26,6 +26,11 @@ def pg_factory(monkeypatch, request):
             db.exec_driver_sql('CREATE TABLE alembic_version (version_num varchar(32) PRIMARY KEY)')
             cfg.attributes['connection']=db
             command.upgrade(cfg,getattr(request,'param','head'))
+        from sqlalchemy import inspect
+        if inspect(engine).has_table('mfa_key_state'):
+            from app.models.mfa import MfaKeyState
+            from app.security.mfa_config import encrypt,MARKER
+            with engine.begin() as db:db.execute(MfaKeyState.__table__.insert().values(id=1,ciphertext=encrypt(MARKER)))
         yield sessionmaker(bind=engine,autoflush=False)
     finally:
         engine.dispose()

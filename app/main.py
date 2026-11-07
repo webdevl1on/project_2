@@ -80,3 +80,5 @@ def protected_redoc():
 
 from app.routers import account_management
 app.include_router(account_management.router)
+from app.routers import mfa
+app.include_router(mfa.router)

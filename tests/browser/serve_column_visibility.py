@@ -26,6 +26,10 @@ Session = sessionmaker(bind=engine, info={"legacy_staff_fixture":True})
 def reset_data():
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
+    from app.models.mfa import MfaKeyState
+    from app.security.mfa_config import encrypt,MARKER
+    with Session() as keys:
+        keys.add(MfaKeyState(id=1,ciphertext=encrypt(MARKER)));keys.commit()
     with Session() as db:
         positions = [
             make_position(10, "Перший", "Водій", "Командир відділення безпілотних комплексів"),

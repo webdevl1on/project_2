@@ -41,3 +41,15 @@ def legacy_staff_sessions(request):
 def existing_security_contract(monkeypatch):
     # Existing regressions exercise the retained, explicitly enabled protection.
     monkeypatch.setenv('PROJECT2_AUTH_ENABLED','1')
+
+# Stable synthetic-only key configuration; never used by app runtime or real DBs.
+os.environ.setdefault('PROJECT2_MFA_KEYS','{"test":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}')
+os.environ.setdefault('PROJECT2_MFA_CURRENT_KEY','test')
+os.environ.setdefault('PROJECT2_WEBAUTHN_RP_ID','testserver')
+os.environ.setdefault('PROJECT2_WEBAUTHN_ORIGINS','["https://testserver"]')
+from sqlalchemy import event
+from app.models.mfa import MfaKeyState
+@event.listens_for(MfaKeyState.__table__,'after_create')
+def synthetic_mfa_key_state(table,connection,**kwargs):
+    from app.security.mfa_config import encrypt,MARKER
+    connection.execute(table.insert().values(id=1,ciphertext=encrypt(MARKER)))

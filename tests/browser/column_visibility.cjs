@@ -21,7 +21,7 @@ async function main() {
             socket.close(() => resolve(port));
         });
     });
-    const base = `http://127.0.0.1:${port}`;
+    const base = `http://localhost:${port}`;
     const assets = {};
     for (const version of ["5.3.3", "5.3.8"]) {
         for (const file of ["js/bootstrap.bundle.min.js", "css/bootstrap.min.css"]) {
@@ -39,7 +39,7 @@ async function main() {
     }
     const server = spawn(process.env.PYTHON || "python3",
         ["-m", "tests.browser.serve_column_visibility", String(port)], {
-            cwd: root, env: { ...process.env, ...devEnv, PROJECT2_ENV:"testing", DATABASE_URL:"sqlite:///"+path.join(privateStorage,"app.sqlite3"), PROJECT2_BROWSER_DATABASE: path.join(privateStorage,"browser.sqlite3"), PROJECT2_ADMIN_TOKEN: adminToken, PROJECT2_ADMIN_ALLOW_HTTP: "1", PROJECT2_AUTH_ALLOW_LOCAL_HTTP: '1', PROJECT2_DOCUMENT_STORAGE: privateStorage },
+            cwd: root, env: { ...process.env, ...devEnv, PROJECT2_ENV:"testing", DATABASE_URL:"sqlite:///"+path.join(privateStorage,"app.sqlite3"), PROJECT2_BROWSER_DATABASE: path.join(privateStorage,"browser.sqlite3"), PROJECT2_ADMIN_TOKEN: adminToken, PROJECT2_ADMIN_ALLOW_HTTP: "1", PROJECT2_AUTH_ALLOW_LOCAL_HTTP: '1', PROJECT2_MFA_KEYS:JSON.stringify({test:'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='}),PROJECT2_MFA_CURRENT_KEY:'test',PROJECT2_WEBAUTHN_RP_ID:'localhost',PROJECT2_WEBAUTHN_ORIGINS:JSON.stringify([base]),PROJECT2_DOCUMENT_STORAGE: privateStorage },
         });
     let serverOutput = "";
     server.stderr.on("data", data => { serverOutput += data; });
@@ -67,6 +67,8 @@ async function main() {
             const version = route.request().url().split("bootstrap@")[1].split("/")[0];
             return route.fulfill({ body: assets[`${version}/${file}`], contentType: file.endsWith(".js") ? "application/javascript" : "text/css" });
         });
+        const {complete}=require('./mfa_helpers.cjs');
+        context.on('page',tab=>tab.on('framenavigated',async frame=>{if(frame===tab.mainFrame()&&new URL(frame.url()).pathname==='/auth/mfa'){try{const done=await complete(context.request,base);await tab.goto(base+(await done.json()).redirect_to);}catch(error){console.error(error);}}}));
         async function signIn(){
             const response=await context.request.post(base+'/auth/login',{data:{username:'browser-admin',password:adminToken}});
             assert.equal(response.status(),200,await response.text());
@@ -78,10 +80,12 @@ async function main() {
                 const me=await context.request.get(base+'/auth/me');
                 if(me.ok())options={...options,headers:{'X-CSRF-Token':(await me.json()).csrf_token,...options.headers}};
             }
-            return rawPost(url,options);
+            const response=await rawPost(url,options);
+            if(target.origin===base&&target.pathname==='/auth/login'&&response.ok())return complete(context.request,base,rawPost);
+            return response;
         };
         await signIn();
-        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "events", "journal", "event_lifecycle", "event_corrections", "journal_snapshot", "history_forms", "assignment_history", "security", "account_management", "name_cases", "geography", "contacts", "personnel", "service_bases", "documents", "workspace", "medical", "injury_vlk", "vlk_workflow"];
+        const suites = ["presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "events", "journal", "event_lifecycle", "event_corrections", "journal_snapshot", "history_forms", "assignment_history", "security", "account_management", "security_mfa", "name_cases", "geography", "contacts", "personnel", "service_bases", "documents", "workspace", "medical", "injury_vlk", "vlk_workflow"];
         if (process.env.COLUMN_STAGE) {
             assert.ok([...suites,'dev_auth','open_access','profile_dates','document_ui','document_workflow','additional_records'].includes(process.env.COLUMN_STAGE));
             await require(`./${process.env.COLUMN_STAGE}.cjs`)({ context, base, adminToken });

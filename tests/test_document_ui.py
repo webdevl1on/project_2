@@ -1,3 +1,4 @@
+from tests.mfa_helpers import finish_http
 """Editor metadata reuses lifecycle; all data are synthetic and isolated."""
 from app.models import DocumentType,PersonDocument,DocumentFile
 from app.services import documents,document_files
@@ -35,7 +36,7 @@ def test_listing_editor_fields_and_files_keep_independent_states(factory,prepare
 def test_catalog_api_access_and_cache_policy(client,prepared):
     browser,_=client;pid=prepared[3]
     assert browser.get(f'/persons/{pid}/documents/catalog').status_code in (401,403)
-    assert browser.post('/auth/login',json={'username':'admin','password':'test-password-123'}).status_code==200
+    assert finish_http(browser,browser.post('/auth/login',json={'username':'admin','password':'test-password-123'})).status_code==200
     result=browser.get(f'/persons/{pid}/documents/catalog')
     assert result.status_code==200 and result.headers['cache-control']=='no-store'
     assert len(result.json()['types'])==8 and result.json()['presence']['NEVER_OBTAINED']=='Не отримували'

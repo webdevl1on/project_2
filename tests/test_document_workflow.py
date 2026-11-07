@@ -1,3 +1,4 @@
+from tests.mfa_helpers import finish_http
 """Isolated canonical tax writes, ordered copies, retry receipts and private viewing."""
 from datetime import datetime
 from sqlalchemy import select, func
@@ -65,7 +66,7 @@ def test_inline_file_access_and_retained_removed_history(client,factory,prepared
         fid=files.attach(db,actor,pid,key,db.get(PersonDocument,key).revision,b'\x89PNG\r\n\x1a\nsynthetic','page.png','other')
     url=f'/persons/{pid}/documents/files/{fid}?inline=true'
     assert browser.get(url).status_code==401
-    login=browser.post('/auth/login',json={'username':'admin','password':'test-password-123'}).json()
+    login=finish_http(browser,browser.post('/auth/login',json={'username':'admin','password':'test-password-123'})).json()
     response=browser.get(url)
     assert response.status_code==200 and response.headers['content-disposition'].startswith('inline')
     assert response.headers['cache-control']=='private, no-store' and response.headers['x-content-type-options']=='nosniff'
@@ -79,7 +80,7 @@ def test_new_apis_require_current_user_csrf_and_matching_tax_revision(client,fac
     browser,_=client;actor,editor,viewer,pid,other=prepared
     path=f'/persons/{pid}/documents'
     assert browser.post(path+'/tax-number',json={'number':None,'expected':'0000000001'}).status_code==401
-    csrf=browser.post('/auth/login',json={'username':'admin','password':'test-password-123'}).json()['csrf_token']
+    csrf=finish_http(browser,browser.post('/auth/login',json={'username':'admin','password':'test-password-123'})).json()['csrf_token']
     with factory() as db:
         key=docs.save(db,actor,pid,'tax_number',{})
         revision=db.get(PersonDocument,key).revision

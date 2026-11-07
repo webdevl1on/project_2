@@ -1,3 +1,5 @@
+from tests.mfa_helpers import finish_http
+from tests.mfa_helpers import login as mfa_login
 """Security 1.2 on synthetic identities and isolated SQLite databases."""
 from datetime import datetime,UTC,timedelta
 import json
@@ -39,7 +41,7 @@ def web(identities):
 
 
 def login(client,name='admin',password=PASSWORD):
-    response=client.post('/auth/login',json={'username':name,'password':password})
+    response=finish_http(client,client.post('/auth/login',json={'username':name,'password':password}))
     assert response.status_code==200,response.text
     return {'X-CSRF-Token':response.json()['csrf_token']}
 
@@ -139,7 +141,7 @@ def test_database_guards_protect_master_and_append_only_audit(identities,action)
 def test_all_sessions_revoked_and_passwords_never_audited(identities,operation):
     factory,ids=identities
     with factory() as db:
-        key=ids['editor'];first,_=accounts.login(db,'editor',PASSWORD);second,_=accounts.login(db,'editor',PASSWORD)
+        key=ids['editor'];first,_=mfa_login(db,'editor',PASSWORD);second,_=mfa_login(db,'editor',PASSWORD)
         user=db.get(User,key);user.failed_attempts=3;user.locked_until=datetime.now(UTC)+timedelta(minutes=3);db.commit()
         locked=user.locked_until;rev=revision(db,key)
         if operation=='block':accounts.set_active(db,ids['admin'],key,rev,False,confirmed=True)
@@ -163,7 +165,7 @@ def test_all_sessions_revoked_and_passwords_never_audited(identities,operation):
 def test_own_password_rejections_are_atomic(identities,current,password,confirmation):
     factory,ids=identities
     with factory() as db:
-        token,_=accounts.login(db,'viewer',PASSWORD)
+        token,_=mfa_login(db,'viewer',PASSWORD)
         count=db.scalar(select(func.count()).select_from(AccountAudit))
         with pytest.raises(ValueError):accounts.change_password(db,ids['viewer'],current,password,confirmation)
         assert accounts.authenticate(db,token)[0].id==ids['viewer']
@@ -174,7 +176,7 @@ def test_own_password_rejections_are_atomic(identities,current,password,confirma
 def test_audit_failure_rolls_back_identity_and_sessions(identities,operation):
     factory,ids=identities
     with factory() as db:
-        key=ids['editor'];token,_=accounts.login(db,'editor',PASSWORD);old=db.get(User,key).password_hash
+        key=ids['editor'];token,_=mfa_login(db,'editor',PASSWORD);old=db.get(User,key).password_hash
         count=db.scalar(select(func.count()).select_from(AccountAudit))
         def fail(mapper,connection,target):raise RuntimeError('synthetic audit write failure')
         event.listen(AccountAudit,'before_insert',fail)
@@ -262,7 +264,7 @@ def test_temporary_lock_distinct_from_administrative_block(identities):
     factory,ids=identities
     with factory() as db:
         for _ in range(5):
-            with pytest.raises(PermissionError):accounts.login(db,'editor','incorrect')
+            with pytest.raises(PermissionError):mfa_login(db,'editor','incorrect')
         rows={u['id']:u for u in view.listing(db,ids['admin'])['users']}
         assert rows[ids['editor']]['temporary_locked'] and rows[ids['editor']]['is_active']
         assert 'Тимчасово' in rows[ids['editor']]['status']
@@ -295,8 +297,8 @@ def test_cli_requires_id_password_and_exact_confirmation(identities,monkeypatch,
 def test_session_count_ignores_expired_but_revoke_removes_every_session(identities):
     factory,ids=identities
     with factory() as db:
-        first,_=accounts.login(db,'editor',PASSWORD);second,_=accounts.login(db,'editor',PASSWORD)
-        db.get(UserSession,accounts.digest_token(first)).expires_at=datetime.now(UTC)-timedelta(days=1);db.commit()
+        first,_=mfa_login(db,'editor',PASSWORD);second,_=mfa_login(db,'editor',PASSWORD)
+        expired=db.get(UserSession,accounts.digest_token(first));expired.created_at=datetime.now(UTC)-timedelta(days=2);expired.last_activity=expired.created_at;expired.mfa_verified_at=expired.created_at;expired.expires_at=datetime.now(UTC)-timedelta(days=1);db.commit()
         assert view.detail(db,ids['admin'],ids['editor'])['active_sessions']==1
         accounts.revoke_all_sessions(db,ids['admin'],ids['editor'],revision(db,ids['editor']),confirmed=True)
         assert db.scalar(select(func.count()).select_from(UserSession).where(UserSession.user_id==ids['editor']))==0
