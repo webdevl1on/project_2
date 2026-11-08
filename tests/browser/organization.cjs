@@ -42,7 +42,7 @@ module.exports=async({context,base,adminToken})=>{
   await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
   console.log('PASS organization: operational links remain separate, incomplete-calendar edits keep drafts, and the editor fits a narrow viewport');
 
-  await api('/auth/users',{username:'org-browser-viewer',display_name:'Тестовий спостерігач дерева',role:'viewer',password:adminToken});
+  await api('/auth/users',{username:'org-browser-viewer',display_name:'Тестовий спостерігач дерева',role:'user',password:adminToken});
   const raw=await browserContextNoMfa(context,base);try{assert.equal((await raw.request.get(base+'/admin/organization')).status(),401);}finally{await raw.close();}
   const noCsrf=await page.evaluate(async()=>{const response=await fetch('/admin/organization/reorder',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':'wrong'},body:'{}'});return response.status;});assert.equal(noCsrf,403);
   await context.clearCookies();assert.equal((await context.request.post(base+'/auth/login',{data:{username:'org-browser-viewer',password:adminToken}})).status(),200);assert.equal((await context.request.get(base+'/admin/organization')).status(),403);assert.equal((await context.request.post(base+'/admin/organization/units',{data:{name:'Заборонено',kind:'company',formed_on:'2020-01-01'}})).status(),403);

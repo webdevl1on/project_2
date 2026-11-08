@@ -1,4 +1,5 @@
 """Scoped, previewed staffing changes and compensating withdrawal, never deletion."""
+from app.services.access_context import actor_operation
 from datetime import date,datetime,UTC,timedelta
 import hashlib,json,secrets
 from app.models import Position,StaffVersion,StaffStructure,PersonAssignment
@@ -68,6 +69,7 @@ def _target_version(db,current,source,on,version_id,mode):
     if structure.org_unit_id is None or Repo.unmapped(db,structure.id):raise ValueError('Спочатку явно зіставте legacy-структуру та всі її посади з підрозділами. Автоматичного зіставлення немає.')
     return version
 
+@actor_operation
 def preview(db,actor,source,scope_id,mode,on,end=None,name='',version_id=None):
     organization.authorize(db,actor,'import',scope_id)
     if mode not in MODES:raise ValueError('Невідомий режим імпорту.')
@@ -75,6 +77,11 @@ def preview(db,actor,source,scope_id,mode,on,end=None,name='',version_id=None):
     if mode=='official' and (not isinstance(name,str) or not name.strip() or len(name.strip())>150):raise ValueError('Назва офіційної версії: 1–150 символів.')
     current,composition,source_on=_source(db,scope_id,on,mode)
     staff.require_complete_mapping(db,scope_id,source_on)
+    from app.services import access
+    e=access.Access(db,actor)
+    if not e.allowed('organization','read',unit_id=current['owner']['id'] if mode=='official' else scope_id):raise PermissionError('Вихідна область штатки недоступна.')
+    if mode=='official' and not e.allowed('organization','import',unit_id=current['owner']['id']):raise PermissionError('Нова версія змінює повну область власника. Потрібен дозвіл імпорту на всю роту або вищий підрозділ.')
+    if mode!='official':composition={**composition,'owner_positions':composition['positions']}
     parsed=read_positions(source,current['selected']['name'])
     version=_target_version(db,current,composition,on,version_id,mode)
     owner_structure=Repo.structure(db,current['owner']['id'])
@@ -122,6 +129,7 @@ def preview(db,actor,source,scope_id,mode,on,end=None,name='',version_id=None):
             'dependencies':[a for a in assignment_data if a['position_id'] in selected],
             'owner_unit_ids':current['owner_unit_ids']}
 
+@actor_operation
 def _receipt(db,actor,prepared):
     receipt=Repo.receipt(db,prepared['identity_key'])
     if receipt:
@@ -137,6 +145,7 @@ def _receipt(db,actor,prepared):
             status='conflict' if item['status']=='conflict' else 'pending',issue='; '.join(item.get('issues',[])) or None))
     db.flush();return receipt
 
+@actor_operation
 def _path_unit(db,actor,prepared,item,current,effects,on):
     nodes=current['nodes'];current_id=prepared['scope_id'];created=list(effects.get('created_unit_ids',[]))
     for display,key in zip(item['path'][1:],item['path_keys'][1:]):
@@ -162,6 +171,7 @@ def _new_position(db,version,unit_id,fields,on,end,managed=None):
     row=Repo.add(db,Position(staff_version_id=version.id,org_unit_id=unit_id,managed_unit_id=managed,valid_from=on,valid_to=end,**validate_position(fields)))
     db.flush();return row
 
+@actor_operation
 def _official(db,actor,prepared,receipt,current,effects,on,end,remove_ids,overrides):
     if receipt.staff_version_id:return Repo.get(db,StaffVersion,receipt.staff_version_id)
     structure=staff.ensure_structure(db,prepared['owner_id'])
@@ -190,7 +200,11 @@ def _official(db,actor,prepared,receipt,current,effects,on,end,remove_ids,overri
     db.flush();effects['created_coverage_ids']=[c.id for c in Repo.coverages(db,current['owner_unit_ids']) if c.staff_version_id==version.id]
     return version
 
+@actor_operation
 def confirm(db,actor,prepared,selected_rows,*,reason=None,replace_ids=(),confirm_removal=False):
+    organization.authorize(db,actor,'import',prepared['scope_id'])
+    organization.authorize(db,actor,'view',prepared['scope_id'])
+    if prepared['mode']=='official':organization.authorize(db,actor,'import',prepared['owner_id'])
     selected=set(selected_rows)
     mode=prepared['mode'];on=date.fromisoformat(prepared['on']);end=date.fromisoformat(prepared['end']) if prepared['end'] else None
     if selected and mode in ('correct','replace'):
@@ -305,12 +319,15 @@ def confirm(db,actor,prepared,selected_rows,*,reason=None,replace_ids=(),confirm
         key=receipt.id
     return key
 
+@actor_operation
 def withdrawal(db,actor,receipt_id,reason):
     reason=organization.reason(reason)
     with organization.organization_write(db,actor,'withdraw'):
         receipt=Repo.get(db,OrgStaffImport,receipt_id)
         if receipt is None:raise ValueError('Квитанція імпорту відсутня.')
         if receipt.withdrawn_at:raise ValueError('Імпорт уже відкликано.')
+        from app.services.access import require
+        require(db,'organization','edit',unit_id=receipt.scope_unit_id,actor_id=actor)
         effects=receipt.effects or {};created=effects.get('created_position_ids',[])
         if Repo.assignments(db,created,include_annulled=True):raise ValueError('Імпорт має подальші призначення; спочатку явно опрацюйте всі залежності.')
         rows=Repo.rows(db,receipt.id)
@@ -354,21 +371,52 @@ def withdrawal(db,actor,receipt_id,reason):
     return receipt_id
 
 
+@actor_operation
 def receipt_data(db,actor,key):
     organization.authorize(db,actor,'view')
     receipt=Repo.get(db,OrgStaffImport,key)
     if receipt is None:raise ValueError('Квитанція імпорту відсутня.')
+    from app.services.access import require
+    require(db,'organization',unit_id=receipt.scope_unit_id,actor_id=actor)
+    for p in receipt.snapshot.get('source_positions',[]):require(db,'organization',unit_id=p['org_unit_id'],actor_id=actor)
+    public=preview_data(db,actor,receipt.snapshot)
+    rows={row['row_number']:row for row in public['rows']}
     return {'id':receipt.id,'revision':receipt.revision,'mode':receipt.mode,'version_id':receipt.staff_version_id,
-        'scope':receipt.scope_unit_id,'snapshot':receipt.snapshot,'withdrawn_at':_iso(receipt.withdrawn_at),'withdrawal_reason':receipt.withdrawal_reason,
-        'rows':[{'row_number':r.row_number,'revision':r.revision,'status':r.status,'issue':r.issue,'position_id':r.position_id,'payload':r.payload} for r in Repo.rows(db,key)]}
+        'scope':receipt.scope_unit_id,'snapshot':public,'withdrawn_at':_iso(receipt.withdrawn_at),'withdrawal_reason':receipt.withdrawal_reason,
+        'rows':[{'row_number':r.row_number,'revision':r.revision,'status':r.status,'issue':r.issue,'position_id':r.position_id,'payload':rows.get(r.row_number,{})} for r in Repo.rows(db,key)]}
 
 
+@actor_operation
+def preview_data(db,actor,prepared):
+    """Project dependency details without changing the private confirmation snapshot."""
+    from copy import deepcopy
+    from app.services.access import Access
+    e=Access(db,actor);public=deepcopy(prepared)
+    if e.user.role=='admin':return public
+    def safe(rows):
+        return [r if e.allowed('service',person_id=r['person_id']) and e.allowed('service',position_id=r['position_id']) else
+                {'restricted':True,'id':'—','person_label':'Реквізити призначення недоступні','position_id':r['position_id'],'assigned_from':None,'assigned_to':None} for r in rows]
+    public['dependencies']=safe(public.get('dependencies',[]))
+    for row in public.get('rows',[]):row['dependencies']=safe(row.get('dependencies',[]))
+    return public
+
+
+@actor_operation
+def receipt_for_confirmation(db,actor,key):
+    receipt=Repo.get(db,OrgStaffImport,key)
+    if receipt is None:raise ValueError('Квитанція імпорту відсутня.')
+    organization.authorize(db,actor,'import',receipt.scope_unit_id)
+    return receipt.snapshot
+
+
+@actor_operation
 def resolve_conflict(db,actor,key,row_number,decision,reason,revision):
     reason=organization.reason(reason)
     if decision not in ('keep','correct'):raise ValueError('Виберіть залишити поточні дані/пропустити або явно виправити реквізити.')
     with organization.organization_write(db,actor,'import'):
         receipt=Repo.get(db,OrgStaffImport,key)
         if receipt is None or receipt.withdrawn_at:raise ValueError('Імпорт недоступний або відкликаний.')
+        organization.authorize(db,actor,'import',receipt.scope_unit_id)
         row=next((r for r in Repo.rows(db,key) if r.row_number==row_number),None)
         if row is None or row.status!='conflict' or row.revision!=int(revision):raise ValueError('Конфлікт уже змінений. Оновіть квитанцію.')
         current=Repo.get(db,Position,row.payload.get('current_id')) if row.payload.get('current_id') else None

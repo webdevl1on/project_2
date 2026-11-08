@@ -45,7 +45,7 @@ async def create(request: Request, user=Depends(current_user), db: Session = Dep
     except ValueError:raise HTTPException(400,'Неправильний JSON.') from None
     if not isinstance(data,dict):raise HTTPException(400,'Потрібен об’єкт JSON.')
     try:
-        key = accounts.create_user(db, data.get('username'), data.get('display_name'), data.get('password'), data.get('role','viewer'), actor_id=user.id)
+        key = accounts.create_user(db, data.get('username'), data.get('display_name'), data.get('password'), data.get('role','user'), actor_id=user.id)
         return {'id':key}
     except PermissionError as error: raise HTTPException(403, str(error)) from error
     except ValueError as error: raise HTTPException(400, str(error)) from error

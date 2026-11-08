@@ -1,4 +1,5 @@
 """Scoped import decisions on isolated synthetic organizations and staffing."""
+from tests.access_helpers import legacy_user
 from datetime import date as D
 from io import BytesIO
 from concurrent.futures import ThreadPoolExecutor
@@ -34,7 +35,7 @@ def store(tmp_path):
     engine=create_engine('sqlite:///'+str(tmp_path/'org-import.sqlite3'),connect_args={'check_same_thread':False})
     Base.metadata.create_all(engine);factory=sessionmaker(engine)
     with factory() as db:
-        actor=accounts.create_user(db,'import-admin','Admin','synthetic-password','admin')
+        actor=legacy_user(db,'import-admin','Admin','synthetic-password','admin')
         root=organization.OrganizationService.create(db,actor,'battalion','Батальйон',D(2020,1,1))
         company=organization.OrganizationService.create(db,actor,'company','1 рота',D(2020,1,1),parent_id=root)
         platoon=organization.OrganizationService.create(db,actor,'platoon','1 взвод',D(2020,1,1),parent_id=company)

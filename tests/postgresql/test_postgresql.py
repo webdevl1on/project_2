@@ -1,3 +1,4 @@
+from tests.access_helpers import legacy_user
 from datetime import date as D
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
@@ -20,7 +21,7 @@ from tests.test_database_reset import geo_package
 def prepare(factory):
     with factory() as db:
         db.add(Rank(**ReferenceRanks.RANKS[0]));db.commit()
-        actor=accounts.create_user(db,'pg-admin','Тест','test-password-123','admin')
+        actor=legacy_user(db,'pg-admin','Тест','test-password-123','admin')
         p=register_person(db,person_data())
         q=register_person(db,person_data(tax_number='0123456788'))
         pid,qid=p.person_id,q.person_id

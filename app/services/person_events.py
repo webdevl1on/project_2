@@ -1,4 +1,5 @@
 """Person-event editor contract; mutations delegate to PersonEventService."""
+from app.services.access_context import actor_operation
 from hashlib import sha256
 from datetime import date, datetime, UTC
 from app.services import event_corrections
@@ -51,11 +52,14 @@ def dictionaries(db):
 
 
 def page(db, person_id):
+    from app.services.access_views import scoped
+    e=scoped(db)
+    if e and not e.allowed('events',person_id=person_id):raise PermissionError('Події цієї особи недоступні.')
     ServicePersonCheck.get_person_or_raise(person_id, db)
     types, subtypes = dictionaries(db)
-    corrections = event_corrections.history(db, person_id)
+    corrections = event_corrections.history(db, person_id) if e is None or e.allowed('history',person_id=person_id) else {}
     rows = [dict(serialize(row, types, subtypes), corrections=corrections.get(row.event_id, [])) for row in reversed(Repo.for_person(db, person_id, include_annulled=True))]
-    return {'person_id': person_id, 'today': today().isoformat(),
+    return {'person_id': person_id, 'today': today().isoformat(),'can_edit':e is None or e.allowed('events','edit',person_id=person_id),
             'types': [{'id': kind.event_type_id, 'code': kind.event_type, 'name': kind.event_name,
                        'color': kind.event_color, 'active': bool(kind.event_is_active) and kind.event_type != 'DAY_OFF',
                        'exclusive': bool(kind.event_exclusive),
@@ -79,6 +83,7 @@ def identifier(value, field, *, optional=False):
         raise EventValidationError('Оберіть коректне значення з довідника.', field) from error
 
 
+@actor_operation
 def save(db, person_id, data, key=None, *, actor_id=None):
     fields = {field: data.get(field) for field in FIELDS}
     for field in ('date_start', 'date_end', 'order_date', 'planned_end'):
@@ -123,6 +128,7 @@ def save(db, person_id, data, key=None, *, actor_id=None):
     return result_id
 
 
+@actor_operation
 def annul(db, person_id, key, data, *, actor_id=None):
     reason = str(data.get('reason') or '').strip()
     if not reason or len(reason) > 2000:

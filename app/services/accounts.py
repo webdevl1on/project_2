@@ -32,21 +32,21 @@ def verify_password(password, encoded):
 def digest_token(token): return hashlib.sha256(token.encode()).hexdigest()
 
 
-def authorize(db, user_id, roles=('admin', 'editor', 'viewer')):
+def authorize(db, user_id, roles=None):
     user = Repo.user(db, user_id)
     # Always re-read: permissions may have changed since the request started.
     if user is not None: db.refresh(user)
-    if user is None or not user.is_active or not has_role(user, roles):
+    if user is None or not user.is_active or not has_role(user, roles or ('master','admin','user')):
         raise PermissionError('Недостатньо прав або обліковий запис вимкнено.')
     return user
 
 
-def create_user(db, username, display_name, password, role='viewer', *, actor_id=None, allow_legacy_bootstrap=False):
+def create_user(db, username, display_name, password, role='user', *, actor_id=None, allow_legacy_bootstrap=False):
     if not isinstance(username,str) or not isinstance(display_name,str): raise ValueError('Логін та ім’я повинні бути текстом.')
     username = (username or '').strip().casefold()
     if not re.fullmatch(r'[a-z0-9_.-]{3,100}', username):
         raise ValueError('Логін: 3–100 латинських літер, цифр, крапка, _ або дефіс.')
-    if role not in ('admin','editor','viewer') or not (display_name or '').strip() or len(display_name) > 200:
+    if role not in ('admin','user') or not (display_name or '').strip() or len(display_name) > 200:
         raise ValueError('Вкажіть ім’я користувача та коректну роль.')
     encoded = password_hash(password)
     with account_write(db):
@@ -55,12 +55,14 @@ def create_user(db, username, display_name, password, role='viewer', *, actor_id
             # CLI-only opt-in: preserve the exact legacy technical identities.
             def technical(user):
                 known={'project2-open-access':('admin','Спільний автор — авторизацію вимкнено','open-access-only$'),
-                       'project2-dev-local':('editor','Локальна розробка (тестовий автор)','dev-only$')}
+                       'project2-dev-local':('user','Локальна розробка (тестовий автор)','dev-only$')}
                 expected=known.get(user.username)
                 return expected and (user.role,user.display_name)==expected[:2] and user.password_hash.startswith(expected[2])
             if role!='admin' or (existing and not (allow_legacy_bootstrap and all(technical(user) for user in existing))):
                 raise PermissionError('Початкове створення дозволено тільки для першого персонального адміністратора. Для незмінених технічних записів є явний CLI-параметр --allow-legacy-technical-accounts.')
-        else: authorize(db, actor_id, ('admin',))
+        else:
+            manager=authorize(db, actor_id, ('master','admin'))
+            if role=='admin' and manager.role!='master':raise PermissionError('Призначення Admin доступне лише Master.')
         if Repo.by_name(db, username): raise ValueError('Логін уже зайнятий.')
         user = Repo.add(db, User(username=username, display_name=display_name.strip(), password_hash=encoded, role=role))
         db.flush(); key = user.id
@@ -113,11 +115,11 @@ def audit_change(db,user,operation,before,actor_id,reason=None,**details):
 
 
 def management_target(db,actor_id,key,revision):
-    actor=authorize(db,actor_id,('admin',))
+    actor=authorize(db,actor_id,('master','admin'))
     user=Repo.locked_user(db,key)
     if user is None:raise ValueError('Обліковий запис не існує.')
     if not personal(user):raise PermissionError('Технічний історичний запис не редагується; створіть персональний обліковий запис.')
-    if user.role=='master' and actor.role!='master':raise PermissionError('Admin не може змінювати Master.')
+    if user.role in ('master','admin') and actor.role!='master':raise PermissionError('Системними акаунтами Master/Admin керує лише Master.')
     if user.revision!=revision:raise ValueError('Обліковий запис змінився. Оновіть сторінку.')
     return actor,user
 
@@ -141,7 +143,8 @@ def update_user(db,actor_id,key,revision,*,display_name=None,role=None,reason=No
         actor,user=management_target(db,actor_id,key,revision)
         role=user.role if role is None else role
         if role=='master' and user.role!='master':raise ValueError('Master призначається лише одноразовою CLI-процедурою.')
-        if role not in ('master','admin','editor','viewer'):raise ValueError('Невідома роль.')
+        if role not in ('master','admin','user'):raise ValueError('Невідома роль.')
+        if role=='admin' and user.role!='admin' and actor.role!='master':raise PermissionError('Призначення Admin доступне лише Master.')
         keep_admin(db,user,role,user.is_active)
         if display_name is not None and (not isinstance(display_name,str) or not display_name.strip() or len(display_name)>200):raise ValueError('Вкажіть відображуване ім’я до 200 символів.')
         before=account_snapshot(user)
@@ -205,7 +208,10 @@ def revoke_all_sessions(db,actor_id,key,revision,*,confirmed=False,reason=None):
     if not confirmed:raise ValueError('Підтвердьте завершення всіх сесій.')
     reason=checked_reason(reason)
     with account_write(db):
-        _,user=management_target(db,actor_id,key,revision)
+        if actor_id==key:
+            user=authorize(db,actor_id);user=Repo.locked_user(db,key)
+            if user.revision!=revision:raise ValueError('Обліковий запис змінився. Оновіть сторінку.')
+        else:_,user=management_target(db,actor_id,key,revision)
         before=account_snapshot(user);revoked=Repo.revoke_sessions(db,key)
         user.revision+=1
         audit_change(db,user,'sessions_revoke',before,actor_id,reason,revoked_sessions=revoked)

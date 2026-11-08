@@ -1,4 +1,5 @@
 """Security 1.3 with managed time and actual WebAuthn signature validation."""
+from tests.access_helpers import legacy_user
 import base64,json,hashlib,secrets
 from datetime import datetime,timedelta,UTC
 import pytest,pyotp,cbor2
@@ -23,7 +24,7 @@ def prepared(tmp_path,monkeypatch):
     Base.metadata.create_all(engine);factory=sessionmaker(engine)
     clock=[datetime(2026,11,7,12)]
     monkeypatch.setattr(mfa,'now',lambda:clock[0])
-    with factory() as db:uid=accounts.create_user(db,'mfa-admin','Тестовий Admin',PASSWORD,'admin')
+    with factory() as db:uid=legacy_user(db,'mfa-admin','Тестовий Admin',PASSWORD,'admin')
     def override():
         with factory() as db:yield db
     previous=dict(app.dependency_overrides);app.dependency_overrides[get_db]=override
@@ -79,7 +80,7 @@ def test_all_roles_migrate_without_identity_changes(prepared,role):
     client,factory,uid,clock=prepared
     with factory() as db:
         if role=='master':accounts.promote_master(db,uid,PASSWORD,confirmed=True)
-        elif role!='admin':uid=accounts.create_user(db,'other-'+role,'Інша роль',PASSWORD,role,actor_id=uid)
+        elif role!='admin':uid=legacy_user(db,'other-'+role,'Інша роль',PASSWORD,role,actor_id=uid)
         user=db.get(User,uid);before=(user.id,user.role,user.password_hash)
         token,setup,codes=enroll(db,uid,user.username)
         assert mfa.finish(db,token)['token'] and (user.id,user.role,user.password_hash)==before
@@ -198,13 +199,13 @@ def test_admin_recovery_blocks_master_and_requires_reason_and_fresh_mfa(prepared
     client,factory,uid,clock=prepared
     with factory() as db:
         accounts.promote_master(db,uid,PASSWORD,confirmed=True)
-        admin=accounts.create_user(db,'other-admin','Admin',PASSWORD,'admin',actor_id=uid)
+        admin=legacy_user(db,'other-admin','Admin',PASSWORD,'admin',actor_id=uid)
         token,_,codes=enroll(db,admin,'other-admin');session=mfa.finish(db,token)
     client.cookies.set('project2_user',session['token']);headers={'X-CSRF-Token':session['csrf_token']}
     body={'confirmed':True,'reason':'Перевірено синтетичну особу'}
     assert client.post(f'/admin/users/{uid}/reset-mfa',json=body,headers=headers).status_code==403
     with factory() as db:
-        target=accounts.create_user(db,'target','Target',PASSWORD,'viewer',actor_id=uid)
+        target=legacy_user(db,'target','Target',PASSWORD,'viewer',actor_id=uid)
         token,_,_=enroll(db,target,'target');old=mfa.finish(db,token)
     assert client.post(f'/admin/users/{target}/reset-mfa',json={'confirmed':True},headers=headers).status_code==409
     assert client.post(f'/admin/users/{target}/reset-mfa',json=body,headers=headers).status_code==200
@@ -255,7 +256,7 @@ def test_own_sessions_cannot_revoke_other_user_or_current(prepared):
     with factory() as db:
         token,_,codes=enroll(db,uid);first=mfa.finish(db,token)
         token,_=accounts.login(db,'mfa-admin',PASSWORD);mfa.prove(db,token,'backup',codes[0]);other=mfa.finish(db,token)
-        target=accounts.create_user(db,'second-user','Other',PASSWORD,'viewer',actor_id=uid)
+        target=legacy_user(db,'second-user','Other',PASSWORD,'viewer',actor_id=uid)
         token,_,_=enroll(db,target,'second-user');foreign=mfa.finish(db,token)
         foreign_id=accounts.Repo.session(db,accounts.digest_token(foreign['token'])).public_id
     client.cookies.set('project2_user',first['token']);headers={'X-CSRF-Token':first['csrf_token']}

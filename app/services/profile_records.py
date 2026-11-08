@@ -1,9 +1,10 @@
 """Validated, revision-checked atomic profile edits, reusing personnel audit."""
+from app.services.access_context import actor_operation
 from app.models.profile_records import MODELS
 from app.profile_records import FIELDS, LABELS
 from app.repositories.profile_record_repository import ProfileRecordRepository as Repo
-from app.services.accounts import authorize
-from app.services.documents import document_transaction, WRITE_ROLES, _text
+from app.services import access
+from app.services.documents import document_transaction, _text
 from app.services.medical import exact, snapshot, audit
 from app.services import geography
 from app.geography import GEO_FIELDS
@@ -63,9 +64,10 @@ def validate(db, kind, data):
     return values, warnings
 
 
+@actor_operation
 def save(db, actor_id, person_id, kind, data, *, key=None, revision=None):
     with document_transaction(db, subject='запису анкети'):
-        authorize(db, actor_id, WRITE_ROLES)
+        access.require(db,'family' if kind=='family' else 'personal','edit',person_id=person_id,actor_id=actor_id)
         subject(db, person_id, kind)
         if key is not None:
             row = Repo.get(db, kind, key)
@@ -87,12 +89,14 @@ def save(db, actor_id, person_id, kind, data, *, key=None, revision=None):
     return result
 
 
+@actor_operation
 def page(db, actor_id, person_id, kind):
-    user = authorize(db, actor_id)
+    e=access.require(db,'family' if kind=='family' else 'personal',person_id=person_id,actor_id=actor_id)
+    user=e.user
     subject(db, person_id, kind)
-    return {'title': LABELS[kind], 'role': user.role, 'fields': FIELDS[kind],
+    return {'title': LABELS[kind], 'role': user.role, 'can_edit':e.allowed('family' if kind=='family' else 'personal','edit',person_id=person_id), 'fields': FIELDS[kind],
             'records': [{**snapshot(row), 'created_at': row.created_at.isoformat()+'Z',
                          'updated_at': row.updated_at.isoformat()+'Z'} for row in Repo.rows(db, kind, person_id)],
             'audit': [{'actor_id': row.actor_id, 'operation': row.operation, 'entity_id': row.entity_id,
                        'occurred_at': row.occurred_at.isoformat()+'Z', 'changes': row.changes}
-                      for row in Repo.audits(db, kind, person_id)]}
+                      for row in Repo.audits(db, kind, person_id)] if e.allowed('history',person_id=person_id) else []}

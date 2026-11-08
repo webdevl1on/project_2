@@ -86,6 +86,7 @@ class TableField:
         return SOURCES[self.source].__mapper__.primary_key[0]
 
     def value(self, row):
+        if self.key in row.get('denied_fields',()):return None
         if self.key == 'event_on_date': return row.get('event_presence', {}).get('label')
         if self.group in ('medical','injuries','awards','tasks','dna') and self.source=='person':return row.get('medical_values',{}).get(self.key) if row.get('person') is not None else None
         if self.key == 'full_address':return row.get('full_address')

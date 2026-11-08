@@ -1,6 +1,7 @@
+"""Security 1.2 on synthetic identities and isolated SQLite databases."""
+from tests.access_helpers import legacy_user
 from tests.mfa_helpers import finish_http
 from tests.mfa_helpers import login as mfa_login
-"""Security 1.2 on synthetic identities and isolated SQLite databases."""
 from datetime import datetime,UTC,timedelta
 import json
 import pytest
@@ -24,9 +25,9 @@ def identities(tmp_path):
     def foreign_keys(connection,record):connection.execute('PRAGMA foreign_keys=ON')
     Base.metadata.create_all(engine);factory=sessionmaker(engine)
     with factory() as db:
-        admin=accounts.create_user(db,'admin','master',PASSWORD,'admin')
-        editor=accounts.create_user(db,'editor','Редактор',PASSWORD,'editor',actor_id=admin)
-        viewer=accounts.create_user(db,'viewer','Спостерігач',PASSWORD,'viewer',actor_id=admin)
+        admin=legacy_user(db,'admin','master',PASSWORD,'admin')
+        editor=legacy_user(db,'editor','Редактор',PASSWORD,'editor',actor_id=admin)
+        viewer=legacy_user(db,'viewer','Спостерігач',PASSWORD,'viewer',actor_id=admin)
     yield factory,{'admin':admin,'editor':editor,'viewer':viewer}
     engine.dispose()
 
@@ -65,8 +66,8 @@ def test_explicit_promotion_preserves_identity_password_and_history(identities):
         assert (user.id,user.username,user.display_name,user.password_hash,user.created_at)==original
         assert user.role=='master' and view.listing(db,user.id)['needs_admin']
         with pytest.raises(ValueError):accounts.promote_master(db,user.id,PASSWORD,confirmed=True)
-        assert accounts.authorize(db,user.id,('admin',)).id==user.id
-        other=accounts.create_user(db,'other-admin','Admin',PASSWORD,'admin',actor_id=user.id)
+        assert accounts.authorize(db,user.id,('master',)).id==user.id
+        other=legacy_user(db,'other-admin','Admin',PASSWORD,'admin',actor_id=user.id)
         assert not view.listing(db,user.id)['needs_admin']
         with pytest.raises(ValueError,match='уже існує'):accounts.promote_master(db,other,PASSWORD,confirmed=True)
         row=db.scalars(select(AccountAudit).where(AccountAudit.operation=='promote_master')).one()
@@ -79,8 +80,8 @@ def test_promotion_only_existing_active_personal_admin(identities,kind):
     with factory() as db:
         key=ids.get(kind,999)
         if kind=='disabled':
-            key=accounts.create_user(db,'disabled','Вимкнений',PASSWORD,'admin',actor_id=ids['admin'])
-            accounts.set_active(db,ids['admin'],key,revision(db,key),False,confirmed=True)
+            key=legacy_user(db,'disabled','Вимкнений',PASSWORD,'admin',actor_id=ids['admin'])
+            db.get(User,key).is_active=False;db.commit()
         if kind=='technical':
             user=User(username='legacy',display_name='Технічний',password_hash='open-access-only$test',role='admin');db.add(user);db.commit();key=user.id
         with pytest.raises(ValueError):accounts.promote_master(db,key,PASSWORD,confirmed=True)
@@ -91,9 +92,9 @@ def test_promotion_only_existing_active_personal_admin(identities,kind):
 def test_admin_cannot_change_master(identities,action):
     factory,ids=identities;promote(factory,ids)
     with factory() as db:
-        actor=accounts.create_user(db,'another-admin','Admin',PASSWORD,'admin',actor_id=ids['admin']);key=ids['admin'];rev=revision(db,key)
+        actor=legacy_user(db,'another-admin','Admin',PASSWORD,'admin',actor_id=ids['admin']);key=ids['admin'];rev=revision(db,key)
         operations={'edit':lambda:accounts.update_user(db,actor,key,rev,display_name='Changed'),
-                    'role':lambda:accounts.update_user(db,actor,key,rev,role='editor',confirmed=True),
+                    'role':lambda:accounts.update_user(db,actor,key,rev,role='user',confirmed=True),
                     'block':lambda:accounts.set_active(db,actor,key,rev,False,confirmed=True),
                     'reset':lambda:accounts.reset_password(db,actor,key,rev,NEW,NEW,confirmed=True),
                     'revoke':lambda:accounts.revoke_all_sessions(db,actor,key,rev,confirmed=True)}
@@ -105,16 +106,16 @@ def test_admin_cannot_change_master(identities,action):
 def test_last_admin_excludes_master_and_technical_accounts(identities,action):
     factory,ids=identities;promote(factory,ids)
     with factory() as db:
-        key=accounts.create_user(db,'only-admin','Admin',PASSWORD,'admin',actor_id=ids['admin'])
+        key=legacy_user(db,'only-admin','Admin',PASSWORD,'admin',actor_id=ids['admin'])
         db.add(User(username='legacy',display_name='Legacy',password_hash='dev-only$test',role='admin'));db.commit()
         with pytest.raises(ValueError,match='останнього'):
             if action=='block':accounts.set_active(db,ids['admin'],key,revision(db,key),False,confirmed=True)
-            else:accounts.update_user(db,ids['admin'],key,revision(db,key),role='editor',confirmed=True)
+            else:accounts.update_user(db,ids['admin'],key,revision(db,key),role='user',confirmed=True)
         # Direct ORM writes are guarded too.
         user=db.get(User,key)
         with pytest.raises(IntegrityError):
             if action=='block':user.is_active=False
-            else:user.role='editor'
+            else:user.role='user'
             db.commit()
         db.rollback();assert db.get(User,key).role=='admin' and db.get(User,key).is_active
 
@@ -150,7 +151,7 @@ def test_all_sessions_revoked_and_passwords_never_audited(identities,operation):
         else:accounts.change_password(db,key,PASSWORD,NEW,NEW)
         for token in (first,second):
             with pytest.raises(PermissionError):accounts.authenticate(db,token)
-        user=db.get(User,key);assert user.role=='editor' and user.failed_attempts==3 and user.locked_until==locked
+        user=db.get(User,key);assert user.role=='user' and user.failed_attempts==3 and user.locked_until==locked
         if operation=='block':
             accounts.set_active(db,ids['admin'],key,revision(db,key),True,confirmed=True)
             assert db.get(User,key).locked_until==locked
@@ -182,7 +183,7 @@ def test_audit_failure_rolls_back_identity_and_sessions(identities,operation):
         event.listen(AccountAudit,'before_insert',fail)
         try:
             with pytest.raises(RuntimeError,match='audit write'):
-                if operation=='create':accounts.create_user(db,'rolled-back','No',PASSWORD,'admin',actor_id=ids['admin'])
+                if operation=='create':legacy_user(db,'rolled-back','No',PASSWORD,'user',actor_id=ids['admin'])
                 elif operation=='edit':accounts.update_user(db,ids['admin'],key,revision(db,key),display_name='No')
                 elif operation=='block':accounts.set_active(db,ids['admin'],key,revision(db,key),False,confirmed=True)
                 elif operation=='password':accounts.change_password(db,key,PASSWORD,NEW,NEW)
@@ -200,22 +201,22 @@ def test_audit_failure_rolls_back_identity_and_sessions(identities,operation):
 def test_revision_confirmations_and_two_audit_authors(identities):
     factory,ids=identities
     with factory() as db:
-        other=accounts.create_user(db,'other-admin','Другий Admin',PASSWORD,'admin',actor_id=ids['admin']);key=ids['editor'];rev=revision(db,key)
-        with pytest.raises(ValueError,match='Підтвердьте'):accounts.update_user(db,ids['admin'],key,rev,role='viewer')
+        other=legacy_user(db,'other-admin','Другий Admin',PASSWORD,'admin',actor_id=ids['admin']);key=ids['editor'];rev=revision(db,key)
+        with pytest.raises(PermissionError):accounts.update_user(db,ids['admin'],key,rev,role='admin')
         accounts.update_user(db,ids['admin'],key,rev,display_name='Перша зміна')
         with pytest.raises(ValueError,match='змінився'):accounts.update_user(db,other,key,rev,display_name='Застаріла')
-        accounts.update_user(db,other,key,revision(db,key),role='viewer',confirmed=True)
+        accounts.update_user(db,other,key,revision(db,key),display_name='Друга зміна')
         rows=list(db.scalars(select(AccountAudit).where(AccountAudit.user_id==key).order_by(AccountAudit.id)))
         assert [r.actor_user_id for r in rows[-2:]]==[ids['admin'],other]
         assert rows[-2].before['display_name']=='Редактор' and rows[-2].after['display_name']=='Перша зміна'
-        assert rows[-1].before['role']=='editor' and rows[-1].after['role']=='viewer'
+        assert rows[-1].before['display_name']=='Перша зміна' and rows[-1].after['display_name']=='Друга зміна'
 
 
 def test_web_admin_crud_csrf_actor_spoofing_and_safe_responses(web):
     client,factory,ids=web;headers=login(client)
     for path in ('/admin/users','/admin/users/new','/admin/users/audit',f'/admin/users/{ids["admin"]}'):
         assert client.get(path).status_code==200
-    payload={'username':'new-admin','display_name':'Новий','password':NEW,'confirm_password':NEW,'role':'admin','actor_id':ids['viewer']}
+    payload={'username':'new-admin','display_name':'Новий','password':NEW,'confirm_password':NEW,'role':'user','actor_id':ids['viewer']}
     assert client.post('/admin/users/new',json=payload).status_code==403
     assert client.post('/admin/users/new',json=payload,headers={**headers,'Origin':'https://evil.example'}).status_code==403
     response=client.post('/admin/users/new',json=payload,headers=headers);assert response.status_code==200,response.text
@@ -237,7 +238,10 @@ def test_web_admin_crud_csrf_actor_spoofing_and_safe_responses(web):
 
 def test_role_effective_on_next_request_and_viewer_own_password(web):
     client,factory,ids=web;headers=login(client,'editor')
-    with factory() as db:accounts.update_user(db,ids['admin'],ids['editor'],revision(db,ids['editor']),role='viewer',confirmed=True)
+    with factory() as db:
+        from app.models.access import AccessRule
+        for r in db.scalars(select(AccessRule).where(AccessRule.user_id==ids['editor'])):r.revoked_at=datetime.now(UTC)
+        db.commit()
     assert client.post('/persons/1/personal-number',json={},headers=headers).status_code==403
     assert client.get('/persons').status_code==200
     response=client.post('/auth/password',json={'current_password':PASSWORD,'password':NEW,'confirm_password':NEW,'actor_user_id':ids['admin']},headers=headers)
@@ -251,7 +255,7 @@ def test_role_effective_on_next_request_and_viewer_own_password(web):
 
 def test_master_existing_admin_routes_and_self_password(web):
     client,factory,ids=web;promote(factory,ids);headers=login(client)
-    for path in ('/admin','/admin/staff','/admin/dictionaries','/admin/tcc','/admin/users','/admin/users/new'):
+    for path in ('/admin','/admin/access','/admin/users','/admin/users/new'):
         assert client.get(path).status_code==200,path
     assert client.post('/auth/users',json={'username':'admin-created','display_name':'Admin','password':NEW,'role':'admin'},headers=headers).status_code==200
     response=client.post('/auth/password',json={'current_password':PASSWORD,'password':NEW,'confirm_password':NEW},headers=headers)
@@ -306,12 +310,15 @@ def test_session_count_ignores_expired_but_revoke_removes_every_session(identiti
         assert row.after['revoked_sessions']==2
 
 
-def test_master_inherits_document_override_file_history_and_medical_writes(identities,tmp_path):
+def test_master_explicit_grants_allow_document_override_file_history_and_medical_writes(identities,tmp_path):
     from app.models import Person,PersonDocument,DocumentFile
     from app.services import documents,document_files,medical
     from app.services.document_storage import DocumentStorage
     factory,ids=identities;promote(factory,ids);master=ids['admin']
     with factory() as db:
+        from app.models.access import AccessRule
+        for category,action in [('documents','edit'),('documents','override'),('history','read'),('medical','edit')]:db.add(AccessRule(user_id=ids['admin'],scope_type='global',category=category,action=action,effect='ALLOW',created_by=ids['admin']))
+        db.commit()
         person=Person();db.add(person);documents.seed_types(db);db.commit();pid=person.person_id
         key=documents.save(db,master,pid,'other',{'number':'synthetic'})
         documents.override(db,master,pid,key,db.get(PersonDocument,key).revision,'FILLED','Перевірено Master')

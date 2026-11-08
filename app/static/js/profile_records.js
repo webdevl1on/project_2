@@ -37,11 +37,11 @@
   }
   function summary(row){if(kind==='education')return [data.fields[0][3][row.level_code],row.institution,[ProfileDates.format(row.started_on),ProfileDates.format(row.ended_on)].filter(Boolean).join(' — ')].filter(Boolean).join(' · ');if(kind==='family')return [data.fields[0][3][row.kinship],row.full_name,ProfileDates.format(row.birth_on)].filter(Boolean).join(' · ');if(kind==='directives')return ['Розпорядження'+(row.number?' №'+row.number:''),ProfileDates.format(row.issued_on)].filter(Boolean).join(' · ');return String(row.id);}
   function render(){fields();const list=panel.querySelector('[data-additional-list]'),expanded=new Set([...list.querySelectorAll('[open]')].map(n=>n.dataset.additionalRecord));list.replaceChildren();
-   panel.querySelector('[data-additional-new]').hidden=data.role==='viewer';
+   panel.querySelector('[data-additional-new]').hidden=!data.can_edit;
    for(const row of data.records){const card=element('details',undefined,'profile-record-card border rounded p-2 mb-2');card.dataset.additionalRecord=String(row.id);card.open=expanded.has(String(row.id));card.append(element('summary',summary(row)));
     for(const [key,label,type,options] of data.fields){let value=row[key];if(value===null||value===undefined||value==='')continue;if(type==='date')value=ProfileDates.format(value);if(type==='select')value=options[value]||value;card.append(element('p',`${label}: ${value}`,'mb-1 text-break'));}
     if(kind==='family')card.append(element('p',`Перевірка адреси: ${{matched:'підтверджено довідником',mismatch:'розбіжність із довідником — текст збережено',unknown:'не підтверджено довідником'}[row.validation_status]}`,'small text-secondary'));
-    if(data.role!=='viewer'){const button=element('button','Редагувати','btn btn-sm btn-outline-secondary');button.type='button';button.addEventListener('click',()=>open(row));card.append(button);}list.append(card);
+    if(data.can_edit){const button=element('button','Редагувати','btn btn-sm btn-outline-secondary');button.type='button';button.addEventListener('click',()=>open(row));card.append(button);}list.append(card);
    }
    panel.querySelector('[data-additional-audit]').replaceChildren(...data.audit.map(row=>element('p',`${row.occurred_at} · Користувач №${row.actor_id} · ${row.operation} · ${JSON.stringify(ProfileDates.display(row.changes))}`,'small text-break')));
    panel.dispatchEvent(new CustomEvent('profile:records-loaded',{bubbles:true}));

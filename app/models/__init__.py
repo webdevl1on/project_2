@@ -60,3 +60,7 @@ __all__ += ['MfaKeyState','TotpFactor','Passkey','RecoveryCode','AuthFlow']
 from app.models.organization import OrgUnit,OrgUnitState,OperationalSubordination,OrgAudit
 from app.models.organization_staff import OrgCoverage,OrgStaffImport,OrgStaffImportRow,OrgReassignment
 __all__ += ['OrgUnit','OrgUnitState','OperationalSubordination','OrgAudit','OrgCoverage','OrgStaffImport','OrgStaffImportRow','OrgReassignment']
+from app.models.access import AccessTemplate,TemplateAssignment,PositionAccessPolicy,TemporaryAccess,AccessRule,AccessDelegation,AccessReview,AccessAudit
+# Queue changes in the same transaction as staffing/account/policy changes.
+from app.services import access_reviews as _access_reviews
+from app.security import access_writes as _access_writes

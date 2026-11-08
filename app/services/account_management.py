@@ -15,22 +15,22 @@ def public_user(user):
 
 
 def listing(db,actor_id,q=''):
-    actor=accounts.authorize(db,actor_id,('admin',))
+    actor=accounts.authorize(db,actor_id,('master','admin'))
     query=q.strip().casefold()
     users=[public_user(user) for user in Repo.users(db) if not query or any(query in str(value).casefold() for value in (user.id,user.username,user.display_name))]
     return {'users':users,'q':q,'needs_admin':actor.role=='master' and Repo.active_admins(db)==0}
 
 
 def detail(db,actor_id,key):
-    actor=accounts.authorize(db,actor_id,('admin',))
+    actor=accounts.authorize(db,actor_id,('master','admin'))
     user=Repo.user(db,key)
     if user is None:raise ValueError('Обліковий запис не існує.')
-    return {'account':public_user(user),'can_manage':personal(user) and (user.role!='master' or actor.role=='master'),
+    return {'account':public_user(user),'can_manage':personal(user) and (user.role=='user' or actor.role=='master'),
             'own_account':actor_id==key,'active_sessions':Repo.session_count(db,key)}
 
 
 def audit_page(db,actor_id,key=None,page=1):
-    accounts.authorize(db,actor_id,('admin',))
+    accounts.authorize(db,actor_id,('master','admin'))
     page=max(1,page)
     fields={'id':'ID','username':'Логін','display_name':'Відображуване ім’я','role':'Роль','is_active':'Активний','revision':'Версія запису',
             'factor_kind':'Вид фактора','factor_id':'ID фактора','renamed':'Перейменовано','password_changed':'Пароль змінено','revoked_sessions':'Відкликано сесій'}

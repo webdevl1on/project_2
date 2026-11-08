@@ -14,7 +14,7 @@ DATE_FILTER_KEYS = tuple(DATE_FILTER_COLUMNS)
 SORT_KEYS = (*SORT_COLUMNS, *DATE_FILTER_COLUMNS)
 
 
-def _row(record):
+def _row(record, db=None):
     keys = ("position", "assignment", "person", "name", "person_rank", "rank", "passport", "service")
     row = dict(zip(keys, record[:8]))
     row["full_address"] = record[16] if len(record)>16 else None
@@ -27,6 +27,16 @@ def _row(record):
         total, active = record[8 + index * 2:10 + index * 2]
         if total and total > 1 and active != 1:
             row["warnings"].append(f"{label}: записів {total}, активних {active}; однозначний вибір неможливий.")
+    if db is not None:
+        from app.services.access_views import scoped,field_category
+        e=scoped(db)
+        if e:
+            pid=row['person'].person_id if row['person'] else None
+            row['denied_fields']={key for key,field in PERSON_POSITIONS_FIELDS.items() if field.source!='position' and not e.allowed(field_category(field),person_id=pid)}
+            row['can_edit_assignment']=e.allowed('service','edit',position_id=row['position'].position_id) and (pid is None or e.allowed('service','edit',person_id=pid))
+            row['can_read_assignment']=pid is None or e.allowed('service',person_id=pid)
+            row['can_events']=pid is not None and e.allowed('events',person_id=pid)
+            row['warnings']=[]
     row["values"] = {key: field.display(row) for key, field in PERSON_POSITIONS_FIELDS.items()}
     return row
 
@@ -51,7 +61,7 @@ class ServicePersonPositionFunc:
             candidates = rows
             if column_filters.get(key) or column_filters.get(key+"__contains"):
                 records = repository.records(column_filters, occupancy, exclude_key=key)
-                candidates = [_row(record) for record in records]
+                candidates = [_row(record,repository.db) for record in records]
             if field.data_type == "partial_date":
                 values = [field.value(row) for row in candidates if row.get(field.source) is not None]
                 from datetime import date
@@ -77,18 +87,22 @@ class ServicePersonPositionFunc:
         column_filters = dict(column_filters or {})
         if unit_short and not column_filters.get("unit_short"):
             column_filters["unit_short"] = unit_short
-        rows = [_row(record) for record in repository.records(
+        rows = [_row(record,db) for record in repository.records(
             column_filters, occupancy, sort_by=sort_by, direction=direction,
             date_sort_priority=date_sort_priority)]
         from app.services.event_views import presence_for_people, presence
         statuses = presence_for_people(db, list({r['person'].person_id for r in rows if r['person'] is not None}), on or today())
         for row in rows:
             row['event_presence'] = statuses[row['person'].person_id] if row['person'] is not None else presence([], vacant=True)
+            if 'event_on_date' in row.get('denied_fields',()):row['event_presence']=presence([],vacant=True);row['event_presence']['label']='Доступ обмежено'
             row['values']['event_on_date'] = row['event_presence']['label']
         from app.repositories.service_history_repository import ServiceHistoryRepository
         mirages={}
         for record,position in ServiceHistoryRepository.mirages(db,position_ids=[r['position'].position_id for r in rows]):
-            mirages.setdefault(position.position_id,[]).append(record)
+
+            from app.services.access_views import scoped
+            e=scoped(db)
+            if e is None or e.allowed('service',person_id=record.person_id):mirages.setdefault(position.position_id,[]).append(record)
         occupied = sum(row["assignment"] is not None for row in rows)
         return {"rows": rows,"mirages_by_position":mirages,
                 "filter_options": ServicePersonPositionFunc._filter_options(repository, column_filters, occupancy, rows),

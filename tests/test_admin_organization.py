@@ -1,4 +1,5 @@
 """Organization GUI/HTTP boundaries with genuine synthetic MFA sessions."""
+from tests.access_helpers import legacy_user
 from datetime import date
 import pytest
 from fastapi import FastAPI,Depends
@@ -20,8 +21,8 @@ def organization_client(tmp_path):
     engine=create_engine('sqlite:///'+str(tmp_path/'organization-http.sqlite3'),connect_args={'check_same_thread':False})
     Base.metadata.create_all(engine);factory=sessionmaker(engine)
     with factory() as db:
-        admin=accounts.create_user(db,'org-admin','Тестовий Admin','synthetic-org-password','admin')
-        viewer=accounts.create_user(db,'org-viewer','Тестовий Viewer','synthetic-org-password','viewer',actor_id=admin)
+        admin=legacy_user(db,'org-admin','Тестовий Admin','synthetic-org-password','admin')
+        viewer=legacy_user(db,'org-viewer','Тестовий User без прав','synthetic-org-password','user',actor_id=admin)
         token,csrf=login(db,'org-admin','synthetic-org-password')
         viewer_token,viewer_csrf=login(db,'org-viewer','synthetic-org-password')
     test_app=FastAPI(dependencies=[Depends(application_access)])

@@ -23,10 +23,12 @@ def service_transaction(db, *, commit=True, immediate=False):
                 db.connection().exec_driver_sql("BEGIN IMMEDIATE")
         previous=db.info.get('project2_write',False)
         db.info['project2_write']=True
-        yield db
-        db.flush()
-        if commit:
-            db.commit()
+        from app.services.access_context import authorization_snapshot
+        with authorization_snapshot(db):
+            yield db
+            db.flush()
+            if commit:
+                db.commit()
     except Exception as error:
         if commit:
             db.rollback()

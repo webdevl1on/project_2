@@ -1,6 +1,6 @@
 """System-wide identities; independent of personnel/document records."""
 from datetime import datetime, UTC
-from sqlalchemy import String, Integer, DateTime, ForeignKey, CheckConstraint, Index, JSON, event, text, inspect
+from sqlalchemy import String, Integer, DateTime, ForeignKey, CheckConstraint, UniqueConstraint, Index, JSON, event, text, inspect
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database.base import Base
 from app.models.staff import SystemTimestamps
@@ -9,6 +9,7 @@ from app.models.staff import SystemTimestamps
 class User(SystemTimestamps, Base):
     __tablename__ = 'users'
     id: Mapped[int] = mapped_column(primary_key=True)
+    person_id: Mapped[int | None] = mapped_column(ForeignKey('persons.person_id',name='user_person_fk'))
     username: Mapped[str] = mapped_column(String(100), unique=True)
     display_name: Mapped[str] = mapped_column(String(200))
     password_hash: Mapped[str] = mapped_column(String(300))
@@ -17,7 +18,8 @@ class User(SystemTimestamps, Base):
     failed_attempts: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime)
     __table_args__ = (
-        CheckConstraint("role IN ('master','admin','editor','viewer')",name='users_role_allowed'),
+        UniqueConstraint('person_id',name='user_person_unique'),
+        CheckConstraint("role IN ('master','admin','user')",name='users_role_allowed'),
         CheckConstraint("role != 'master' OR (is_active AND password_hash LIKE 'scrypt$%')",name='master_personal_active'),
         Index('one_master', 'role', unique=True, sqlite_where=text("role='master'"),postgresql_where=text("role='master'")),
     )

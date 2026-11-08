@@ -103,6 +103,20 @@ def memory_db():
 
 app.dependency_overrides[get_db] = memory_db
 
+# Explicit policy for synthetic DB-owner fixtures only. Master has no subject ACL
+# in app.main and cannot use an unknown production route as an administrator.
+# These handlers exist solely in this test server; cookie/MFA/CSRF stay real.
+from fastapi import Request,Depends,HTTPException
+from app.security.application import application_access
+from app.security.accounts import current_user
+async def browser_policy(request:Request,db=Depends(get_db)):
+    if request.url.path.startswith('/_column-test/'):
+        user=await current_user(request,db)
+        if user.role not in ('master','admin'):raise HTTPException(403,'Synthetic fixture requires a system administrator.')
+        return
+    await application_access(request,db)
+app.dependency_overrides[application_access]=browser_policy
+
 
 @app.post('/_column-test/family-geography')
 def family_geography_fixture():
@@ -160,7 +174,7 @@ def two_tables():
 def document_accounts():
     # Test-only application module: never registered by app.main in production.
     import os
-    from app.services.accounts import create_user
+    from tests.access_helpers import legacy_user as create_user
     with Session() as db:
         from app.models import User
         from sqlalchemy import select
@@ -168,6 +182,35 @@ def document_accounts():
         existing=db.scalar(select(User.id).where(User.username=='doc-admin'))
         key=existing or create_user(db,'doc-admin','Тестовий адміністратор',os.environ['PROJECT2_ADMIN_TOKEN'],'admin',actor_id=actor)
     return {'user_id':key,'person_id':3}
+
+
+@app.post('/_column-test/access/setup')
+def access_fixture():
+    """Synthetic subjects only; grants are made by the browser through real ACL APIs."""
+    from datetime import date
+    from sqlalchemy import select
+    from app.models import User, Position, StaffVersion, StaffStructure, PersonDocument
+    from app.services import accounts, organization, organization_staff, documents, document_files, medical
+    from tests.access_helpers import legacy_user
+    with Session() as db:
+        admin=db.scalar(select(User).where(User.username=='browser-admin'))
+        master=legacy_user(db,'acl-master','Synthetic Master',os.environ['PROJECT2_ADMIN_TOKEN'],'admin',actor_id=admin.id)
+        accounts.promote_master(db,master,os.environ['PROJECT2_ADMIN_TOKEN'],confirmed=True)
+        user=accounts.create_user(db,'acl-user','Synthetic User',os.environ['PROJECT2_ADMIN_TOKEN'],'user',actor_id=admin.id)
+        other=accounts.create_user(db,'acl-other','Synthetic Other',os.environ['PROJECT2_ADMIN_TOKEN'],'user',actor_id=admin.id)
+        root=organization.OrganizationService.create(db,admin.id,'battalion','ACL батальйон',date(1990,1,1))
+        unit=organization.OrganizationService.create(db,admin.id,'company','ACL доступна рота',date(1990,1,1),parent_id=root)
+        hidden=organization.OrganizationService.create(db,admin.id,'company','ACL прихована рота',date(1990,1,1),parent_id=root)
+        version=db.scalar(select(StaffVersion).order_by(StaffVersion.id))
+        structure=db.get(StaffStructure,version.staff_structure_id)
+        organization_staff.bind_structure(db,admin.id,structure.id,root,structure.revision)
+        positions=list(db.scalars(select(Position).where(Position.staff_version_id==version.id).order_by(Position.position_number)))
+        organization_staff.bind_positions(db,admin.id,version.id,[{'position_id':pos.position_id,'revision':pos.revision,'org_unit_id':unit if index<2 else hidden,'managed_unit_id':unit if index==0 else None} for index,pos in enumerate(positions)])
+        documents.seed_types(db);db.commit()
+        doc=documents.save(db,admin.id,1,'military',{'number':'ACL-SECRET-DOC'})
+        file=document_files.attach(db,admin.id,1,doc,db.get(PersonDocument,doc).revision,b'%PDF-1.7 synthetic private file','ACL-private.pdf','front')
+        medical.save(db,admin.id,1,'exams',{'status':'NEEDS_EXAM','basis':'OTHER','basis_note':'ACL-SECRET-MEDICAL'})
+        return {'user':user,'other':other,'master':master,'admin':admin.id,'root':root,'unit':unit,'hidden':hidden,'positions':[p.position_id for p in positions],'document':doc,'file':file}
 
 
 @app.post('/_column-test/many-positions')

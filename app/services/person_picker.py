@@ -5,10 +5,16 @@ from app.utils.date_utils import format_partial_date
 
 
 def person_options(db, on):
+    from app.services.access_views import scoped
+    e=scoped(db)
     result=[]
     for person,name,rank,assignment,position in PersonRepository.picker_rows(db, on):
+        if e and not e.allowed('basic',person_id=person.person_id):continue
         label=" ".join(value for value in (name.surname,name.name,name.patronymic) if value) if name else "Без ПІБ"
         birth=format_partial_date(person.birth_day,person.birth_month,person.birth_year)
+        if e and not e.allowed('personal',person_id=person.person_id):birth='Не доступно'
+        if e:
+            actual=e.current.get(person.person_id);position=e.positions.get(actual.staff_position_id) if actual else None
         result.append({"person":person,"name":name,"id":person.person_id,"label":label,
                        "birth":birth,"rank":rank.nominative if rank else "Звання невідоме",
                        "position_id":position.position_id if position else None,

@@ -112,7 +112,10 @@ def test_http_cannot_forge_actor_or_delete_and_records_authenticated_actor(lifec
     from tests.mfa_helpers import login
     factory,pid,kinds,_=lifecycle
     with factory() as db:
-        user=User(username='event-test',display_name='Тестовий автор',password_hash=password_hash('synthetic-password'),role='editor');db.add(user);db.commit();actor=user.id
+        user=User(username='event-test',display_name='Тестовий автор',password_hash=password_hash('synthetic-password'),role='user');db.add(user);db.flush();actor=user.id
+        from app.models.access import AccessRule
+        for category in ('events','history'):db.add(AccessRule(user_id=actor,scope_type='person',person_id=pid,category=category,action='edit',effect='ALLOW',created_by=actor))
+        db.commit()
         token,csrf=login(db,'event-test','synthetic-password')
         key=add(db,lifecycle);original=record(db,pid,key)
     def session():

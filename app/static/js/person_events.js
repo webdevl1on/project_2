@@ -53,7 +53,7 @@
         select.value = String(selected || '');
     }
     function openEditor(record = null) {
-        if (saving || (dirty() && !window.confirm('Відхилити незбережені зміни події?'))) return;
+        if (model?.can_edit===false || saving || (dirty() && !window.confirm('Відхилити незбережені зміни події?'))) return;
         if(record?.annulled_at)return;
         confirmedType=null;typeConfirm.hidden=true;
         editing = record; form.reset(); clearErrors(); notice('');
@@ -87,6 +87,7 @@
         annulConfirm.hidden=false;annulForm.elements.reason.focus();
     }
     function render() {
+        newButton.hidden=model.can_edit===false;
         list.replaceChildren();
         if (!model.events.length) { const empty = document.createElement('p'); empty.textContent = 'Активних або завершених подій немає.'; list.append(empty); }
         for (const record of model.events) {
@@ -104,10 +105,10 @@
                 value.style.whiteSpace = 'pre-wrap'; detail.append(label, value);
             }
             const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'btn btn-sm btn-outline-primary';
-            edit.textContent = 'Редагувати'; edit.dataset.eventEdit = record.event_id; edit.disabled = saving;
+            edit.textContent = 'Редагувати'; edit.dataset.eventEdit = record.event_id; edit.disabled = saving; edit.hidden=model.can_edit===false;
             edit.addEventListener('click', () => openEditor(record)); card.append(title, period, detail, edit);
-            if (!record.completion_confirmed && !record.mirage) { const confirm=document.createElement('button');confirm.type='button';confirm.className='btn btn-sm btn-outline-success ms-2';confirm.dataset.eventConfirm=record.event_id;confirm.textContent='Підтвердити завершення / повернення';confirm.addEventListener('click',()=>{openEditor(record);field('completion_confirmed').checked=true;field('duration').value='';field('date_end').value=record.planned_end && record.planned_end<=model.today ? record.planned_end : '';field('date_end').focus();});card.append(confirm); }
-            const annul=make('button','Анулювати');annul.type='button';annul.className='btn btn-sm btn-outline-danger ms-2';annul.dataset.eventAnnul=record.event_id;annul.disabled=saving;annul.addEventListener('click',()=>requestAnnul(record));card.append(annul);
+            if (model.can_edit!==false && !record.completion_confirmed && !record.mirage) { const confirm=document.createElement('button');confirm.type='button';confirm.className='btn btn-sm btn-outline-success ms-2';confirm.dataset.eventConfirm=record.event_id;confirm.textContent='Підтвердити завершення / повернення';confirm.addEventListener('click',()=>{openEditor(record);field('completion_confirmed').checked=true;field('duration').value='';field('date_end').value=record.planned_end && record.planned_end<=model.today ? record.planned_end : '';field('date_end').focus();});card.append(confirm); }
+            const annul=make('button','Анулювати');annul.type='button';annul.className='btn btn-sm btn-outline-danger ms-2';annul.dataset.eventAnnul=record.event_id;annul.disabled=saving;annul.hidden=model.can_edit===false;annul.addEventListener('click',()=>requestAnnul(record));card.append(annul);
             if(record.corrections?.length)card.append(correctionHistory(record));
             list.append(card);
         }
@@ -151,7 +152,7 @@
     form.addEventListener('input', event => { event.target.classList.remove('is-invalid'); event.target.removeAttribute('aria-invalid'); });
     newButton.addEventListener('click', () => model && openEditor());
     modal.querySelector('[data-event-cancel]').addEventListener('click', () => {
-        if (saving || (dirty() && !window.confirm('Відхилити незбережені зміни події?'))) return;
+        if (model?.can_edit===false || saving || (dirty() && !window.confirm('Відхилити незбережені зміни події?'))) return;
         editor.hidden = true; editing = null; clearErrors(); notice('');
     });
     modal.querySelector('[data-events-reload]').addEventListener('click', async () => {

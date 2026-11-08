@@ -1,5 +1,5 @@
 """Read queries for the staff table; whitelisted field metadata only."""
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_,case
 from app.repositories.organization_staff_repository import effective_position
 
 from app.models.person import Person
@@ -28,7 +28,13 @@ class PositionTableRepository:
     def __init__(self, db, version_id, on, mirage_filter="all"):
         from app.models import PersonPositionMirage
         from sqlalchemy import exists
+        self.db=db
+        from app.services.access_views import scoped
+        self.access=scoped(db)
         self._query = self._base_query(db, version_id, on)
+        if self.access:
+            visible=self.access.position_ids('organization')|self.access.position_ids('service')
+            self._query=self._query.filter(Position.position_id.in_(visible))
         has=exists().where(PersonPositionMirage.staff_position_id==Position.position_id,PersonPositionMirage.status=='waiting')
         if mirage_filter=='with':self._query=self._query.filter(has)
         elif mirage_filter=='without':self._query=self._query.filter(~has)
@@ -84,19 +90,18 @@ class PositionTableRepository:
                 conditions.append(column == "")
         return query.filter(or_(*conditions)) if conditions else query.filter(False)
 
-    @staticmethod
-    def _apply_filters(query, column_filters, occupancy, exclude_key=None):
+    def _apply_filters(self,query, column_filters, occupancy, exclude_key=None):
         from app.utils.text_search import contains_clause
         for key,field in PERSON_POSITIONS_FIELDS.items():
             alias=key+'__contains'
             if field.filterable and field.data_type=='text' and key!=exclude_key and column_filters.get(alias):
                 values=PositionTableRepository._normalise_values(column_filters[alias])
                 if len(values)!=1:raise ValueError('Містить текст: один запит на колонку.')
-                query=query.filter(contains_clause(field.expression,values[0]))
+                query=query.filter(contains_clause(self.expression(key),values[0]))
         for key, column in FILTER_COLUMNS.items():
             if key != exclude_key:
                 query = PositionTableRepository._apply_value_filter(
-                    query, column, column_filters.get(key), PERSON_POSITIONS_FIELDS[key].data_type)
+                    query, self.expression(key), column_filters.get(key), PERSON_POSITIONS_FIELDS[key].data_type)
         for key, binding in DATE_FILTER_COLUMNS.items():
             if key != exclude_key and column_filters.get(key):
                 values = PositionTableRepository._normalise_values(column_filters[key])
@@ -104,12 +109,35 @@ class PositionTableRepository:
                     raise ValueError("Фільтр дати має бути заданий один раз.")
                 spec = DateFilter.from_json(values[0])
                 if spec.active:
-                    query = binding.filter(query.filter(DATE_FILTER_RECORDS[key].is_not(None)), spec)
+                    binding=self.binding(key)
+                    query=query.filter(DATE_FILTER_RECORDS[key].is_not(None))
+                    condition=self.condition(key)
+                    if condition is not None:query=query.filter(condition)
+                    query = binding.filter(query, spec)
         if occupancy == "occupied":
             query = query.filter(PersonPosition.person_position_id.is_not(None))
         elif occupancy == "vacant":
             query = query.filter(PersonPosition.person_position_id.is_(None))
         return query
+
+    def condition(self,key):
+        from app.services.access_views import field_category
+        field=PERSON_POSITIONS_FIELDS[key]
+        if self.access is None or field.source=='position':return None
+        ids=self.access.person_ids(field_category(field))
+        return Person.person_id.in_(ids or ())
+
+    def expression(self,key):
+        expression=PERSON_POSITIONS_FIELDS[key].expression;condition=self.condition(key)
+        return case((condition,expression),else_=None) if condition is not None else expression
+
+    def binding(self,key):
+        from app.utils.date_query import DateBinding
+        field=PERSON_POSITIONS_FIELDS[key];condition=self.condition(key)
+        if condition is None:return field.date_binding
+        if field.prefix is None:return DateBinding.exact(field.date_field,self.expression(key))
+        from app.table_fields import SOURCES
+        return DateBinding(field.date_field,*(case((condition,getattr(SOURCES[field.source],field.prefix+'_'+part)),else_=None) for part in ('day','month','year')))
 
     def records(self, column_filters, occupancy, *, exclude_key=None, sort_by=None,
                 direction="asc", date_sort_priority=None):
@@ -117,9 +145,9 @@ class PositionTableRepository:
         if sort_by is not None:
             if sort_by in DATE_FILTER_COLUMNS:
                 priority = date_sort_priority.get(sort_by) if isinstance(date_sort_priority, dict) else date_sort_priority
-                orders = DATE_FILTER_COLUMNS[sort_by].order_by(date_priority(priority), direction)
+                orders = self.binding(sort_by).order_by(date_priority(priority), direction)
             else:
-                column = SORT_COLUMNS.get(sort_by, Position.position_number)
+                column = self.expression(sort_by) if sort_by in SORT_COLUMNS else Position.position_number
                 orders = [column.desc() if direction == "desc" else column.asc()]
             query = query.order_by(*orders, Position.position_number, Position.position_id)
         return query.all()

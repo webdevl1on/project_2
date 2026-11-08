@@ -1,5 +1,6 @@
-from tests.mfa_helpers import finish_http
 """Synthetic words and isolated SQLite only; no production dictionary or people."""
+from tests.access_helpers import legacy_user
+from tests.mfa_helpers import finish_http
 from io import BytesIO
 import secrets
 from lxml import html
@@ -315,7 +316,7 @@ def login(client, token):
     try:
         if db.scalar(select(User).where(User.username=='fixture-admin')) is None:
             actor=db.scalar(select(User.id).where(User.role=='admin'))
-            accounts.create_user(db,'fixture-admin','Тестовий адміністратор',token,'admin',actor_id=actor)
+            legacy_user(db,'fixture-admin','Тестовий адміністратор',token,'admin',actor_id=actor)
     finally:dependency.close()
     response=finish_http(client,client.post('/auth/login',json={'username':'fixture-admin','password':token}))
     assert response.status_code==200,response.text

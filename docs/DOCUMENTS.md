@@ -51,11 +51,11 @@ PostgreSQL та чинні приватне сховище/аудит збере
 
 ## Загальносистемний доступ
 
-`models/accounts.py`, repositories/account_repository.py, services/accounts.py, security/accounts.py та routers/accounts.py не залежать від модуля документів. User містить username, display_name, scrypt password_hash із випадковою сіллю, роль admin/editor/viewer, активність, UTC/revision. UserSession зберігає тільки SHA256 bearer-cookie, CSRF-токен і точний строк завершення.
+`models/accounts.py`, repositories/account_repository.py, services/accounts.py, security/accounts.py та routers/accounts.py не залежать від модуля документів. User містить username, display_name, scrypt password_hash із випадковою сіллю, роль master/admin/user, активність, UTC/revision. UserSession зберігає тільки SHA256 bearer-cookie, CSRF-токен і точний строк завершення.
 
 Персональна HttpOnly/SameSite=Strict cookie має path=/, TTL 8 годин і Secure для HTTPS. Logout відкликає сесію в БД, прострочена/неактивного користувача не приймається. Права повторно перевіряються перед записом. Після п’яти невдалих спроб відомий обліковий запис блокується на 5 хвилин. Пароль — 12–128 символів; bootstrap читає його getpass, не з аргументів чи коду.
 
-Ролі наразі загальносистемні: viewer читає документи/доступні копії, editor також записує/архівує/прикріплює, admin додатково створює користувачів, коригує статус і читає вилучені копії через явний history=true. Поособових ACL поки немає. Автор береться тільки з перевіреної сесії, actor_id з payload не приймається як автор. Журнал містить чутливі реквізити й теж потребує персонального входу.
+Security 1.4: records і копії використовують один scoped documents.read/edit; вилучені копії та журнал додатково потребують history.read, ручний статус — documents.edit + documents.override. Медичний зв’язок додатково потребує medical.read/edit, зокрема за прямим файловим URL. User отримує тільки явно дозволені категорії/області, Admin має захищений предметний доступ, Master без явних grants предметних даних не бачить. Автор — тільки перевірена персональна MFA-сесія; actor_id з body не приймається. Спільні сховище, CSRF, revision й аудит не дублюються. Деталі та міграція — [ACCESS_CONTROL.md](ACCESS_CONTROL.md).
 
 `PROJECT2_DEV_ADMIN_OPEN` **не** відкриває новий API. Словники/ТЦК у /admin також вимагають персональної ролі admin. Для нового входу потрібен HTTPS; тільки прямий localhost/loopback може явно дозволити HTTP через `PROJECT2_AUTH_ALLOW_LOCAL_HTTP=1`. Цей прапорець не прибирає пароль чи CSRF, не працює для LAN/forwarded-запитів. Кожен write після входу потребує X-CSRF-Token, а cross-site Origin/Sec-Fetch-Site відхиляється. Login приймає тільки JSON.
 

@@ -1,4 +1,5 @@
 """Effective staffing sources, explicit legacy mapping and period eligibility."""
+from app.services.access_context import actor_operation
 from datetime import date,datetime,UTC,timedelta
 from app.models import StaffStructure,StaffVersion,Position,PersonAssignment
 from app.models.organization import OrgUnit,OrgAudit,ROSTER_KINDS
@@ -8,6 +9,7 @@ from app.services.organization import OrganizationService,organization_write,che
 from app.services.staff_service import checked,period
 
 
+@actor_operation
 def audit(db,actor_id,org_unit_id,operation,before=None,after=None,reason=None):
     db.add(OrgAudit(org_unit_id=org_unit_id,actor_user_id=actor_id,operation=operation,before=before or {},after=after or {},reason=reason));db.flush()
 
@@ -61,6 +63,7 @@ def effective_end(db,position,version,on):
     return min(limits) if limits else None
 
 
+@actor_operation
 def replace_coverage(db,actor_id,version,unit_ids,start,end):
     period(start,end)
     if version.annulled_at:raise ValueError('Версію джерела анульовано.')
@@ -89,6 +92,7 @@ def replace_coverage(db,actor_id,version,unit_ids,start,end):
     db.flush()
 
 
+@actor_operation
 def bind_structure(db,actor_id,structure_id,unit_id,revision):
     with organization_write(db,actor_id,'bind'):
         unit=org_checked(db,unit_id)
@@ -100,6 +104,7 @@ def bind_structure(db,actor_id,structure_id,unit_id,revision):
         structure.org_unit_id=unit_id;audit(db,actor_id,unit_id,'map',after={'structure_id':structure_id})
 
 
+@actor_operation
 def bind_positions(db,actor_id,version_id,mappings):
     if not mappings:raise ValueError('Виберіть посади для явного зіставлення.')
     with organization_write(db,actor_id,'bind'):
@@ -143,13 +148,14 @@ def require_complete_mapping(db,unit_id,on):
     if pending:raise ValueError('Є незіставлені посади у вихідній структурі. Спочатку явно зіставте їх з організаційними ID.')
 
 
+@actor_operation
 def page_data(db,actor_id,scope_id,on):
     authorize(db,actor_id,'view',scope_id);context=snapshot(db,scope_id,on)
     from app.validators.position_validator import POSITION_ATTRIBUTES
     from app.services.person_picker import person_options
     names={person['id']:person['label'] for person in person_options(db,on)}
     def pos(p):return {'id':p.position_id,'version_id':p.staff_version_id,'number':p.position_number,'unit_id':p.org_unit_id,'managed_unit_id':p.managed_unit_id,'revision':p.revision,'values':{key:getattr(p,key) for key in POSITION_ATTRIBUTES}}
-    return {'selected':context['selected'],'owner':context['owner'],'on':on.isoformat(),'units':context['nodes'],
+    result={'selected':context['selected'],'owner':context['owner'],'on':on.isoformat(),'units':context['nodes'],
         'structures':[{'id':s.id,'name':s.name,'org_unit_id':s.org_unit_id,'revision':s.revision} for s in Repo.all_structures(db)],
         'versions':[{'id':v.id,'name':v.name,'structure_id':v.staff_structure_id,'valid_from':v.valid_from.isoformat(),'valid_to':v.valid_to.isoformat() if v.valid_to else None,'revision':v.revision} for v in Repo.all_versions(db)],
         'positions':[pos(p) for p in context['positions']], 'legacy_positions':[pos(p) for p in Repo.unbound_positions(db)],
@@ -160,8 +166,23 @@ def page_data(db,actor_id,scope_id,on):
                   'order_number':a.assignment_order_number,'order_date':a.assignment_order_date.isoformat() if a.assignment_order_date else None,
                   'release_number':a.release_order_number,'release_date':a.release_order_date.isoformat() if a.release_order_date else None,
                   'completion_reason':a.completion_reason,'completion_note':a.completion_note,'revision':q.revision} for q,a in Repo.queue_details(db)]}
+    from app.services.access_views import scoped
+    e=scoped(db)
+    if e:
+        if not e.allowed('organization',unit_id=scope_id):raise PermissionError('Підрозділ недоступний.')
+        result['units']=[u for u in result['units'] if e.allowed('organization',unit_id=u['id'])]
+        result['positions']=[p for p in result['positions'] if e.allowed('organization',position_id=p['id'])]
+        result['legacy_positions']=[p for p in result['legacy_positions'] if e.allowed('organization',position_id=p['id'])]
+        result['structures']=[s for s in result['structures'] if e.allowed('organization',unit_id=s['org_unit_id'])]
+        structures={s['id'] for s in result['structures']};versions={p['version_id'] for p in result['positions']}
+        result['versions']=[v for v in result['versions'] if v['structure_id'] in structures or v['id'] in versions]
+        result['receipts']=[r for r in result['receipts'] if e.allowed('organization',unit_id=r['scope'])]
+        result['coverages']=[c for c in result['coverages'] if e.allowed('organization',unit_id=c['unit_id'])]
+        result['queue']=[q for q in result['queue'] if e.allowed('service',person_id=q['person_id'])]
+    return result
 
 
+@actor_operation
 def resolve_reassignment(db,actor_id,key,revision,position_id,start,end,details):
     from app.models import Person
     from app.models.organization_staff import OrgReassignment
@@ -184,6 +205,7 @@ def resolve_reassignment(db,actor_id,key,revision,position_id,start,end,details)
         return record.id
 
 
+@actor_operation
 def close_coverage(db,actor_id,key,revision,end):
     from app.models.staff import exact_date
     exact_date(end)

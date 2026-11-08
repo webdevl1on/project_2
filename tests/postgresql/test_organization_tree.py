@@ -1,4 +1,5 @@
 """PostgreSQL 17 organizational invariants and direct-writer races, project2_ci only."""
+from tests.access_helpers import legacy_user
 from datetime import date as D
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
@@ -11,7 +12,7 @@ from app.services import accounts
 
 @pytest.fixture
 def organizational(pg_factory):
-    with pg_factory() as db:actor=accounts.create_user(db,'organization-admin','Тестовий Admin','synthetic-password','admin')
+    with pg_factory() as db:actor=legacy_user(db,'organization-admin','Тестовий Admin','synthetic-password','admin')
     return pg_factory,actor
 
 def unit(factory,actor,name,*,parent=None):

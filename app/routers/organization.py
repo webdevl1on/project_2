@@ -59,6 +59,8 @@ def page(request:Request,on:str|None=None,unit_id:int|None=None,user=Depends(cur
     permission(db,user,'view')
     try:
         selected_on=on_date(on);tree=OrganizationService.tree(db,selected_on)
+        from app.services.access_views import prune_tree
+        tree=prune_tree(db,tree)
     except ValueError as error:raise HTTPException(422,str(error)) from None
     return templates.TemplateResponse(request=request,name='admin/organization.html',context={'organization_tree':tree,'organization_kinds':KINDS,'selected_unit_id':unit_id})
 
@@ -66,14 +68,21 @@ def page(request:Request,on:str|None=None,unit_id:int|None=None,user=Depends(cur
 @router.get('/tree')
 def tree(on:str|None=None,user=Depends(current_user),db:Session=Depends(get_db)):
     permission(db,user,'view')
-    try:return OrganizationService.tree(db,on_date(on))
+    try:
+        from app.services.access_views import prune_tree
+        return prune_tree(db,OrganizationService.tree(db,on_date(on)))
     except ValueError as error:raise HTTPException(422,str(error)) from None
 
 
 @router.get('/units/{key:int}')
 def detail(key:int,user=Depends(current_user),db:Session=Depends(get_db)):
     permission(db,user,'view')
-    try:return OrganizationService.history(db,key)
+    try:
+        authorize(db,user.id,'view',key)
+        result=OrganizationService.history(db,key)
+        from app.services.access import Access
+        if not Access(db).allowed('history',unit_id=key):result['audit']=[]
+        return result
     except ValueError as error:raise HTTPException(404,str(error)) from None
 
 

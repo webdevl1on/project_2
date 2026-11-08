@@ -14,7 +14,7 @@ MFA_PATHS=frozenset({'/auth/mfa','/auth/mfa/state','/auth/mfa/totp/start','/auth
 SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS'})
 ADMIN_PREFIXES = ('/admin', '/staff/import', '/staff/structures', '/staff/versions', '/staff/positions')
 HTML_PATHS = frozenset({'/persons','/persons/new','/person-positions','/staff/history','/events',
-    '/admin','/admin/login','/admin/staff','/admin/dictionaries','/admin/dictionaries/new',
+    '/admin/access','/admin','/admin/login','/admin/staff','/admin/dictionaries','/admin/dictionaries/new',
     '/admin/tcc','/admin/tcc/new','/admin/users','/admin/users/new','/admin/users/audit','/admin/organization','/admin/organization/staff','/account/password','/account/security','/account/sessions','/docs','/redoc'})
 
 
@@ -56,10 +56,8 @@ async def application_access(request: Request, db: Session = Depends(get_db)):
             target=safe_return(request.url.path+('?' + request.url.query if request.url.query else ''))
             raise HTTPException(303,'Потрібен персональний вхід.',headers={'Location':'/auth/login?'+urlencode({'return_to':target}),'Cache-Control':'no-store'}) from error
         raise
-    if admin_path(path) or path=='/auth/users':
-        if not has_role(user,('admin',)):raise HTTPException(403,'Потрібні права адміністратора.')
-    elif request.method not in SAFE_METHODS and path not in ('/auth/logout','/auth/password') and not path.startswith('/account/') and not has_role(user,('admin','editor')):
-        raise HTTPException(403,'Потрібні права редактора.')
+    from app.security.access import enforce
+    await enforce(request,db)
 
     if request.method not in SAFE_METHODS and (path=='/auth/password' or path=='/auth/users' or path.startswith('/admin/users') or path.startswith('/account/security/')) and path!='/account/security/reauth':
         from app.services.mfa import fresh

@@ -45,6 +45,9 @@ def presence(events, *, vacant=False, on=None):
 
 def records(db, start, end, ids=None):
     rows = Repo.window_rows(db, start, end, ids)
+    from app.services.access_views import scoped
+    e=scoped(db)
+    if e:rows=[r for r in rows if e.allowed('events',person_id=r[0].person_id)]
     kinds = {kind.event_type_id: kind for _, kind, _ in rows}
     subs = {sub.event_subtype_id: sub for _, _, sub in rows if sub is not None}
     return [serialize(row, kinds, subs) for row, _, _ in rows]
@@ -54,7 +57,9 @@ def presence_for_people(db, ids, on):
     grouped = defaultdict(list)
     if ids:
         for row in records(db, on, on, ids): grouped[row['person_id']].append(row)
-    return {pid: presence(grouped[pid], on=on) for pid in ids}
+    from app.services.access_views import scoped
+    e=scoped(db)
+    return {pid: presence(grouped[pid], on=on) if e is None or e.allowed('events',person_id=pid) else {**presentation('__vacant__'),'label':'Доступ обмежено','description':'Доступ обмежено','event_ids':[]} for pid in ids}
 
 
 def parse_options(raw):
@@ -146,6 +151,9 @@ def calendar_projection(events, periods, types):
 def problems(db, on=None):
     on = on or today()
     rows = Repo.problem_rows(db, on)
+    from app.services.access_views import scoped
+    e=scoped(db)
+    if e:rows=[r for r in rows if e.allowed('events',person_id=r[0].person_id)]
     types = {kind.event_type_id: kind for _, kind, _ in rows}
     subs = {sub.event_subtype_id: sub for _, _, sub in rows if sub}
     names = {p.person_id: ' '.join(v for v in (name.surname, name.name, name.patronymic) if v) if name else 'Без ПІБ'
@@ -153,7 +161,7 @@ def problems(db, on=None):
     items = []
     for row, _, _ in rows:
         item = event_rules.problem(serialize(row, types, subs), on=on)
-        if item: items.append({**item, 'person_name': names.get(row.person_id, 'Без ПІБ')})
+        if item: items.append({**item, 'person_name': names.get(row.person_id, 'Без ПІБ') if e is None or e.allowed('basic',person_id=row.person_id) else 'Військовослужбовець ID '+str(row.person_id)})
     return {'on': on.isoformat(), 'on_label': day_label(on), 'groups': event_rules.PROBLEM_GROUPS, 'items': items,
             'has_vlk': any(t.event_type == 'VLK' for t in Repo.types(db)) or any(s.event_subtype in {'VLK','HOSPITAL_VLK'} for s in Repo.subtypes(db))}
 
@@ -167,6 +175,9 @@ def journal(db, raw):
     periods = buckets(start, end, options['scale'])
     kinds = {t.event_type_id: t for t in types}
     staff_rows = PersonRepository.picker_rows(db, options['as_of'], official_only=True)
+    from app.services.access_views import scoped
+    e=scoped(db)
+    if e:staff_rows=[r for r in staff_rows if e.allowed('events',person_id=r[0].person_id)]
     selected_ids = list({row[0].person_id for row in staff_rows})
     by_person = defaultdict(list)
     for item in records(db, start, end, selected_ids): by_person[item['person_id']].append(item)
@@ -185,16 +196,18 @@ def journal(db, raw):
         seen.add(person.person_id)
         pid = person.person_id
         label = ' '.join(v for v in (name.surname, name.name, name.patronymic) if v) if name else 'Без ПІБ'
+        basic=e is None or e.allowed('basic',person_id=pid)
+        if not basic:label=f'Військовослужбовець ID {pid}'
+        unit_label=(position.unit_short or '') if basic else ''
         available = by_person[pid]
         if options['search'] and normalized_text(options['search']) not in normalized_text(label): continue
-        if options['unit'] and options['unit'] != position.unit_short: continue
+        if options['unit'] and options['unit'] != unit_label: continue
         if options['event_type'] and not any(r['event_type_id'] == options['event_type'] for r in available): continue
-        unit_label = position.unit_short or ''
         cells, summary = calendar_projection(available, periods, kinds)
-        people.append({'cells': cells, 'summary': summary, 'id': pid, 'name': label, 'rank': rank.nominative if rank else 'Звання не зазначено',
-                       'birth': format_partial_date(person.birth_day, person.birth_month, person.birth_year),
-                       'unit': unit_label, 'units': [unit_label] if unit_label else [], 'position_number': position.position_number if position else None,
-                       'position_short': position.name_short if position else None, 'events': available})
+        people.append({'cells': cells, 'summary': summary, 'id': pid, 'name': label, 'rank': rank.nominative if rank and basic else 'Звання не зазначено',
+                       'birth': format_partial_date(person.birth_day, person.birth_month, person.birth_year) if e is None or e.allowed('personal',person_id=pid) else 'Доступ обмежено',
+                       'unit': unit_label, 'units': [unit_label] if unit_label else [], 'position_number': position.position_number if position and basic else None,
+                       'position_short': position.name_short if position and basic else None, 'events': available})
     from app.services.event_journal_filters import apply_filters, columns
     people, facets, active_filters, filter_order = apply_filters(people, raw, periods)
     sort_people(people, options, by_sort, sort_period, kinds)
@@ -210,7 +223,7 @@ def journal(db, raw):
             'buckets': periods, 'people': people,
             'types': [{'id': t.event_type_id, 'code': t.event_type, 'name': t.event_name,
                        'active': bool(t.event_is_active) and t.event_type != 'DAY_OFF', **{'presentation': event_presentation({'type_code': t.event_type, 'type_name': t.event_name, 'type_color': t.event_color})}} for t in types],
-            'units': sorted({position.unit_short for _,_,_,_,position in staff_rows if position.unit_short}), 'legend': [p for p in legend() if p['code'] != '__vacant__']}
+            'units': sorted({p['unit'] for p in people if p['unit']}), 'legend': [p for p in legend() if p['code'] != '__vacant__']}
 
 
 def sort_people(people, options, by_person, period, kinds):

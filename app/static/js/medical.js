@@ -23,21 +23,21 @@
   configureExam(panel);ProfileUI.openEditor(panel.querySelector('[data-medical-editor]'));form.querySelector('input,select')?.focus();
  }
  function related(card,kind,id){if(!id)return;const a=el('a',`${meta.labels[kind]} №${id} `);a.href='#'+kind;a.addEventListener('click',()=>{const target=panels.find(p=>p.dataset.medicalPanel===kind);const row=state[kind].find(r=>r.id===id);if(!row)return;if(kind==='tasks'&&row.status!=='OPEN'){target.querySelector('[data-task-history]').checked=true;render();}const details=target.querySelector(`[data-medical-record="${id}"] [data-record-card]`);if(details)details.open=true;});card.append(a);}
- function documentUI(panel,card,kind,row){if(!meta.documents[kind])return;
+ function documentUI(panel,card,kind,row){if(!meta.documents[kind]||!state.can_documents)return;
   const details=el('details'),summary=el('summary','Документи та копії');details.append(summary);card.append(details);
   const fk={exams:'exam_id',injuries:'injury_id',awards:'award_id'}[kind];
   for(const link of state.links.filter(link=>link[fk]===row.id)){
    const block=el('div',undefined,'border-start ps-2 mb-2');block.append(el('p',`${meta.documents[kind][link.category]} · документ №${link.document_id}`));details.append(block);
    for(const file of link.files){const a=el('a',file.name,'me-2');a.href=`/persons/${pid}/documents/files/${file.id}`;block.append(a);
-    if(role!=='viewer')block.append(button('Вилучити копію',async()=>{const reason=prompt('Причина вилучення копії');if(!reason)return;await request(`/persons/${pid}/documents/files/${file.id}/remove`,{revision:file.revision,reason});await load();message(panel,'Копію вилучено з поточного перегляду; історію збережено.');}));
+    if(state.can_edit&&state.can_edit_documents)block.append(button('Вилучити копію',async()=>{const reason=prompt('Причина вилучення копії');if(!reason)return;await request(`/persons/${pid}/documents/files/${file.id}/remove`,{revision:file.revision,reason});await load();message(panel,'Копію вилучено з поточного перегляду; історію збережено.');}));
    }
-   if(role!=='viewer'){
+   if(state.can_edit&&state.can_edit_documents){
     const upload=el('form'),file=el('input');file.type='file';file.accept='.jpg,.jpeg,.png,.pdf';file.required=true;file.name='file';upload.append(file);
     const submit=el('button','Додати копію','btn btn-sm btn-outline-primary');upload.append(submit);block.append(upload);
     upload.addEventListener('submit',async e=>{e.preventDefault();submit.disabled=true;try{const data=new FormData(upload);data.set('revision',link.document_revision);data.set('side','page');await request(`/persons/${pid}/documents/${link.document_id}/files`,data);await load();message(panel,'Копію збережено.');}catch(error){message(panel,error.message,true);}finally{submit.disabled=false;}});
    }
   }
-  if(role==='viewer')return;
+  if(!state.can_edit||!state.can_edit_documents)return;
   const form=el('form'),category=el('select',undefined,'form-select my-1');category.name='category';
   for(const [value,label] of Object.entries(meta.documents[kind])){const option=el('option',label);option.value=value;category.append(option);}form.append(category);
   const documentID=el('input');documentID.type='number';documentID.min='1';documentID.placeholder='ID наявного документа (або порожньо)';documentID.setAttribute('aria-label','ID наявного документа');form.append(documentID);
@@ -45,7 +45,7 @@
   form.addEventListener('submit',async e=>{e.preventDefault();submit.disabled=true;try{await request(`${base}/${kind}/${row.id}/documents`,{category:category.value,revision:row.revision,document_id:documentID.value?Number(documentID.value):null});await load();message(panel,'Документ прив’язано. Відкрийте його блок, щоб додати копії.');}catch(error){message(panel,error.message,true);}finally{submit.disabled=false;}});
  }
  function render(){for(const panel of panels){const kind=panel.dataset.medicalPanel;panel.querySelector('[data-medical-login]').hidden=true;panel.querySelector('[data-medical-content]').hidden=false;
-  if(role==='viewer')ProfileUI.closeEditor(panel.querySelector('[data-medical-editor]'));panel.querySelector('[data-medical-new]').hidden=role==='viewer';
+  if(!state.can_edit)ProfileUI.closeEditor(panel.querySelector('[data-medical-editor]'));panel.querySelector('[data-medical-new]').hidden=!state.can_edit;
   panel.querySelectorAll('[data-injury-choice]').forEach(select=>{const current=select.value;select.replaceChildren(new Option('Не зазначено',''),...state.injuries.map(r=>new Option(`№${r.id} · ${ProfileDates.format(r.occurred_on)||'Дата невідома'} · ${r.description||''}`,r.id)));select.value=current;});
   const list=panel.querySelector('[data-medical-list]');const expanded=new Set([...list.querySelectorAll('[data-medical-record]')].filter(card=>card.querySelector('[data-record-card]')?.open).map(card=>card.dataset.medicalRecord));const documentsExpanded=new Set([...list.querySelectorAll('[data-medical-record]')].filter(card=>card.querySelector('[data-record-card] > details')?.open).map(card=>card.dataset.medicalRecord));list.replaceChildren();
   for(const row of state[kind]){if(kind==='tasks'&&row.status!=='OPEN'&&!panel.querySelector('[data-task-history]').checked)continue;const article=el('article',undefined,'border rounded p-2 mb-2');article.dataset.medicalRecord=row.id;let card=article;
@@ -65,21 +65,21 @@
     card.append(el('p',row.stage_label,'fw-semibold'));
     if(row.stage==='NOT_NEEDED')card.append(el('p',row.decision_reason||'Причина раніше не зазначена.'));
     for(const id of row.exam_ids)related(card,'exams',id);
-    if(role!=='viewer'){
+    if(state.can_edit){
      if(row.status==='OPEN'){
       if(row.kind==='injury_vlk')card.append(button('ВЛК не потрібна',async()=>{const reason=prompt('Причина: чому ВЛК не потрібна?');if(reason===null)return;await request(`${base}/tasks/${row.id}/vlk-decision`,{action:'not_needed',reason,revision:row.revision});await load();message(panel,'Рішення щодо ВЛК збережено.');}));
       card.append(button('Відкрити ВЛК',()=>{const target=panels.find(p=>p.dataset.medicalPanel==='exams');edit(target,null);const form=target.querySelector('[data-medical-form]');form.elements.status.value='NEEDS_EXAM';form.elements.basis.value='INJURY';form.elements.injury_id.value=row.injury_id?String(row.injury_id):'';configureExam(target);location.hash='exams';}));
      }else if(row.stage==='NOT_NEEDED')card.append(button('Скасувати рішення «ВЛК не потрібна»',async()=>{const reason=prompt('Причина скасування рішення');if(reason===null)return;await request(`${base}/tasks/${row.id}/vlk-decision`,{action:'reopen',reason,revision:row.revision});await load();message(panel,'Рішення скасовано; стан перераховано за пов’язаними ВЛК.');}));
     }
    }
-   if(role!=='viewer')card.append(button('Редагувати',()=>edit(panel,row)));
-   if(kind==='exams'&&row.status==='COMPLETED'&&role!=='viewer')card.append(button('Зробити активним',async()=>{await request(base+'/active',{exam_id:row.id,revision:state.selection.revision});await load();message(panel,'Ручний вибір активного ВЛК збережено.');window.refreshProfileOverview?.();}));
+   if(state.can_edit)card.append(button('Редагувати',()=>edit(panel,row)));
+   if(kind==='exams'&&row.status==='COMPLETED'&&state.can_edit)card.append(button('Зробити активним',async()=>{await request(base+'/active',{exam_id:row.id,revision:state.selection.revision});await load();message(panel,'Ручний вибір активного ВЛК збережено.');window.refreshProfileOverview?.();}));
    related(card,'injuries',row.injury_id);related(card,'awards',row.award_id);
    if(kind==='injuries')for(const target of ['exams','awards','tasks'])for(const r of state[target].filter(r=>r.injury_id===row.id))related(card,target,r.id);
    documentUI(panel,card,kind,row);if(expanded.has(String(row.id)))card.open=true;if(documentsExpanded.has(String(row.id))&&card.querySelector('details'))card.querySelector('details').open=true;list.append(article);
   }
   if(!list.children.length)list.append(el('p',kind==='tasks'?'Відкритих завдань немає. Для історії увімкніть показ завершених.':'Записів немає.'));
-  if(kind==='exams'){panel.querySelector('[data-active-exam]').textContent=state.active_warning||(state.active_exam?`Активне ВЛК №${state.active_exam.id}: ${meta.fitness[state.active_exam.fitness]||'Придатність не зазначена'} (${state.selection.exam_id?'ручний вибір':'автоматично'})`:'Актуальне ВЛК не визначено');panel.querySelector('[data-exam-auto]').hidden=role==='viewer';}
+  if(kind==='exams'){panel.querySelector('[data-active-exam]').textContent=state.active_warning||(state.active_exam?`Активне ВЛК №${state.active_exam.id}: ${meta.fitness[state.active_exam.fitness]||'Придатність не зазначена'} (${state.selection.exam_id?'ручний вибір':'автоматично'})`:'Актуальне ВЛК не визначено');panel.querySelector('[data-exam-auto]').hidden=!state.can_edit;}
   if(kind==='tasks'){const pending=panel.querySelector('[data-pending-exams]');pending.replaceChildren(el('h3',`Непройдені ВЛК: ${state.pending_exams.length}`,'h6'));for(const r of state.pending_exams)related(pending,'exams',r.id);for(const warning of state.warnings)pending.append(el('p',warning,'text-warning'));
    const audit=panel.querySelector('[data-medical-audit]');audit.replaceChildren(...state.audit.map(r=>el('p',`${r.occurred_at} · користувач №${r.actor_id} · ${r.entity} №${r.entity_id} · ${r.operation} · ${JSON.stringify(ProfileDates.display(r.changes))}`,'small text-break')));
   }

@@ -15,6 +15,12 @@ def composite_staff_context(db,version_id=None):
 def table_context(db, version_id=None, on=None):
     structures = StaffRepository.structures(db, ordered=True)
     versions = StaffRepository.versions(db, stable=True)
+    from app.services.access_views import scoped
+    e=scoped(db)
+    if e:
+        ids={p.staff_version_id for p in e.positions.values() if p.annulled_at is None and (e.allowed('organization',position_id=p.position_id) or e.allowed('service',position_id=p.position_id))}
+        versions=[v for v in versions if v.id in ids]
+        structures=[s for s in structures if any(v.staff_structure_id==s.id for v in versions)]
     chosen = next((item for item in versions if item.id == version_id), None)
     if chosen is not None and chosen.annulled_at:raise ValueError('Версію анульовано. Історія збережена на сторінці історичних призначень.')
     if version_id is not None and chosen is None:
@@ -39,10 +45,20 @@ def history_context(db, version_id=None, structure_id=None, search=''):
     versions = StaffRepository.versions(db)
     if structure_id is not None:
         versions = [v for v in versions if v.staff_structure_id == structure_id]
+    from app.services.access_views import scoped
+    e=scoped(db)
+    if e:
+        visible_versions={p.staff_version_id for p in e.positions.values() if p.annulled_at is None and e.allowed('service',position_id=p.position_id)}
+        versions=[v for v in versions if v.id in visible_versions]
     chosen = next((v for v in versions if v.id == version_id), None) if version_id else (versions[0] if versions else None)
     structures = StaffRepository.structures(db)
+    if e:structures=[s for s in structures if any(v.staff_structure_id==s.id for v in versions)]
     positions = StaffRepository.positions(db, chosen.id) if chosen else []
     records = StaffRepository.assignment_history(db, chosen.id) if chosen else []
+    if e:
+        positions=[p for p in positions if e.allowed('service',position_id=p.position_id)]
+        ids={p.position_id for p in positions}
+        records=[(r,p) for r,p in records if p.position_id in ids and e.allowed('service',person_id=r.person_id)]
     people = person_options(db, today())
     names = {person['id']:person['label'] for person in people}
     groups = {position.position_id:{'position':position,'current':[], 'archive':[], 'future':[], 'annulled':[], 'count':0} for position in positions}
@@ -72,6 +88,12 @@ def assignment_position_id(db, key):
 
 
 def assignment_audit_context(db, key):
+    if db.info.get('access_actor') is not None:
+        from app.services.access import require
+        record=StaffRepository.get(db,PersonAssignment,key)
+        if record is None:raise ValueError('Запис відсутній.')
+        require(db,'history',person_id=record.person_id)
+        require(db,'service',person_id=record.person_id)
     from app.utils.date_utils import format_calendar_date
     assignment_position_id(db, key)
     labels={'person_id':'Військовослужбовець (ID)','staff_position_id':'Посада (ID)',

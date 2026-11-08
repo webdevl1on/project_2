@@ -13,7 +13,7 @@ router=APIRouter()
 
 
 def render(request,name,**context):
-    return templates.TemplateResponse(request=request,name=name,context={'roles':ASSIGNABLE_ROLES,**context})
+    return templates.TemplateResponse(request=request,name=name,context={'roles':ASSIGNABLE_ROLES if request.state.authenticated_user.role=='master' else {'user':'User'},**context})
 
 
 @router.get('/admin/users')
@@ -26,7 +26,7 @@ def users(request:Request,q:str='',user=Depends(current_user),db:Session=Depends
 
 @router.get('/admin/users/new')
 def new_user(request:Request,user=Depends(current_user),db:Session=Depends(get_db)):
-    try:accounts.authorize(db,user.id,('admin',))
+    try:accounts.authorize(db,user.id,('master','admin'))
     except PermissionError as error:raise HTTPException(403,str(error)) from error
     return render(request,'admin/user_new.html')
 
@@ -68,7 +68,7 @@ async def create(request:Request,user=Depends(current_user),db:Session=Depends(g
     try:
         data=await payload(request)
         if data.get('password')!=data.get('confirm_password'):raise ValueError('Підтвердження пароля не збігається.')
-        key=accounts.create_user(db,data.get('username'),data.get('display_name'),data.get('password'),data.get('role','viewer'),actor_id=user.id)
+        key=accounts.create_user(db,data.get('username'),data.get('display_name'),data.get('password'),data.get('role','user'),actor_id=user.id)
         return {'ok':True,'redirect_to':f'/admin/users/{key}'}
     except PermissionError as error:return JSONResponse({'detail':str(error)},status_code=403)
     except ValueError as error:return JSONResponse({'detail':str(error)},status_code=409)
@@ -94,7 +94,7 @@ async def change(request:Request,key:int,action:str='edit',user=Depends(current_
         elif action=='revoke-sessions':accounts.revoke_all_sessions(db,user.id,key,rev,confirmed=confirmed(data),reason=reason)
         else:raise ValueError('Невідома операція.')
         revoked=user.id==key and action in ('state','revoke-sessions')
-        target='/auth/login' if revoked else '/persons' if not has_role(user,('admin',)) else f'/admin/users/{key}'
+        target='/auth/login' if revoked else '/persons' if not has_role(user,('master','admin')) else f'/admin/users/{key}'
         response=JSONResponse({'ok':True,'redirect_to':target})
         if revoked:response.delete_cookie(COOKIE,path='/')
         return response

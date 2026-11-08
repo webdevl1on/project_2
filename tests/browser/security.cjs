@@ -16,7 +16,7 @@ module.exports=async({context,base,adminToken})=>{
   const pending=await require('./mfa_helpers.cjs').verify(context.request,base);
   const renewed=await page.evaluate(async({csrf,oldToken})=>{const r=await fetch('/auth/mfa/finish',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':csrf},body:'{}'});const data=await r.json();return {changed:oldToken!==data.csrf_token,meta:document.querySelector('meta[name="project2-csrf"]').content===data.csrf_token,forms:[...document.querySelectorAll('form input[name=csrf]')].every(n=>n.value===data.csrf_token)};},{csrf:pending.csrf_token,oldToken});assert.deepEqual(renewed,{changed:true,meta:true,forms:true});
   console.log('PASS security: existing fetch callers gain valid CSRF, explicit wrong tokens fail and re-login refreshes native forms');
-  await context.request.post(base+'/auth/users',{data:{username:'browser-viewer',display_name:'Тестовий спостерігач',role:'viewer',password:adminToken}});
+  await context.request.post(base+'/auth/users',{data:{username:'browser-viewer',display_name:'Тестовий спостерігач',role:'user',password:adminToken}});
   await context.request.post(base+'/auth/logout');
   const expired=await page.evaluate(async()=>{const response=await fetch('/events/data');return response.status;});assert.equal(expired,401);await page.locator('#session-expired').waitFor();
   await page.goto(base+'/auth/login?return_to='+encodeURIComponent('//evil.example'));await page.locator('[name=username]').fill('browser-viewer');await page.locator('[name=password]').fill(adminToken);await Promise.all([page.waitForURL('**/persons'),page.getByRole('button',{name:'Увійти',exact:true}).click()]);

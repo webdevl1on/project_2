@@ -11,12 +11,18 @@ class AdminOwner(str):
         return owner
 
 
-def require_admin(request: Request):
+def session_owner(request: Request):
+    """Bind a signed import preview to the verified personal session, not a role."""
     user=getattr(request.state,'authenticated_user',None)
     session=getattr(request.state,'personal_session',None)
     if user is None or session is None:raise HTTPException(401,'Потрібен персональний вхід.')
-    if not has_role(user,('admin',)):raise HTTPException(403,'Потрібні права адміністратора.')
     return AdminOwner(f'user:{user.id}:session:{session.token_hash}',session.csrf_token)
+
+
+def require_admin(request: Request):
+    owner=session_owner(request)
+    if not has_role(request.state.authenticated_user,('admin',)):raise HTTPException(403,'Потрібні права адміністратора.')
+    return owner
 
 
 def csrf_token(owner):

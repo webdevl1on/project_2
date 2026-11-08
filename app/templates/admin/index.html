@@ -4,7 +4,7 @@
 <body class="container py-4">
 {% include "components/app_navigation.html" %}<h1>Адміністрування</h1>
 {% if message %}<div class="alert alert-success" role="status">{{ message }}</div>{% endif %}
-<section class="card my-3"><div class="card-body"><h2 class="h4">Словники відмінків</h2>
+{% if security_user.role=='admin' %}<section class="card my-3"><div class="card-body"><h2 class="h4">Словники відмінків</h2>
 <p>Перевірені форми прізвищ, імен та по батькові. Персональні форми людей зберігаються окремо.</p>
 {% for kind,label in parts.items() %}<a class="btn btn-outline-primary mb-2" href="/admin/dictionaries?kind={{ kind }}">{{ label }}</a> {% endfor %}
 <hr><a class="btn btn-outline-secondary" href="/admin/dictionaries/template.xlsx">Завантажити порожній Excel-шаблон</a>
@@ -18,8 +18,8 @@
 <button class="btn btn-primary">Перевірити файл</button></form></div></section>
 <section class="card my-3"><div class="card-body"><h2 class="h4">Довідник ТЦК та СП</h2><p>Незалежний довідник установ: пошук, редагування, деактивація та контрольований Excel-імпорт.</p><a href="/admin/tcc" class="btn btn-outline-primary">Відкрити довідник ТЦК та СП</a></div></section>
 <section class="card my-3"><div class="card-body"><h2 class="h4">Штатна структура</h2><a class="btn btn-outline-primary" href="/admin/staff">Керування штатною структурою</a></div></section>
-<section class="card my-3"><div class="card-body"><h2 class="h4">Користувачі</h2><p>Персональні облікові записи, Master/Admin, сесії та журнал змін.</p><a class="btn btn-outline-primary" href="/admin/users">Керування користувачами</a></div></section>
-<section class="card my-3"><div class="card-body"><h2 class="h4">Організаційна структура</h2><a class="btn btn-outline-primary" href="/admin/organization">Дерево підрозділів та незалежні штатки</a></div></section>
-<p>Наступні розділи адміністрування додаватимуться за потреби.</p>
+{% endif %}<section class="card my-3"><div class="card-body"><h2 class="h4">Користувачі</h2><p>Персональні облікові записи, Master/Admin, сесії та журнал змін.</p><a class="btn btn-outline-primary" href="/admin/users">Керування користувачами</a></div></section>
+{% if acl_allow('organization') %}<section class="card my-3"><div class="card-body"><h2 class="h4">Організаційна структура</h2><a class="btn btn-outline-primary" href="/admin/organization">Дерево підрозділів та незалежні штатки</a></div></section>
+{% endif %}<section class="card my-3"><div class="card-body"><h2 class="h4">Права доступу</h2><a href="/admin/access" class="btn btn-outline-primary">Матриця, шаблони та перевірки прав</a></div></section><p>Наступні розділи адміністрування додаватимуться за потреби.</p>
 <form method="post" action="/admin/logout"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-outline-secondary">Вийти з адміністрування</button> <a href="/persons" class="btn btn-link">До списку людей</a></form>
 </body></html>

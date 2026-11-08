@@ -1,4 +1,5 @@
 """Document operations: separate presence, contents, copies and effective status."""
+from app.services.access_context import actor_operation
 from datetime import date
 from contextlib import contextmanager
 import os
@@ -9,10 +10,9 @@ from app.database.transactions import service_transaction
 from app.document_schemas import SCHEMAS, STATUSES, PRESENCE, DRIVING_CATEGORIES, DATE_POLICIES
 from app.models import DocumentType, PersonDocumentState, PersonDocument, DocumentDetails, DrivingCategory, DocumentAudit, Passport
 from app.repositories.document_repository import DocumentRepository as Repo
-from app.services.accounts import authorize
+from app.services import access
 from app.utils.date_utils import validate_date_components, validate_field_date
 
-WRITE_ROLES = ('admin','editor')
 
 
 @contextmanager
@@ -51,12 +51,14 @@ def _type(db, code):
 
 
 def _record(db, person_id, key, revision=None):
+    if db.info.get('access_actor') is not None:access.require_document(db,person_id,key,'edit' if db.info.get('project2_write') else 'read')
     record = Repo.document(db, key)
     if record is None or record.person_id != person_id: raise ValueError('Документ цієї особи не знайдено.')
     if revision is not None and str(record.revision) != str(revision): raise ValueError('Документ змінено після відкриття форми.')
     return record
 
 
+@actor_operation
 def audit(db, actor_id, record, operation, changes, reason=None, *, person_id=None, type_id=None, file_id=None):
     Repo.add(db, DocumentAudit(person_id=record.person_id if record else person_id,
         document_type_id=record.document_type_id if record else type_id, document_id=record.id if record else None,
@@ -155,10 +157,11 @@ def _fingerprint(values):
     return hashlib.sha256(json.dumps(values,sort_keys=True,ensure_ascii=False,default=_json).encode()).hexdigest()
 
 
+@actor_operation
 def save(db, actor_id, person_id, code, data, *, key=None, revision=None, replaces_id=None):
     try:
         with document_transaction(db):
-            authorize(db,actor_id,WRITE_ROLES)
+            access.require(db,'documents','edit',person_id=person_id,actor_id=actor_id)
             if Repo.person(db,person_id) is None: raise ValueError('Особу не знайдено.')
             kind=_type(db,code)
             if key is not None:
@@ -194,10 +197,11 @@ def save(db, actor_id, person_id, code, data, *, key=None, revision=None, replac
     except SQLAlchemyError: raise ValueError('Конфлікт збереження документа; усю операцію скасовано.') from None
 
 
+@actor_operation
 def set_presence(db, actor_id, person_id, code, presence, *, revision=None):
     if presence not in PRESENCE: raise ValueError('Невідомий стан фізичної наявності.')
     with document_transaction(db):
-        authorize(db,actor_id,WRITE_ROLES)
+        access.require(db,'documents','edit',person_id=person_id,actor_id=actor_id)
         if Repo.person(db,person_id) is None: raise ValueError('Особу не знайдено.')
         kind=_type(db,code)
         if kind.is_primary and presence=='NEVER_OBTAINED': raise ValueError('Основний документ не можна позначити як неотриманий.')
@@ -209,13 +213,14 @@ def set_presence(db, actor_id, person_id, code, presence, *, revision=None):
         audit(db,actor_id,None,'presence',{'presence':{'old':old,'new':presence}},person_id=person_id,type_id=kind.id)
 
 
+@actor_operation
 def override(db, actor_id, person_id, key, revision, status, reason):
     if revision is None:raise ValueError('Потрібна revision документа.')
     if status is not None and status not in STATUSES: raise ValueError('Невідомий статус заповненості.')
     reason=_text(reason,1000)
     if not reason: raise ValueError('Вкажіть причину ручного коригування або його скасування.')
     with document_transaction(db):
-        authorize(db,actor_id,('admin',))
+        access.require(db,'documents','override',person_id=person_id,actor_id=actor_id)
         record=_record(db,person_id,key,revision)
         old=record.override_status
         record.override_status=status;record.override_reason=reason if status else None;record.override_user_id=actor_id if status else None
@@ -232,10 +237,11 @@ def _archive(db, actor_id, record, reason):
     audit(db,actor_id,record,'archive',{'is_current':{'old':True,'new':False},'snapshot':snapshot},reason)
 
 
+@actor_operation
 def archive(db,actor_id,person_id,key,revision):
     if revision is None:raise ValueError('Потрібна revision документа.')
     with document_transaction(db):
-        authorize(db,actor_id,WRITE_ROLES);record=_record(db,person_id,key,revision)
+        access.require(db,'documents','edit',person_id=person_id,actor_id=actor_id);record=_record(db,person_id,key,revision)
         if not record.is_current: raise ValueError('Документ уже архівний.')
         _archive(db,actor_id,record,'manual')
 
@@ -267,10 +273,12 @@ def expiry(values, *, on=None, days=None):
     return 'EXPIRED' if delta<0 else ('EXPIRING' if delta<=days else 'VALID')
 
 
+@actor_operation
 def list_documents(db,actor_id,person_id,**filters):
-    authorize(db,actor_id)
+    access.require(db,'documents','read',person_id=person_id,actor_id=actor_id)
     if Repo.person(db,person_id) is None: raise ValueError('Особу не знайдено.')
-    rows=Repo.records(db,person_id); result=[]
+    e=access.Access(db,actor_id);hidden=access.Repo.medical_document_ids(db,person_id) if not e.allowed('medical',person_id=person_id) else set()
+    rows=[r for r in Repo.records(db,person_id) if r.id not in hidden]; result=[]
     for kind in Repo.types(db):
         state=Repo.state(db,person_id,kind.id);presence=state.presence if state else 'UNKNOWN'
         selected=[r for r in rows if r.document_type_id==kind.id]
@@ -294,27 +302,33 @@ def list_documents(db,actor_id,person_id,**filters):
     return result
 
 
+@actor_operation
 def audit_entries(db,actor_id,person_id):
-    authorize(db,actor_id)
+    access.require(db,'history',person_id=person_id,actor_id=actor_id)
+    access.require(db,'documents','read',person_id=person_id,actor_id=actor_id)
     if Repo.person(db,person_id) is None:raise ValueError('Особу не знайдено.')
+    hidden=access.Repo.medical_document_ids(db,person_id) if not access.Access(db,actor_id).allowed('medical',person_id=person_id) else set()
     return [{'id':r.id,'actor_id':r.actor_id,'actor_kind':r.actor_kind,
         'occurred_at':r.occurred_at.isoformat()+'Z','document_id':r.document_id,'file_id':r.file_id,
-        'operation':r.operation,'changes':r.changes,'reason':r.reason} for r in Repo.audits(db,person_id)]
+        'operation':r.operation,'changes':r.changes,'reason':r.reason} for r in Repo.audits(db,person_id) if r.document_id not in hidden]
 
 
+@actor_operation
 def editor_catalog(db,actor_id,person_id):
     """Real type rows plus trusted schemas; no user-provided executable metadata."""
-    authorize(db,actor_id)
+    access.require(db,'documents','read',person_id=person_id,actor_id=actor_id)
     if Repo.person(db,person_id) is None:raise ValueError('Особу не знайдено.')
     from app.document_schemas import editor_schema,PRESENCE_LABELS,STATUS_LABELS,EXPIRY_LABELS,FILE_SIDE_LABELS
-    return {'types':[{'code':kind.code,'name':kind.name,'schema_key':kind.schema_key,'is_primary':kind.is_primary,'is_active':kind.is_active,'schema':editor_schema(kind.schema_key)} for kind in Repo.types(db)],
+    e=access.Access(db,actor_id)
+    return {'can_edit':e.allowed('documents','edit',person_id=person_id),'can_override':e.allowed('documents','edit',person_id=person_id) and e.allowed('documents','override',person_id=person_id),'can_history':e.allowed('history',person_id=person_id),'types':[{'code':kind.code,'name':kind.name,'schema_key':kind.schema_key,'is_primary':kind.is_primary,'is_active':kind.is_active,'schema':editor_schema(kind.schema_key)} for kind in Repo.types(db)],
             'presence':PRESENCE_LABELS,'statuses':STATUS_LABELS,'expiry':EXPIRY_LABELS,'sides':FILE_SIDE_LABELS,'driving_categories':sorted(DRIVING_CATEGORIES)}
 
 
+@actor_operation
 def update_tax_number(db,actor_id,person_id,value,expected,*,key=None,revision=None):
     """Only the canonical number changes; no name writes or implicit document creation."""
     with document_transaction(db):
-        authorize(db,actor_id,WRITE_ROLES)
+        access.require(db,'documents','edit',person_id=person_id,actor_id=actor_id)
         person=Repo.person(db,person_id)
         if person is None:raise ValueError('Особу не знайдено.')
         kind=_type(db,'tax_number')

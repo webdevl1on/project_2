@@ -28,7 +28,7 @@ def database_path(value=None):
 
 
 def validate_user(user):
-    if not user or not user.is_active or user.role!='editor' or user.display_name!=DISPLAY_NAME or not user.password_hash.startswith(PREFIX):
+    if not user or not user.is_active or user.role!='user' or user.display_name!=DISPLAY_NAME or not user.password_hash.startswith(PREFIX):
         raise ValueError('Ініціалізуйте тестового автора: python -m app.services.dev_auth --database PATH. Наявні облікові записи автоматично не змінюються.')
     return user
 
@@ -52,7 +52,7 @@ def initialize(db):
         user=Repo.by_name(db,USERNAME)
         if user:validate_user(user)
         else:
-            user=Repo.add(db,User(username=USERNAME,display_name=DISPLAY_NAME,password_hash=PREFIX+secrets.token_hex(32),role='editor',is_active=True))
+            user=Repo.add(db,User(username=USERNAME,display_name=DISPLAY_NAME,password_hash=PREFIX+secrets.token_hex(32),role='user',is_active=True))
             db.flush()
         key=user.id
     return key

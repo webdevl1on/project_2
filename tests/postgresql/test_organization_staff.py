@@ -1,4 +1,5 @@
 """Roster source invariants and additive migration on isolated PostgreSQL 17 schemas."""
+from tests.access_helpers import legacy_user
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date as D
 from pathlib import Path
@@ -21,7 +22,7 @@ ON=D(2026,1,1)
 @pytest.fixture
 def roster(pg_factory):
     with pg_factory() as db:
-        actor=accounts.create_user(db,'roster-admin','Синтетичний Admin','synthetic-password','admin')
+        actor=legacy_user(db,'roster-admin','Синтетичний Admin','synthetic-password','admin')
         root=organization.OrganizationService.create(db,actor,'battalion','Батальйон',D(2020,1,1))
         company=organization.OrganizationService.create(db,actor,'company','1 рота',D(2020,1,1),parent_id=root)
         child=organization.OrganizationService.create(db,actor,'platoon','1 взвод',D(2020,1,1),parent_id=company)
@@ -149,7 +150,7 @@ def test_org_audit_failure_rolls_back_replacement_and_assignment_audit(roster):
 def test_additive_0008_preserves_legacy_records_without_guessing_mapping_or_audit(pg_factory):
     engine=pg_factory.kw['bind']
     with pg_factory() as db:
-        actor=accounts.create_user(db,'legacy-admin','Попередній Admin','synthetic-password','admin')
+        actor=db.scalar(text("INSERT INTO users(username,display_name,password_hash,role,is_active,failed_attempts,created_at,updated_at,revision) VALUES ('legacy-admin','Попередній Admin',:password,'admin',true,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1) RETURNING id"),{'password':accounts.password_hash('synthetic-password')})
         structure=db.scalar(text("INSERT INTO staff_structures(code,name,created_at,updated_at,revision) VALUES ('legacy','Архівний штат',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1) RETURNING id"))
         version=db.scalar(text("INSERT INTO staff_versions(staff_structure_id,name,valid_from,created_at,updated_at,revision) VALUES (:structure,'Попередня версія','2020-01-01',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1) RETURNING id"),{'structure':structure})
         from app.validators.position_validator import POSITION_ATTRIBUTES

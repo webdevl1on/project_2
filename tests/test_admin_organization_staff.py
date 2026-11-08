@@ -1,4 +1,5 @@
 """Organization staffing UI/API with real MFA and isolated synthetic SQLite."""
+from tests.access_helpers import legacy_user
 from datetime import date as D
 import pytest
 from fastapi.testclient import TestClient
@@ -17,8 +18,8 @@ from tests.test_organization_import import fields,excel
 def web(tmp_path):
     engine=create_engine('sqlite:///'+str(tmp_path/'admin-org-staff.sqlite3'),connect_args={'check_same_thread':False});Base.metadata.create_all(engine);factory=sessionmaker(engine)
     with factory() as db:
-        actor=accounts.create_user(db,'org-staff-admin','Admin','synthetic-password','admin')
-        accounts.create_user(db,'org-staff-viewer','Viewer','synthetic-password','viewer',actor_id=actor)
+        actor=legacy_user(db,'org-staff-admin','Admin','synthetic-password','admin')
+        legacy_user(db,'org-staff-viewer','User без прав','synthetic-password','user',actor_id=actor)
         root=organization.OrganizationService.create(db,actor,'battalion','Батальйон',D(2020,1,1))
         company=organization.OrganizationService.create(db,actor,'company','1 рота',D(2020,1,1),parent_id=root)
         child=organization.OrganizationService.create(db,actor,'platoon','1 взвод',D(2020,1,1),parent_id=company)

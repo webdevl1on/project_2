@@ -1,4 +1,5 @@
 """Transactional domain operations; effective dates, never creation order."""
+from app.services.access_context import actor_operation
 from contextlib import contextmanager
 from datetime import date, datetime, timedelta, UTC
 from zoneinfo import ZoneInfo
@@ -55,8 +56,10 @@ def write_unit(db):
         else:
             db.execute(text("SELECT pg_advisory_xact_lock(hashtext(current_schema()),hashtext('project2_organization'))"))
         db.info['project2_write']=True
-        yield
-        db.commit()
+        from app.services.access_context import authorization_snapshot
+        with authorization_snapshot(db):
+            yield
+            db.commit()
     except (IntegrityError, OperationalError, StaleDataError) as error:
         db.rollback()
         message = str(getattr(error, "orig", error))
@@ -115,6 +118,7 @@ class StaffService:
         return key
 
     @staticmethod
+    @actor_operation
     def create_assignment(db, person_id, position_id, start, end=None, *, order_number=None, order_date=None, release_number=None, release_date=None, completion_reason=None, completion_note=None, actor_id=None):
         period(start, end); official_start(start)
         with write_unit(db):
@@ -129,6 +133,7 @@ class StaffService:
         return key
 
     @staticmethod
+    @actor_operation
     def correct_assignment(db, key, revision, person_id, position_id, start, end, *, details=None, actor_id=None):
         period(start, end)
         with write_unit(db):
@@ -162,6 +167,7 @@ class StaffService:
         return key
 
     @staticmethod
+    @actor_operation
     def close_version(db, key, revision, end, *, actor_id=None):
         exact_date(end)
         with write_unit(db):
@@ -226,6 +232,7 @@ class StaffService:
         return result
 
     @staticmethod
+    @actor_operation
     def assign(db, position_id, person_id, on, expected, confirmed=False, *, actor_id=None):
         with write_unit(db):
             return StaffService._assign_locked(db,position_id,person_id,on,expected,confirmed,actor_id=actor_id)
@@ -271,6 +278,7 @@ class StaffService:
         return "Призначення збережено; історію попередньої посади збережено." if person_id else "Призначення завершено."
 
     @staticmethod
+    @actor_operation
     def correct_orders(db, key, revision, assignment_number=_ORDER_UNSET, assignment_date=_ORDER_UNSET, release_number=_ORDER_UNSET, release_date=_ORDER_UNSET, *, actor_id=None):
         values={}
         for prefix,number,issued in [('assignment',assignment_number,assignment_date),('release',release_number,release_date)]:
@@ -285,6 +293,7 @@ class StaffService:
         return key
 
     @staticmethod
+    @actor_operation
     def release_assignment(db,key,revision,effective,number=None,issued=None,note=None,confirmed=False, *, actor_id=None):
         exact_date(effective)
         if not confirmed:raise ValueError('Підтвердьте звільнення саме з посади.')
@@ -303,6 +312,7 @@ class StaffService:
         return key
 
     @staticmethod
+    @actor_operation
     def annul_assignment(db, key, revision, reason, *, confirmed=False, actor_id=None):
         reason = (reason or '').strip()
         if not confirmed: raise ValueError('Підтвердьте анулювання призначення.')
@@ -312,6 +322,7 @@ class StaffService:
         return key
 
     @staticmethod
+    @actor_operation
     def annul_assignment_locked(db,key,revision,reason,*,actor_id=None):
         if not db.info.get('project2_write'):raise ValueError('Потрібна спільна кадрова транзакція.')
         reason=(reason or '').strip()
@@ -324,6 +335,7 @@ class StaffService:
         return key
 
     @staticmethod
+    @actor_operation
     def restore_assignment(db, key, revision, *, actor_id=None):
         with write_unit(db):
             record = checked(db, PersonAssignment, key, revision)

@@ -233,10 +233,10 @@ def recover(db,actor_id,uid,reason,*,password=None):
     if not reason:raise ValueError('Обов’язково задокументуйте перевірку особи та причину.')
     with accounts.account_write(db):
         if actor_id is not None:
-            actor=accounts.authorize(db,actor_id,('admin',));user=accounts.authorize(db,uid)
+            actor=accounts.authorize(db,actor_id,('master','admin'));user=accounts.authorize(db,uid)
             from app.account_policy import personal
             if not personal(user):raise PermissionError('Історичний технічний запис не змінюється.')
-            if uid==actor_id or user.role=='master':raise PermissionError('Власне MFA або MFA Master не скидається через адміністративний HTTP API.')
+            if uid==actor_id or user.role=='master' or user.role=='admin' and actor.role!='master':raise PermissionError('Власне MFA або MFA Master не скидається через адміністративний HTTP API.')
         else:
             user=accounts.authorize(db,uid)
             if not accounts.verify_password(password,user.password_hash):raise PermissionError('Поточний пароль Master не підтверджений.')

@@ -1,4 +1,5 @@
 """Independent dated organizational identity; synthetic DB and administrators only."""
+from tests.access_helpers import legacy_user
 from datetime import date as D
 import pytest
 from sqlalchemy import create_engine,select,func,event
@@ -15,7 +16,7 @@ def organization(tmp_path):
     engine=create_engine('sqlite:///'+str(tmp_path/'organization.sqlite3'));Base.metadata.create_all(engine)
     factory=sessionmaker(engine)
     with factory() as db:
-        actor=accounts.create_user(db,'organization-admin','Тестовий Admin','synthetic-password','admin')
+        actor=legacy_user(db,'organization-admin','Тестовий Admin','synthetic-password','admin')
         yield db,actor
     engine.dispose()
 
@@ -108,11 +109,11 @@ def test_operational_parent_is_separate_and_cycles_rejected(organization):
     with pytest.raises(ValueError,match='Оперативне'):Service.dissolve(db,actor,b,revision(db,b),D(2020,6,1))
 
 
-def test_unauthorized_editor_cannot_mutate_tree_and_master_can(organization):
-    db,actor=organization;editor=accounts.create_user(db,'org-editor','Editor','synthetic-password','editor',actor_id=actor)
+def test_user_without_grants_and_master_cannot_mutate_subject_tree(organization):
+    db,actor=organization;editor=legacy_user(db,'org-editor','User','synthetic-password','user',actor_id=actor)
     with pytest.raises(PermissionError):create(db,editor,'Заборонено')
     accounts.promote_master(db,actor,'synthetic-password',confirmed=True)
-    assert create(db,actor,'Master може')
+    with pytest.raises(PermissionError):create(db,actor,'Master без предметних прав')
 
 
 def test_audit_failure_rolls_back_entire_tree_change(organization):

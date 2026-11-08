@@ -4,6 +4,9 @@ from app.services.service_person_checking import ServicePersonCheck
 
 
 def list_people(db, sort_by="surname", direction="asc"):
+    from app.services.access_views import people
+    filtered=people(db,sort_by,direction)
+    if filtered is not None:return filtered
     return [{"person": person, "name": name, "rank": rank}
             for person, name, rank in PersonRepository.list_people(db, sort_by, direction)]
 

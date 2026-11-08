@@ -19,14 +19,15 @@ module.exports=async({context,base,adminToken})=>{
   assert.match(await page.locator(`[data-account-id="${master}"]`).innerText(),/Master/);
   console.log('PASS accounts: Master transition warning, GUI creation of the first Admin and distinct Master label');
 
-  const editor=await create('account-editor','editor');
+  const editor=await create('account-editor','user');
   let form=page.locator(`form[action="/admin/users/${editor}"]`);
   await form.locator('[name=display_name]').fill('Збережене виправлення');await submit(form);
   form=page.locator(`form[action="/admin/users/${editor}"]`);
-  await form.locator('[name=role]').selectOption('viewer');await form.locator('[name=confirmed]').check();await submit(form);
+  await form.locator('[name=role]').selectOption('admin');await form.locator('[name=confirmed]').check();await submit(form);
   await page.getByRole('link',{name:'Історія змін',exact:true}).click();await page.waitForURL('**/admin/users/audit?*');
   assert.match(await page.locator('body').innerText(),/Збережене виправлення/);assert.match(await page.locator('body').innerText(),/Зміна ролі/);
   console.log('PASS accounts: display-name editing, confirmed role change and readable before/after audit');
+  await page.goto(base+`/admin/users/${editor}`);form=page.locator(`form[action="/admin/users/${editor}"]`);await form.locator('[name=role]').selectOption('user');await form.locator('[name=confirmed]').check();await submit(form);
 
   await page.goto(base+'/admin/users/new');form=page.locator('[data-account-form]');await form.locator('[name=username]').fill('account-editor');await form.locator('[name=display_name]').fill('Залишити чернетку');await form.locator('[name=password]').fill(password);await form.locator('[name=confirm_password]').fill(password);await form.locator('button').click();
   await form.locator('[data-account-error]:visible').waitFor();assert.equal(await form.locator('[name=username]').inputValue(),'account-editor');assert.equal(await form.locator('[name=display_name]').inputValue(),'Залишити чернетку');assert.equal(await form.locator('[name=password]').inputValue(),'');
@@ -51,14 +52,16 @@ module.exports=async({context,base,adminToken})=>{
   }finally{await other.close();}
   console.log('PASS accounts: disable revokes real sessions, enable never restores revoked cookies');
 
+  await signIn('browser-admin',adminToken);
   await page.goto(base+`/admin/users/${admin}`);await page.getByText('Вимкнути користувача',{exact:true}).click();form=page.locator('form[action$="/state"]');await form.locator('[name=confirmed]').check();await form.locator('button').click();await form.locator('[data-account-error]:visible').waitFor();assert.match(await form.locator('[data-account-error]').innerText(),/останнього/);
   assert.equal(await form.locator('[name=confirmed]').isChecked(),true);
   console.log('PASS accounts: last active Admin cannot be disabled and the form remains open');
 
+  await signIn('account-admin',password);
   await page.goto(base+`/admin/users/${editor}`);await page.getByText('Адміністративне скидання пароля',{exact:true}).click();form=page.locator('form[action$="/reset-password"]');await form.locator('[name=password]').fill(password+'-reset');await form.locator('[name=confirm_password]').fill(password+'-reset');await form.locator('[name=confirmed]').check();await submit(form);
   await signIn('account-editor',password+'-reset');await page.goto(base+'/account/password');form=page.locator('[data-account-form]');await form.locator('[name=current_password]').fill(password+'-reset');await form.locator('[name=password]').fill(password+'-own');await form.locator('[name=confirm_password]').fill(password+'-own');await submit(form);assert.equal(new URL(page.url()).pathname,'/auth/login');assert.equal((await context.request.get(base+'/auth/me')).status(),401);
   await signIn('account-editor',password+'-own');assert.equal((await context.request.get(base+'/admin/users')).status(),403);
-  console.log('PASS accounts: Admin password reset and Viewer own-password change revoke sessions and preserve role');
+  console.log('PASS accounts: Admin password reset and User own-password change revoke sessions and preserve role');
 
   await signIn('browser-admin',adminToken);await page.goto(base+`/admin/users/${master}`);assert.equal(await page.locator('[name=role]').count(),0);assert.equal(await page.locator('form[action$="/reset-password"]').count(),0);assert.equal(await page.locator('form[action$="/state"]').count(),0);
   await page.setViewportSize({width:390,height:844});await page.goto(base+'/admin/users');assert.equal(await page.locator('table').count(),1);assert.equal(await page.locator('[data-account-id]').count(),3);

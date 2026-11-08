@@ -1,4 +1,5 @@
 """Persistent MFA state and races on actual PostgreSQL 17, project2_ci only."""
+from tests.access_helpers import legacy_user
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from datetime import timedelta,UTC
@@ -18,8 +19,10 @@ from tests.test_mfa import enroll,PASSWORD
 def test_additive_migration_keeps_master_and_invalidates_old_password_sessions(pg_factory):
     engine=pg_factory.kw['bind']
     with pg_factory() as db:
-        uid=accounts.create_user(db,'mfa-admin','Master',PASSWORD,'admin');accounts.promote_master(db,uid,PASSWORD,confirmed=True)
-        encoded=db.get(User,uid).password_hash
+        # Frozen 0006 schema has no User.person_id; seed without the new ORM.
+        encoded=accounts.password_hash(PASSWORD)
+        uid=db.scalar(text("INSERT INTO users(username,display_name,password_hash,role,is_active,failed_attempts,created_at,updated_at,revision) VALUES ('mfa-admin','Master',:password,'admin',true,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1) RETURNING id"),{'password':encoded})
+        db.execute(text("UPDATE users SET role='master' WHERE id=:uid"),{'uid':uid})
         db.execute(text("INSERT INTO user_sessions(token_hash,user_id,csrf_token,expires_at) VALUES (:token,:uid,'old-csrf',CURRENT_TIMESTAMP+interval '8 hours')"),{'token':accounts.digest_token('old-token'),'uid':uid});db.commit()
     cfg=Config(str(Path(__file__).resolve().parents[2]/'alembic.ini'))
     with engine.begin() as db:cfg.attributes['connection']=db;command.upgrade(cfg,'head');command.upgrade(cfg,'head')
@@ -34,7 +37,7 @@ def test_additive_migration_keeps_master_and_invalidates_old_password_sessions(p
 def test_concurrent_single_use_factor_or_flow(pg_factory,monkeypatch,operation):
     clock=[mfa.now()];monkeypatch.setattr(mfa,'now',lambda:clock[0])
     with pg_factory() as db:
-        uid=accounts.create_user(db,'mfa-admin','Admin',PASSWORD,'admin');token,setup,codes=enroll(db,uid);mfa.finish(db,token)
+        uid=legacy_user(db,'mfa-admin','Admin',PASSWORD,'admin');token,setup,codes=enroll(db,uid);mfa.finish(db,token)
         token,_=accounts.login(db,'mfa-admin',PASSWORD)
         if operation=='finish':mfa.prove(db,token,'backup',codes[0])
         other,_=accounts.login(db,'mfa-admin',PASSWORD)
@@ -56,7 +59,7 @@ def test_multiple_sessions_process_restart_and_rotation(pg_factory,monkeypatch):
     import app.database.db as database
     engine=pg_factory.kw['bind']
     with pg_factory() as db:
-        uid=accounts.create_user(db,'mfa-admin','Admin',PASSWORD,'admin');token,setup,codes=enroll(db,uid);session=mfa.finish(db,token)
+        uid=legacy_user(db,'mfa-admin','Admin',PASSWORD,'admin');token,setup,codes=enroll(db,uid);session=mfa.finish(db,token)
         pending,_=accounts.login(db,'mfa-admin',PASSWORD)
     # A completely new Session consumes state persisted by the previous worker.
     with pg_factory() as db:mfa.prove(db,pending,'backup',codes[0]);assert mfa.finish(db,pending)['token']
@@ -72,7 +75,7 @@ def test_multiple_sessions_process_restart_and_rotation(pg_factory,monkeypatch):
 def test_pending_flow_survives_two_separate_server_processes(pg_factory):
     import os,sys,json,subprocess
     with pg_factory() as db:
-        uid=accounts.create_user(db,'mfa-admin','Admin',PASSWORD,'admin');token,_,codes=enroll(db,uid);mfa.finish(db,token)
+        uid=legacy_user(db,'mfa-admin','Admin',PASSWORD,'admin');token,_,codes=enroll(db,uid);mfa.finish(db,token)
         pending,_=accounts.login(db,'mfa-admin',PASSWORD)
         schema=db.scalar(text('SELECT current_schema()'))
     script='''

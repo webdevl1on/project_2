@@ -87,3 +87,10 @@ from app.routers import organization
 app.include_router(organization.router)
 from app.routers import organization_staff
 app.include_router(organization_staff.router)
+from app.routers import access_control
+app.include_router(access_control.router)
+
+@app.exception_handler(PermissionError)
+async def permission_error(request:Request,error:PermissionError):
+    from fastapi.responses import JSONResponse
+    return JSONResponse({'detail':str(error) or 'Недостатньо прав доступу.'},status_code=403)

@@ -52,6 +52,12 @@ class ServicePersonCreate:
             person.birth_year = person_data["birth_year"]
 
             current_name = PersonRepository.current_name(db, person_id)
+            if db.info.get("access_actor") is not None:
+                from app.services.access import Access
+                e=Access(db)
+                if not e.allowed("basic","edit",person_id=person_id):
+                    if current_name is None or any(name_data.get(key)!=getattr(current_name,key) for key in ("surname","name","patronymic")):raise PermissionError("Редагування ПІБ не дозволене.")
+                    return person
             if not current_name:
                 current_name = PersonRepository.add_name(db, person_id, name_data)
             else:

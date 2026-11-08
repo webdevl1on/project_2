@@ -14,6 +14,8 @@ def contact_list(request:Request,person_id:int,db:Session=Depends(get_db)):
 
 @router.get('/persons/{person_id}/overview')
 def overview(request:Request,person_id:int,db:Session=Depends(get_db)):
+    from app.services.access_views import scoped,profile
+    if scoped(db) is not None:return templates.TemplateResponse(request=request,name='person/components/access_overview.html',context=profile(db,person_id))
     return templates.TemplateResponse(request=request,name='person/components/profile_overview.html',context=full_profile(db,person_id),headers={'Cache-Control':'no-store'})
 
 @router.post('/persons/{person_id}/contacts')

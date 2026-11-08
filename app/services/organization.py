@@ -1,4 +1,5 @@
 """Effective organizational tree, independent of staffing versions and assignments."""
+from app.services.access_context import actor_operation
 from contextlib import contextmanager
 from datetime import date,datetime,UTC,timedelta
 from unicodedata import normalize as unicode_normalize
@@ -11,10 +12,17 @@ from app.services.accounts import authorize as authorize_account
 UNSET=object()
 ACTIONS=frozenset({'view','manage','create','edit','reparent','reorder','bind','import','dissolve','annul','operational','coverage','map','withdraw','position','position_annul','reassignment'})
 
+@actor_operation
 def authorize(db,actor_id,action,unit_id=None):
-    """Explicit action boundary for future ACL; all management currently Master/Admin."""
+    """Evaluate the requested organizational action separately from other edits."""
     if action not in ACTIONS:raise ValueError('Невідома організаційна операція.')
-    return authorize_account(db,actor_id,('admin',))
+    user=authorize_account(db,actor_id)
+    if user.role=='admin':return user
+    from app.services.access import Access
+    e=Access(db,actor_id);mapped={'view':'read','reorder':'reorder','reparent':'reparent','bind':'bind','map':'bind','import':'import'}.get(action,'edit')
+    allowed=e.allowed('organization',mapped,unit_id=unit_id) if unit_id is not None else any(e.allowed('organization',mapped,unit_id=key) for key in e.states) or e.allowed('organization',mapped)
+    if not allowed:raise PermissionError('Недостатньо організаційних прав для цієї дії.')
+    return user
 
 def normalize(name):
     if not isinstance(name,str) or not name.strip() or len(name)>500:raise ValueError('Назва підрозділу: 1–500 символів.')
@@ -29,7 +37,11 @@ def organization_write(db,actor_id,action='manage'):
     with write_unit(db):
         Repo.lock(db)
         authorize(db,actor_id,action)
-        yield
+        previous=db.info.get('access_org_action');db.info['access_org_action']=action
+        try:yield
+        finally:
+            if previous is None:db.info.pop('access_org_action',None)
+            else:db.info['access_org_action']=previous
 
 def checked(db,key,revision=None):
     unit=Repo.get(db,key)
@@ -100,20 +112,24 @@ def validate_tree(db):
 
 class OrganizationService:
     @staticmethod
+    @actor_operation
     def create(db,actor_id,kind,name,formed_on,*,parent_id=None,dissolved_on=None):
         with organization_write(db,actor_id,'create'):
             return create_locked(db,actor_id,kind,name,formed_on,parent_id=parent_id,dissolved_on=dissolved_on)
 
     @staticmethod
+    @actor_operation
     def revise(db,actor_id,key,revision,effective_from,*,name=None,parent_id=UNSET):
         exact_date(effective_from)
-        with organization_write(db,actor_id):
+        with organization_write(db,actor_id,'reparent' if parent_id is not UNSET and name is None else 'edit'):
             unit=checked(db,key,revision);before=snapshot(db,unit);states=Repo.states(db,key);old=state_at(states,key,effective_from)
             if old is None or not active(unit,effective_from):raise ValueError('Дата не належить періоду існування підрозділу.')
             if parent_id is not UNSET and parent_id is not None:checked(db,parent_id)
             new_name=old.name if name is None else name.strip() if isinstance(name,str) else name
             normalized=normalize(new_name);parent=old.primary_parent_id if parent_id is UNSET else parent_id
-            if parent!=old.primary_parent_id:authorize(db,actor_id,'reparent',key)
+            if parent!=old.primary_parent_id:
+                authorize(db,actor_id,'reparent',key)
+                if parent is not None:authorize(db,actor_id,'reparent',parent)
             if new_name!=old.name:authorize(db,actor_id,'edit',key)
             end=old.valid_to
             if effective_from==old.valid_from:
@@ -125,6 +141,7 @@ class OrganizationService:
         return key
 
     @staticmethod
+    @actor_operation
     def dissolve(db,actor_id,key,revision,end):
         exact_date(end)
         with organization_write(db,actor_id,'dissolve'):
@@ -141,6 +158,7 @@ class OrganizationService:
         return key
 
     @staticmethod
+    @actor_operation
     def annul(db,actor_id,key,revision,why):
         why=reason(why)
         with organization_write(db,actor_id,'annul'):
@@ -157,6 +175,7 @@ class OrganizationService:
         return key
 
     @staticmethod
+    @actor_operation
     def reorder(db,actor_id,on,parent_id,ids,*,revisions=None):
         exact_date(on)
         if not isinstance(ids,list) or any(type(key) is not int for key in ids) or len(set(ids))!=len(ids):raise ValueError('Вкажіть унікальні ID підрозділів.')
@@ -176,6 +195,7 @@ class OrganizationService:
         return ids
 
     @staticmethod
+    @actor_operation
     def add_operational(db,actor_id,child_id,parent_id,start,end=None,*,note=None,revision=None):
         period(start,end)
         if child_id==parent_id:raise ValueError('Оперативне підпорядкування самому собі заборонене.')
@@ -243,6 +263,7 @@ class OrganizationService:
         return {'unit':payload,'states':states,'operational':operations,'audit':audits}
 
     @staticmethod
+    @actor_operation
     def close_operational(db,actor_id,key,revision,end):
         exact_date(end)
         with organization_write(db,actor_id,'operational'):
@@ -256,12 +277,17 @@ class OrganizationService:
         return key
 
 
+@actor_operation
 def create_locked(db,actor_id,kind,name,formed_on,*,parent_id=None,dissolved_on=None,validate=True):
     """Participate in an existing write unit; caller commits the full import atomically."""
     if not db.info.get('project2_write'):raise ValueError('create_locked потребує зовнішньої write unit.')
     Repo.lock(db);authorize(db,actor_id,'create');period(formed_on,dissolved_on);normalized=normalize(name)
     if kind not in KINDS:raise ValueError('Невідомий вид підрозділу.')
     if parent_id is not None:checked(db,parent_id)
+    from app.services.access_views import scoped
+    e=scoped(db)
+    if e and not e.allowed('organization','edit',unit_id=parent_id):raise PermissionError('Недостатньо прав на створення підрозділу в цій області.')
+    db.info['access_new_unit_parent']=parent_id
     unit=Repo.add(db,OrgUnit(kind=kind,formed_on=formed_on,dissolved_on=dissolved_on));db.flush()
     Repo.add(db,OrgUnitState(org_unit_id=unit.id,name=name.strip(),normalized_name=normalized,primary_parent_id=parent_id,valid_from=formed_on,valid_to=dissolved_on))
     if validate:validate_tree(db)

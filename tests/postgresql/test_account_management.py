@@ -1,5 +1,6 @@
-from tests.mfa_helpers import login as mfa_login
 """Real PostgreSQL 17 migration and concurrent account invariant checks, CI only."""
+from tests.access_helpers import legacy_user
+from tests.mfa_helpers import login as mfa_login
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from pathlib import Path
@@ -17,8 +18,8 @@ PASSWORD='synthetic-pg-password'
 
 def setup(factory):
     with factory() as db:
-        first=accounts.create_user(db,'admin-a','Admin A',PASSWORD,'admin')
-        second=accounts.create_user(db,'admin-b','Admin B',PASSWORD,'admin',actor_id=first)
+        first=legacy_user(db,'admin-a','Admin A',PASSWORD,'admin')
+        second=legacy_user(db,'admin-b','Admin B',PASSWORD,'admin',actor_id=first)
     return first,second
 
 
@@ -43,21 +44,24 @@ def test_migration_preserves_users_credentials_and_does_not_invent_master_or_aud
 @pytest.mark.parametrize('action',['block','demote'])
 def test_concurrent_admin_operations_preserve_one_active_admin(pg_factory,action):
     a,b=setup(pg_factory);barrier=Barrier(2)
+    with pg_factory() as db:
+        master=legacy_user(db,'master','Master',PASSWORD,'admin',actor_id=a)
+        accounts.promote_master(db,master,PASSWORD,confirmed=True)
     def write(key):
         with pg_factory() as db:
             rev=db.get(User,key).revision;barrier.wait(timeout=5)
             try:
-                if action=='block':accounts.set_active(db,key,key,rev,False,confirmed=True)
-                else:accounts.update_user(db,key,key,rev,role='editor',confirmed=True)
+                if action=='block':accounts.set_active(db,master,key,rev,False,confirmed=True)
+                else:accounts.update_user(db,master,key,rev,role='user',confirmed=True)
                 return 'ok'
             except ValueError:return 'rejected'
     with ThreadPoolExecutor(max_workers=2) as pool:assert sorted(pool.map(write,[a,b]))==['ok','rejected']
     with pg_factory() as db:
         assert accounts.Repo.active_admins(db)==1
-        assert db.scalar(select(func.count()).select_from(AccountAudit).where(AccountAudit.operation.in_(('create','edit','role_change','block','unblock','password_reset','password_change','sessions_revoke','promote_master'))))==3
+        assert db.scalar(select(func.count()).select_from(AccountAudit).where(AccountAudit.operation.in_(('create','edit','role_change','block','unblock','password_reset','password_change','sessions_revoke','promote_master'))))==5
 
 
-@pytest.mark.parametrize('action',['is_active=false',"role='viewer'"])
+@pytest.mark.parametrize('action',['is_active=false',"role='user'"])
 def test_direct_sql_concurrent_updates_cannot_remove_all_admins(pg_factory,action):
     a,b=setup(pg_factory);barrier=Barrier(2);engine=pg_factory.kw['bind']
     def write(key):
@@ -99,6 +103,7 @@ def test_postgresql_master_and_audit_guards_cannot_be_bypassed_with_sql(pg_facto
 def test_postgresql_audit_failure_rolls_back_password_and_all_session_revocations(pg_factory):
     a,b=setup(pg_factory)
     with pg_factory() as db:
+        accounts.promote_master(db,a,PASSWORD,confirmed=True)
         first,_=mfa_login(db,'admin-b',PASSWORD);second,_=mfa_login(db,'admin-b',PASSWORD)
         before=db.get(User,b).password_hash
         def fail(*args):raise RuntimeError('synthetic audit failure')
@@ -108,13 +113,13 @@ def test_postgresql_audit_failure_rolls_back_password_and_all_session_revocation
         finally:event.remove(AccountAudit,'before_insert',fail)
         assert db.get(User,b).password_hash==before
         assert all(accounts.authenticate(db,token)[0].id==b for token in (first,second))
-        assert db.scalar(select(func.count()).select_from(AccountAudit).where(AccountAudit.operation.in_(('create','edit','role_change','block','unblock','password_reset','password_change','sessions_revoke','promote_master'))))==2
+        assert db.scalar(select(func.count()).select_from(AccountAudit).where(AccountAudit.operation.in_(('create','edit','role_change','block','unblock','password_reset','password_change','sessions_revoke','promote_master'))))==3
 
 
 def test_postgresql_concurrent_revisions_and_actors_are_not_overwritten(pg_factory):
     a,b=setup(pg_factory)
     with pg_factory() as db:
-        target=accounts.create_user(db,'target','Target',PASSWORD,'editor',actor_id=a);rev=db.get(User,target).revision
+        target=legacy_user(db,'target','Target',PASSWORD,'editor',actor_id=a);rev=db.get(User,target).revision
     barrier=Barrier(2)
     def write(actor):
         with pg_factory() as db:

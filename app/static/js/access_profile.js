@@ -1,0 +1,2 @@
+/* Read-only category controls complement server ACL; they never grant permission. */
+(()=>{for(const panel of document.querySelectorAll('[data-access-section][data-can-edit="0"]')){const apply=()=>{for(const form of panel.querySelectorAll('form'))form.hidden=true;for(const button of panel.querySelectorAll('[data-profile-record-new],[data-profile-record-open]'))button.hidden=true;};apply();new MutationObserver(apply).observe(panel,{childList:true,subtree:true});}})();

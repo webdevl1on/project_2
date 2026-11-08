@@ -4,7 +4,7 @@ module.exports=async({context,base,adminToken})=>{
  const browser=context.browser(),own=await browser.newContext(),page=await own.newPage();
  async function password(username){await page.goto(base+'/auth/login');await page.locator('[name=username]').fill(username);await page.locator('[name=password]').fill(adminToken);await Promise.all([page.waitForURL('**/auth/mfa'),page.locator('[type=submit]').click()]);}
  try{
-  for(const name of ['mfa-totp','mfa-passkey']){const r=await context.request.post(base+'/auth/users',{data:{username:name,display_name:'MFA тест',role:'viewer',password:adminToken}});assert.equal(r.status(),200,await r.text());}
+  for(const name of ['mfa-totp','mfa-passkey']){const r=await context.request.post(base+'/auth/users',{data:{username:name,display_name:'MFA тест',role:'user',password:adminToken}});assert.equal(r.status(),200,await r.text());}
   await password('mfa-totp');assert.equal((await own.request.get(base+'/persons')).status(),401);
   await page.locator('[data-totp-start]').click();await page.locator('[data-secret]').waitFor({state:'visible'});const secret=await page.locator('[data-secret]').innerText();
   await page.locator('[name=code]').first().fill(totp(secret));await page.locator('[data-totp-confirm] button').click();await page.locator('[data-codes]:visible').waitFor();const backups=(await page.locator('[data-code-list]').innerText()).split('\n');assert.equal(backups.length,10);

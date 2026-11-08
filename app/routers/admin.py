@@ -41,7 +41,10 @@ def logout(request: Request, db:Session=Depends(get_db)):
 @router.get("")
 def index(request: Request):
     try:
-        owner = require_admin(request)
+        if request.state.authenticated_user.role=='master':
+            from app.security.admin import AdminOwner
+            owner=AdminOwner('system-index',request.state.csrf_token)
+        else:owner = require_admin(request)
     except HTTPException as error:
         if error.status_code == 401:
             return RedirectResponse("/admin/login", 303)

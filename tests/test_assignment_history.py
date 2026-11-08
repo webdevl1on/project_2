@@ -1,5 +1,6 @@
-from tests.mfa_helpers import login as mfa_login
 """Assignment history, author attribution and rollback on isolated SQLite."""
+from tests.access_helpers import legacy_user
+from tests.mfa_helpers import login as mfa_login
 from datetime import date as D, timedelta
 import pytest
 from sqlalchemy import event, text
@@ -192,8 +193,8 @@ def test_history_search_vacancies_versions_and_constant_query_count(data):
 
 def test_two_personal_authors_body_spoof_ignored_and_anonymous_null(data):
     db,_,_,positions,people=data
-    a=accounts.create_user(db,'author_a','Автор А','synthetic-password','admin')
-    b=accounts.create_user(db,'author_b','Автор Б','synthetic-password','editor',actor_id=a)
+    a=legacy_user(db,'author_a','Автор А','synthetic-password','admin')
+    b=legacy_user(db,'author_b','Автор Б','synthetic-password','editor',actor_id=a)
     token_a,csrf_a=mfa_login(db,'author_a','synthetic-password');token_b,csrf_b=mfa_login(db,'author_b','synthetic-password')
     def override():yield db
     app.dependency_overrides[get_db]=override

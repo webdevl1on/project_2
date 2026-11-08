@@ -1,12 +1,13 @@
 """Atomic independent facts, explicit evidence and non-destructive task sync."""
+from app.services.access_context import actor_operation
 from datetime import date
 from app.models import MedicalSelection, PersonnelTask, PersonnelAudit, MedicalDocumentLink, PersonDocument, DocumentDetails
 from app.models.medical import MODELS
 from app.medical_catalog import FORM_FIELDS, DOCUMENT_ROLES, EXAM_STATES, FITNESS, AWARD_STATES, BASES, TASK_STATES, VLK_TASK_STAGES
 from app.repositories.medical_repository import MedicalRepository as Repo
 from app.repositories.document_repository import DocumentRepository as Docs
-from app.services.accounts import authorize
-from app.services.documents import document_transaction, audit as document_audit, _text, WRITE_ROLES
+from app.services import access
+from app.services.documents import document_transaction, audit as document_audit, _text
 
 
 def exact(value,required=False):
@@ -31,6 +32,7 @@ def snapshot(row):
     return {c.name:(v.isoformat() if isinstance(v,date) else v) for c in row.__table__.columns if c.name not in ('created_at','updated_at') for v in [getattr(row,c.name)]}
 
 
+@actor_operation
 def audit(db,actor,pid,kind,row,operation,old,*,details=None):
     new=snapshot(row)
     changes={key:{'old':old.get(key),'new':new.get(key)} for key in old.keys()|new.keys() if old.get(key)!=new.get(key)}
@@ -167,12 +169,13 @@ def validate_exam(db,pid,values,previous,document_id):
     return document
 
 
+@actor_operation
 def vlk_decision(db,actor,pid,key,action,reason,revision):
     reason=_text(reason,1000)
     if not reason:raise ValueError('Вкажіть причину рішення щодо ВЛК.')
     if action not in ('not_needed','reopen'):raise ValueError('Невідома дія щодо ВЛК.')
     with document_transaction(db,subject='рішення щодо ВЛК'):
-        authorize(db,actor,WRITE_ROLES)
+        access.require(db,'medical','edit',person_id=pid,actor_id=actor)
         if revision is None:raise ValueError('Потрібна revision завдання.')
         task=record(db,pid,'tasks',key,revision)
         if task.kind!='injury_vlk':raise ValueError('Це не завдання ВЛК за пораненням.')
@@ -188,9 +191,11 @@ def vlk_decision(db,actor,pid,key,action,reason,revision):
         db.flush();audit(db,actor,pid,'tasks',task,'vlk_decision',old_task,details={'action':action,'reason':reason})
 
 
+@actor_operation
 def save(db,actor,pid,kind,data,*,key=None,revision=None,basis_document_id=None):
+    if basis_document_id:access.require_document(db,pid,basis_document_id,'edit',actor)
     with document_transaction(db,subject="кадрового запису"):
-        authorize(db,actor,WRITE_ROLES)
+        access.require(db,'medical','edit',person_id=pid,actor_id=actor)
         if Repo.person(db,pid) is None:raise ValueError('Особу не знайдено.')
         if kind not in MODELS or not isinstance(data,dict):raise ValueError('Невідомий розділ або некоректні поля.')
         if key is not None:
@@ -223,10 +228,11 @@ def save(db,actor,pid,kind,data,*,key=None,revision=None,basis_document_id=None)
     return {'id':result,'warnings':warnings}
 
 
+@actor_operation
 def select_active(db,actor,pid,exam_id,revision=None):
     if exam_id is not None and type(exam_id) is not int:raise ValueError('Потрібен ID ВЛК або null.')
     with document_transaction(db,subject="кадрового запису"):
-        authorize(db,actor,WRITE_ROLES)
+        access.require(db,'medical','edit',person_id=pid,actor_id=actor)
         if Repo.person(db,pid) is None:raise ValueError('Особу не знайдено.')
         if exam_id is not None:
             chosen=record(db,pid,'exams',exam_id)
@@ -244,10 +250,12 @@ def active_exam(db,pid):
     return row,('Активне ВЛК не визначено: однакові або відсутні дати завершених довідок.' if ambiguous else None)
 
 
+@actor_operation
 def link_document(db,actor,pid,kind,key,category,*,document_id=None,revision=None):
+    access.require(db,'documents','edit',person_id=pid,actor_id=actor)
     if category not in DOCUMENT_ROLES.get(kind,{}):raise ValueError('Невідома категорія документа.')
     with document_transaction(db,subject="кадрового запису"):
-        authorize(db,actor,WRITE_ROLES);target=record(db,pid,kind,key,revision)
+        access.require(db,'medical','edit',person_id=pid,actor_id=actor);target=record(db,pid,kind,key,revision)
         if revision is None:raise ValueError('Потрібна revision предметного запису.')
         if kind=='exams' and category=='referral' and document_id is not None and any(l.exam_id and l.exam_id!=key and l.category=='referral' and l.document_id==document_id for l in Repo.links(db,pid)):
             raise ValueError('Для нового проходження потрібне нове направлення.')
@@ -271,15 +279,18 @@ def link_document(db,actor,pid,kind,key,category,*,document_id=None,revision=Non
     return result
 
 
+@actor_operation
 def page(db,actor,pid):
-    authorize(db,actor)
+    access.require(db,'medical',person_id=pid,actor_id=actor)
     if Repo.person(db,pid) is None:raise ValueError('Особу не знайдено.')
     result={kind:[snapshot(row) for row in Repo.rows(db,kind,pid)] for kind in MODELS}
     chosen,warning=active_exam(db,pid);choice=Repo.selection(db,pid)
     result.update(active_exam=snapshot(chosen) if chosen else None,active_warning=warning,
                   selection={'exam_id':choice.exam_id if choice else None,'revision':choice.revision if choice else None})
-    result['links']=[{**snapshot(link),'files':[{'id':f.id,'name':f.original_name,'revision':f.revision} for f in Repo.files(db,link.document_id)],'document_revision':Docs.document(db,link.document_id).revision} for link in Repo.links(db,pid)]
-    result['audit']=[{'id':r.id,'actor_id':r.actor_id,'occurred_at':r.occurred_at.isoformat()+'Z','entity':r.entity,'entity_id':r.entity_id,'operation':r.operation,'changes':r.changes} for r in Repo.audits(db,pid)]
+    e=access.Access(db,actor)
+    result.update(can_edit=e.allowed('medical','edit',person_id=pid),can_documents=e.allowed('documents',person_id=pid),can_edit_documents=e.allowed('documents','edit',person_id=pid))
+    result['links']=[{**snapshot(link),'files':[{'id':f.id,'name':f.original_name,'revision':f.revision} for f in Repo.files(db,link.document_id)],'document_revision':Docs.document(db,link.document_id).revision} for link in Repo.links(db,pid)] if result['can_documents'] else []
+    result['audit']=[{'id':r.id,'actor_id':r.actor_id,'occurred_at':r.occurred_at.isoformat()+'Z','entity':r.entity,'entity_id':r.entity_id,'operation':r.operation,'changes':r.changes} for r in Repo.audits(db,pid)] if e.allowed('history',person_id=pid) else []
     injuries={r.id:r for r in Repo.rows(db,'injuries',pid)}
     exams=Repo.rows(db,'exams',pid)
     for task in result['tasks']:

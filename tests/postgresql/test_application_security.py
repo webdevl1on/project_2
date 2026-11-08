@@ -1,5 +1,6 @@
-from tests.mfa_helpers import finish_http
 """Actual PostgreSQL: whole-route denial and real personal-session regression."""
+from tests.access_helpers import legacy_user
+from tests.mfa_helpers import finish_http
 from fastapi.testclient import TestClient
 from app.main import app
 from app.database.db import get_db
@@ -11,8 +12,8 @@ import re
 
 def test_postgresql_all_registered_routes_fail_closed_and_real_roles_work(pg_factory):
     with pg_factory() as db:
-        admin=accounts.create_user(db,'security-admin','Адміністратор PostgreSQL','synthetic-password','admin')
-        accounts.create_user(db,'security-editor','Редактор PostgreSQL','synthetic-password','editor',actor_id=admin)
+        admin=legacy_user(db,'security-admin','Адміністратор PostgreSQL','synthetic-password','admin')
+        legacy_user(db,'security-editor','Редактор PostgreSQL','synthetic-password','editor',actor_id=admin)
         person=Person();db.add(person);db.commit();pid=person.person_id
     def override():
         with pg_factory() as db:yield db

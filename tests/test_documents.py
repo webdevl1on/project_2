@@ -1,6 +1,7 @@
+"""Isolated infrastructure tests; no real files or personnel."""
+from tests.access_helpers import legacy_user
 from tests.mfa_helpers import finish_http
 from tests.mfa_helpers import login as mfa_login
-"""Isolated infrastructure tests; no real files or personnel."""
 from datetime import date, datetime, UTC, timedelta
 import sqlite3
 from pathlib import Path
@@ -20,9 +21,9 @@ from tests.test_name_cases import factory, client
 def prepared(factory):
     with factory() as db:
         docs.seed_types(db);db.commit()
-        admin=accounts.create_user(db,'admin','Тестовий адміністратор','test-password-123','admin')
-        editor=accounts.create_user(db,'editor','Тестовий редактор','test-password-123','editor',actor_id=admin)
-        viewer=accounts.create_user(db,'viewer','Тестовий читач','test-password-123','viewer',actor_id=admin)
+        admin=legacy_user(db,'admin','Тестовий адміністратор','test-password-123','admin')
+        editor=legacy_user(db,'editor','Тестовий редактор','test-password-123','editor',actor_id=admin)
+        viewer=legacy_user(db,'viewer','Тестовий читач','test-password-123','viewer',actor_id=admin)
         person=Person(tax_number='0000000001');other=Person();db.add_all([person,other]);db.commit()
         return admin,editor,viewer,person.person_id,other.person_id
 
@@ -34,9 +35,9 @@ def test_accounts_are_personal_passwords_hashed_sessions_revocable(factory,prepa
     admin,editor,viewer,pid,_=prepared
     with factory() as db:
         assert db.get(User,admin).password_hash!='test-password-123'
-        with pytest.raises(PermissionError):accounts.create_user(db,'second','Другий','test-password-123','admin')
-        with pytest.raises(PermissionError):accounts.create_user(db,'unauthorized','Чужий','test-password-123',actor_id=viewer)
-        with pytest.raises(ValueError):accounts.create_user(db,'weak','Тест','short',actor_id=admin)
+        with pytest.raises(PermissionError):legacy_user(db,'second','Другий','test-password-123','admin')
+        with pytest.raises(PermissionError):legacy_user(db,'unauthorized','Чужий','test-password-123',actor_id=viewer)
+        with pytest.raises(ValueError):legacy_user(db,'weak','Тест','short',actor_id=admin)
         with pytest.raises(PermissionError):mfa_login(db,'admin','incorrect')
         token,csrf=mfa_login(db,'admin','test-password-123')
         user,session=accounts.authenticate(db,token)
@@ -199,6 +200,9 @@ def test_files_private_owner_checked_removed_history_requires_admin(factory,prep
         with pytest.raises(ValueError):files.download(db,viewer,other,fid,storage=storage)
         files.remove(db,editor,pid,fid,file.revision,'Помилкове завантаження')
         with pytest.raises(ValueError):files.download(db,viewer,pid,fid,storage=storage)
+        assert files.download(db,viewer,pid,fid,history=True,storage=storage)[1].is_file()
+        from app.models.access import AccessRule
+        db.scalar(select(AccessRule).where(AccessRule.user_id==viewer,AccessRule.category=='history')).revoked_at=datetime.now(UTC);db.commit()
         with pytest.raises(PermissionError):files.download(db,viewer,pid,fid,history=True,storage=storage)
         assert files.download(db,admin,pid,fid,history=True,storage=storage)[1].is_file()
         assert not row(db,pid,key)['has_copies']

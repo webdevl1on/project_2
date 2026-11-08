@@ -1,0 +1,2 @@
+{% if access_rights.basic.read %}<h1 class="h3">{{ minimum.name }}</h1><p>{{ minimum.rank or 'Звання не зазначено' }} · {{ minimum.position or 'Посада не зазначена' }}</p><p>Телефон: {{ minimum.phone or 'Не зазначено' }}</p>{% endif %}
+{% if access_rights.personal.read %}<p>Дата народження: {{ personal.birth }}</p><p>Стать: {{ {'male':'Чоловіча','female':'Жіноча'}.get(personal.sex,'Не зазначена') }}</p><p>Особистий номер: {{ personal.personal_number or 'Не зазначено' }}</p>{% endif %}

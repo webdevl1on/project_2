@@ -83,6 +83,10 @@ async def create_person_from_form(request: Request, db: Session = Depends(get_db
 
 @router.get("/persons/{person_id}/created")
 def person_created(request: Request, person_id: int, db: Session = Depends(get_db)):
+    from app.services.access_views import scoped
+    if scoped(db) is not None:
+        from types import SimpleNamespace
+        return templates.TemplateResponse(request=request,name='person_created.html',context={'person':SimpleNamespace(person_id=person_id)})
     try:
         details = person_details(db, person_id)
     except ValueError as error:
@@ -94,11 +98,15 @@ def person_created(request: Request, person_id: int, db: Session = Depends(get_d
 def get_edit_person_page(person_id: int, request: Request, db: Session = Depends(get_db)):
     details = person_details(db, person_id)
     person, current_name = details["person"], details["current_name"]
+    form_data=build_person_form_data(person,current_name)
+    from app.services.access_views import scoped
+    e=scoped(db)
+    if e and not e.allowed("documents",person_id=person_id):form_data["tax_number"]=""
     return templates.TemplateResponse(
         request=request,
         name="person_form.html",
         context={
-            "form_data": build_person_form_data(person, current_name),
+            "form_data": form_data,"person_id":person_id,
             "form_action": f"/persons/{person_id}/edit",
             "page_title": f"Редагувати людину #{person_id}",
             "submit_label": "Зберегти зміни",
@@ -134,17 +142,21 @@ def update_person_from_form(
         "birth_year": birth_year,
     }
 
+    from app.services.access_views import scoped
+    e=scoped(db)
+    if e and not e.allowed('documents','edit',person_id=person_id):form_data['tax_number']=person_details(db,person_id)['person'].tax_number
     if sex is not None:
         form_data["sex"] = sex
     try:
         person = ServicePersonCreate.update_person(person_id, form_data, db)
     except ValueError as error:
+        if e and not e.allowed('documents',person_id=person_id):form_data['tax_number']=''
         return templates.TemplateResponse(
             request=request,
             name="person_form.html",
             context={
                 "error": str(error),
-                "form_data": form_data,
+                "form_data": form_data,"person_id":person_id,
                 "form_action": f"/persons/{person_id}/edit",
                 "page_title": f"Редагувати людину #{person_id}",
                 "submit_label": "Зберегти зміни",
@@ -158,6 +170,9 @@ def update_person_from_form(
 #Коротка інформація про людину
 @router.get("/person_detail/{person_id}")
 def get_person_page(person_id: int, request: Request, db: Session = Depends(get_db)):
+    from app.services.access_views import scoped,profile
+    if scoped(db) is not None:
+        return templates.TemplateResponse(request=request,name='person_access.html',context=profile(db,person_id))
     try:
         details = person_details(db, person_id, include_history=True)
     except ValueError as error:
@@ -177,6 +192,9 @@ def get_person_full_info(
     person_id: int,
     db: Session = Depends(get_db),
     ):
+    from app.services.access_views import scoped,profile
+    if scoped(db) is not None:
+        return templates.TemplateResponse(request=request,name='person_access.html',context=profile(db,person_id))
     from app.services.person_read import full_profile
     details = full_profile(db, person_id)
     return templates.TemplateResponse(

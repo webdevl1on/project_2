@@ -242,12 +242,12 @@
                             {% if column.key == 'event_on_date' %}<div data-event-presence-person="{{ item.person.person_id if item.person else '' }}" data-event-presence-on="{{ as_of }}">{{ event_badge(item.event_presence, true) }}</div>
                             {% elif column.key == "assignment" %}
                             <div class="assignment-summary">
-                                <div class="d-flex align-items-center gap-1"><button type="button" class="assignment-toggle flex-grow-1" style="min-width:0" data-assignment-toggle aria-expanded="false" aria-controls="assignment-editor-{{ item.position.position_id }}" title="Офіційно: {{ people_labels.get(item.assignment.person_id,'Без ПІБ') if item.assignment else 'Вакантна' }} — редагувати призначення">Офіційно: {{ people_labels.get(item.assignment.person_id,'Без ПІБ') if item.assignment else 'Вакантна' }}</button>
-                                {% if item.assignment %}<button type="button" class="btn btn-sm btn-outline-secondary py-0 flex-shrink-0" data-events-open data-person-id="{{ item.assignment.person_id }}" data-events-person-label="{{ people_labels.get(item.assignment.person_id,'Без ПІБ') }}" title="Події військовослужбовця">Події</button>{% endif %}</div>
+                                <div class="d-flex align-items-center gap-1"><button type="button" {% if not item.can_edit_assignment|default(true) %}disabled{% endif %} class="assignment-toggle flex-grow-1" style="min-width:0" data-assignment-toggle aria-expanded="false" aria-controls="assignment-editor-{{ item.position.position_id }}" title="Офіційно: {{ people_labels.get(item.assignment.person_id,'Без ПІБ') if item.assignment else 'Вакантна' }} — редагувати призначення">Офіційно: {{ people_labels.get(item.assignment.person_id,'Без ПІБ') if item.assignment else 'Вакантна' }}</button>
+                                {% if item.assignment and item.can_events|default(true) %}<button type="button" class="btn btn-sm btn-outline-secondary py-0 flex-shrink-0" data-events-open data-person-id="{{ item.assignment.person_id }}" data-events-person-label="{{ people_labels.get(item.assignment.person_id,'Без ПІБ') }}" title="Події військовослужбовця">Події</button>{% endif %}</div>
                                 <span class="small text-warning" data-assignment-draft hidden>Чернетка</span>
                                 {% for mirage in (mirages_by_position|default({})).get(item.position.position_id,[]) %}<div class="assignment-mirage" title="{{ people_labels.get(mirage.person_id,'Без ПІБ') }} · Міраж — не офіційне призначення"><a href="/person_full_info/{{ mirage.person_id }}">{{ people_labels.get(mirage.person_id,'Без ПІБ') }}</a> · Міраж</div>{% endfor %}
                             </div>
-                            <div class="assignment-editor" id="assignment-editor-{{ item.position.position_id }}" data-assignment-editor hidden>
+                            {% if item.can_edit_assignment|default(true) %}<div class="assignment-editor" id="assignment-editor-{{ item.position.position_id }}" data-assignment-editor hidden>
                             <div class="d-flex gap-2 mb-2"><button type="button" class="btn btn-sm btn-outline-secondary" data-assignment-close>Згорнути (чернетка збережеться)</button><button type="button" class="btn btn-sm btn-outline-danger" data-assignment-cancel>Скасувати зміни</button></div>
                             {% if item.assignment %}<p>Наказ призначення {{ item.assignment.assignment_order_number or 'Не зазначено' }} · {{ item.assignment.assignment_order_date or 'Дата невідома' }}</p><details data-staff-tools><summary>Накази та звільнення</summary>{{ orders(item.assignment) }}{{ release(item.assignment) }}</details>{% endif %}
                             {% for mirage in (mirages_by_position|default({})).get(item.position.position_id,[]) %}<div class="text-secondary border-start ps-2 my-2">♧ Міраж: {{ people_labels.get(mirage.person_id,'Без ПІБ') }} — очікує наказу. {{ mirage.note or '' }}{{ mirage_actions(mirage) }}</div>{% endfor %}
@@ -266,7 +266,7 @@
                                 <button type="submit" class="btn btn-sm btn-primary align-self-start">Зберегти</button>
                             </form>
                             </div>
-                            {% else %}
+                            {% endif %}{% else %}
                             {% if column.key == "row_number" %}
                             <div class="staff-row-number">
                                 <span data-column-value title="{{ row_number }}">{{ row_number }}</span>

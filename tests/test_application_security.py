@@ -1,5 +1,6 @@
-from tests.mfa_helpers import finish_http
 """Whole-application Security 1.1, with real sessions and isolated synthetic data."""
+from tests.access_helpers import legacy_user
+from tests.mfa_helpers import finish_http
 from datetime import datetime,UTC,timedelta
 import re
 import pytest
@@ -20,9 +21,9 @@ def secure(tmp_path,monkeypatch):
     engine=create_engine('sqlite:///'+str(tmp_path/'security.sqlite3'),connect_args={'check_same_thread':False})
     Base.metadata.create_all(engine);factory=sessionmaker(engine)
     with factory() as db:
-        a=accounts.create_user(db,'security_admin','Адміністратор тестів','synthetic-password','admin')
-        e=accounts.create_user(db,'security_editor','Редактор тестів','synthetic-password','editor',actor_id=a)
-        v=accounts.create_user(db,'security_viewer','Спостерігач тестів','synthetic-password','viewer',actor_id=a)
+        a=legacy_user(db,'security_admin','Адміністратор тестів','synthetic-password','admin')
+        e=legacy_user(db,'security_editor','Редактор тестів','synthetic-password','editor',actor_id=a)
+        v=legacy_user(db,'security_viewer','Спостерігач тестів','synthetic-password','viewer',actor_id=a)
         p=Person(tax_number='0123456789');db.add(p);db.commit();pid=p.person_id
     def override():
         with factory() as db:yield db
@@ -164,10 +165,10 @@ def test_explicit_cli_bootstrap_can_preserve_legacy_technical_users_only(tmp_pat
     with sessionmaker(engine)() as db:
         old=User(username='project2-open-access',display_name='Спільний автор — авторизацію вимкнено',role='admin',password_hash='open-access-only$synthetic')
         db.add(old);db.commit();old_id=old.id
-        with pytest.raises(PermissionError):accounts.create_user(db,'personal-admin','Персональний адміністратор','synthetic-password','admin')
-        key=accounts.create_user(db,'personal-admin','Персональний адміністратор','synthetic-password','admin',allow_legacy_bootstrap=True)
+        with pytest.raises(PermissionError):legacy_user(db,'personal-admin','Персональний адміністратор','synthetic-password','admin')
+        key=legacy_user(db,'personal-admin','Персональний адміністратор','synthetic-password','admin',allow_legacy_bootstrap=True)
         assert key!=old_id and db.get(User,old_id).password_hash=='open-access-only$synthetic'
-        with pytest.raises(PermissionError):accounts.create_user(db,'second-admin','Зайвий адміністратор','synthetic-password','admin',allow_legacy_bootstrap=True)
+        with pytest.raises(PermissionError):legacy_user(db,'second-admin','Зайвий адміністратор','synthetic-password','admin',allow_legacy_bootstrap=True)
     engine.dispose()
 
 
