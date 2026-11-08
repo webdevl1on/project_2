@@ -285,6 +285,18 @@ python -m app.services.mfa_keys --initialize
 python -c "from app.database.db import engine; from app.database.schema_check import require_current_schema; require_current_schema(engine); print('Schema OK')"
 ```
 
-Поточний head **0007_mfa_sessions**: п’ять нових MFA-таблиць, nullable метадані UserSession, UNIQUE публічного ID, FK/index/CHECK та розширення дозволених account_audit операцій. Старі User/ролі/паролі/аудит/сесії не видаляються; старі сесії з NULL підтвердженням MFA більше не авторизують. Існуючі Master/Admin налаштовують перший фактор після пароля; startup не блокує сам факт відсутності у них MFA, але перевіряє постійний ключ/marker/RP/config. Єдиний Master і мінімум окремого Admin зберігаються. Downgrade заборонений; повернення — backup в окремій БД з відповідним key ring. Reset не потрібний.
+Ревізія **0007_mfa_sessions**: п’ять нових MFA-таблиць, nullable метадані UserSession, UNIQUE публічного ID, FK/index/CHECK та розширення дозволених account_audit операцій. Старі User/ролі/паролі/аудит/сесії не видаляються; старі сесії з NULL підтвердженням MFA більше не авторизують. Існуючі Master/Admin налаштовують перший фактор після пароля; startup не блокує сам факт відсутності у них MFA, але перевіряє постійний ключ/marker/RP/config. Єдиний Master і мінімум окремого Admin зберігаються. Downgrade заборонений; повернення — backup в окремій БД з відповідним key ring. Reset не потрібний.
 
 Ініціалізація ключа не створює ні фактора, ні користувача. Ротація з усіма старими ключами й новим current key: `python -m app.services.mfa_keys --rotate`, атомарно та після зупинки серверів/backup. Деталі та явна локальна процедура відновлення Master — [SECURITY.md](SECURITY.md). PostgreSQL-тести використовують тільки project2_ci та випадкові схеми; development/production не змінюються.
+
+## Організаційна структура — 0008_organization
+
+Поточний head — **0008_organization** після 0007. Вісім нових таблиць дерева/оперативного підпорядкування/аудиту/покриття/квитанцій/перепризначення, nullable організаційні FK старих StaffStructure/Position, періоди й логічне анулювання Position та метадані анулювання StaffVersion. Старі люди, накази, призначення, User/MFA й аудит зберігаються; автоматичного зіставлення й минулих фіктивних подій немає.
+
+Нова ревізія замінює активний UNIQUE номера посади й EXCLUDE періоду версій на предикати `annulled_at IS NULL`; відкладений EXCLUDE OrgCoverage дає одне джерело на unit/date. Заморожені SQL `organization_tree_guards.sql` та `organization_staff_guards.sql` перевіряють дерево на всіх періодах, життя підрозділів, належність посад, чинність призначень і незмінність історії/аудиту. Schema checker вимагає нові таблиці, колонки, guards, CHECK та активні предикати.
+
+Організаційні й кадрові записи серіалізує одна schema-scoped advisory xact lock перед row locks; raw SQL guards беруть ту саму lock. Це запобігає гонці призначення зі зміною джерела, але обмежує паралельність записів у межах схеми. Читання штатки не блокується.
+
+Перед ручним `python -m alembic upgrade 0008_organization` зупинити застосунок, перевірити цільову БД/оточення й зробити перевірений backup із цього документа. Автоматичного startup upgrade, create_all чи reset немає. Downgrade не видаляє організаційну історію: відновлення — у нову БД з backup. Після upgrade потрібне явне GUI-зіставлення старих структур і всіх їхніх посад. Подробиці й приклад — [ORGANIZATION.md](ORGANIZATION.md).
+
+Перевірки виконуються лише в project2_ci зі випадковою схемою на тест. Новий `tests/postgresql/test_organization_staff.py` перевіряє upgrade 0007→0008 двічі зі старими записами, ефективний ротний знімок без дублювання, DB guards, конкурентне підтвердження/призначення та rollback. Development/production у цьому етапі не змінювалися.

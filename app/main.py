@@ -82,3 +82,8 @@ from app.routers import account_management
 app.include_router(account_management.router)
 from app.routers import mfa
 app.include_router(mfa.router)
+
+from app.routers import organization
+app.include_router(organization.router)
+from app.routers import organization_staff
+app.include_router(organization_staff.router)

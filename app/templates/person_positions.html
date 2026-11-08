@@ -121,8 +121,8 @@
     <details class="table-filter-panel" data-table-filters open><summary>Фільтри</summary>
     <form id="position-filters" method="get" action="/person-positions" class="row g-2 mb-3">
         <div class="col-md-4"><label class="form-label">Версія штату<select name="version_id" class="form-select">
-        {% if not chosen_version %}<option value="" selected>Немає поточної версії — оберіть версію</option>{% endif %}
-        {% for version in staff_versions %}<option value="{{ version.id }}" data-valid-from="{{ version.valid_from }}" data-valid-to="{{ version.valid_to or '' }}" {% if chosen_version and version.id==chosen_version.id %}selected{% endif %}>{{ structure_names.get(version.staff_structure_id,'') }} · {{ version.name }} · {{ version.valid_from }} — {{ version.valid_to or 'відкрита' }}</option>{% endfor %}</select></label></div>
+        {% if composite_staff %}<option value="" selected>Сукупний чинний штат за джерелами підрозділів</option>{% elif not chosen_version %}<option value="" selected>Немає поточної версії — оберіть версію</option>{% endif %}
+        {% for version in staff_versions if not version.annulled_at %}<option value="{{ version.id }}" data-valid-from="{{ version.valid_from }}" data-valid-to="{{ version.valid_to or '' }}" {% if chosen_version and version.id==chosen_version.id %}selected{% endif %}>{{ structure_names.get(version.staff_structure_id,'') }} · {{ version.name }} · {{ version.valid_from }} — {{ version.valid_to or 'відкрита' }}</option>{% endfor %}</select></label></div>
         <div class="col-md-3"><label class="form-label">Стан на дату<input type="date" name="as_of" class="form-control" value="{{ as_of }}" required></label></div>
         <input type="hidden" name="sort_by" value="{{ sort_by }}">
         <input type="hidden" name="direction" value="{{ direction }}">

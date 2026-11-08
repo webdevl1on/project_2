@@ -1,6 +1,7 @@
 """Staff persistence and queries. Period decisions stay in StaffService."""
 from app.database.locking import locked_get
 from sqlalchemy import and_, or_
+from app.repositories.organization_staff_repository import effective_position
 from app.models import StaffStructure, StaffVersion, Position, PersonAssignment
 
 
@@ -45,7 +46,7 @@ class StaffRepository:
     @staticmethod
     def overlapping_version(db, structure_id, start, end, exclude=None):
         query = db.query(StaffVersion).filter(
-            StaffVersion.staff_structure_id == structure_id,
+            StaffVersion.staff_structure_id == structure_id, StaffVersion.annulled_at.is_(None),
             StaffVersion.valid_from <= end,
             or_(StaffVersion.valid_to.is_(None), StaffVersion.valid_to >= start))
         if exclude is not None:
@@ -78,7 +79,7 @@ class StaffRepository:
     def assignments_at(db, on):
         return (db.query(PersonAssignment).join(Position).join(StaffVersion)
                 .filter(active(PersonAssignment, "assigned_from", "assigned_to", on),
-                        active(StaffVersion, "valid_from", "valid_to", on)))
+                        active(StaffVersion, "valid_from", "valid_to", on),effective_position(on)))
 
     @staticmethod
     def person_assignment_at(db, person_id, on):

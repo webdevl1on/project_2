@@ -19,7 +19,19 @@ from tests.test_staff_history import setup
 def test_additive_assignment_migration_preserves_old_orders_without_fake_audit(pg_factory):
     engine=pg_factory.kw['bind']
     with pg_factory() as db:
-        _,versions,positions,people=setup(db)
+        # Seed the frozen pre-0005 schema without importing newer ORM columns.
+        from types import SimpleNamespace
+        from app.validators.position_validator import POSITION_ATTRIBUTES
+        structure=db.scalar(text("INSERT INTO staff_structures(code,name,created_at,updated_at,revision) VALUES ('legacy','Стара структура',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1) RETURNING id"))
+        versions=[]
+        for label,start,end in [('Архів','2026-01-01','2026-05-31'),('Поточний','2026-06-01',None)]:
+            key=db.scalar(text("INSERT INTO staff_versions(staff_structure_id,name,valid_from,valid_to,created_at,updated_at,revision) VALUES (:structure,:name,:start,:end,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1) RETURNING id"),{'structure':structure,'name':label,'start':D.fromisoformat(start),'end':D.fromisoformat(end) if end else None});versions.append(key)
+        positions=[]
+        for number,version in [(15,versions[0]),(15,versions[1]),(27,versions[1])]:
+            values={field:'Тестова посада' for field in POSITION_ATTRIBUTES};values.update(position_number=number,code='TEST',version=version)
+            columns=', '.join(POSITION_ATTRIBUTES);binds=', '.join(':'+field for field in POSITION_ATTRIBUTES)
+            key=db.scalar(text(f"INSERT INTO positions(staff_version_id,{columns},created_at,updated_at,revision) VALUES (:version,{binds},CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1) RETURNING position_id"),values);positions.append(SimpleNamespace(position_id=key))
+        people=[SimpleNamespace(person_id=db.scalar(text('INSERT INTO persons DEFAULT VALUES RETURNING person_id'))) for _ in range(3)]
         db.execute(text("INSERT INTO person_assignments(person_id,staff_position_id,assigned_from,assignment_order_number,assignment_order_date,created_at,updated_at,revision) VALUES (:person,:pos,'2026-06-01','125','2026-05-31',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1)"),{'person':people[0].person_id,'pos':positions[1].position_id})
         db.execute(text("INSERT INTO person_assignments(person_id,staff_position_id,assigned_from,assignment_order_number,created_at,updated_at,revision) VALUES (:person,:pos,'2027-01-01','legacy future',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1)"),{'person':people[1].person_id,'pos':positions[2].position_id});db.commit()
     cfg=Config(str(Path(__file__).resolve().parents[2]/'alembic.ini'))

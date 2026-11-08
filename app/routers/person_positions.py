@@ -53,7 +53,9 @@ def get_person_positions_page(request, occupancy="all", sort_by="position_number
         structures,versions,chosen,on=table_context(
             db,int(raw_version) if raw_version else None,date.fromisoformat(raw_date) if raw_date else None)
     except ValueError as error: raise HTTPException(400,str(error)) from error
-    version_id=chosen.id if chosen else -1
+    from app.services.staff_read import composite_staff_context
+    composite=composite_staff_context(db,int(raw_version) if raw_version else None)
+    version_id=chosen.id if chosen else None if composite else -1
     # Read only fields allowed by this table, not arbitrary model attributes.
     column_filters = {key: field_values.get(key, request.query_params.getlist(key)) for key in FILTER_KEYS}
     try:
@@ -96,7 +98,7 @@ def get_person_positions_page(request, occupancy="all", sort_by="position_number
 
     def contextual(query):
         query += "&" + urlencode({"mirage":request.query_params.get("mirage","all")})
-        return query + "&" + urlencode({"version_id":version_id,"as_of":on.isoformat()}) if chosen else query
+        return query + "&" + urlencode({"version_id":version_id,"as_of":on.isoformat()}) if chosen else query + "&" + urlencode({"as_of":on.isoformat()}) if composite else query
 
     active_query = build_query_string(sort_by, direction, occupancy, column_filters, filter_order, priorities)
     sort_urls = {}
@@ -136,7 +138,7 @@ def get_person_positions_page(request, occupancy="all", sort_by="position_number
             "sort_commands": sort_commands,
             "mirage_filter":request.query_params.get("mirage","all"),"people_labels":{p["id"]:p["rank"]+" "+p["label"] for p in people},
             "people": people, "people_json":picker_json(people),
-            "staff_versions":versions,"staff_structures":structures,"structure_names":{item.id:f"{item.name} ({item.code})" for item in structures},"chosen_version":chosen,"as_of":on,
+            "staff_versions":versions,"staff_structures":structures,"structure_names":{item.id:f"{item.name} ({item.code})" for item in structures},"chosen_version":chosen,"as_of":on,"composite_staff":composite,
             "staff_message":request.query_params.get("staff_message", ""),
             "table_columns": PERSON_POSITIONS_COLUMNS,
             "event_status_legend": event_legend(),

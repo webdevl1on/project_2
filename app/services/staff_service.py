@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 from app.repositories.staff_repository import StaffRepository, active
 from app.repositories.person_repository import PersonRepository
 from app.validators.position_validator import POSITION_ATTRIBUTES, validate_position
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm.exc import StaleDataError
 from app.models.staff import StaffStructure, StaffVersion, PersonAssignment, exact_date
@@ -51,6 +52,8 @@ def write_unit(db):
     try:
         if db.bind.dialect.name == "sqlite":
             db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+        else:
+            db.execute(text("SELECT pg_advisory_xact_lock(hashtext(current_schema()),hashtext('project2_organization'))"))
         db.info['project2_write']=True
         yield
         db.commit()
@@ -115,7 +118,9 @@ class StaffService:
     def create_assignment(db, person_id, position_id, start, end=None, *, order_number=None, order_date=None, release_number=None, release_date=None, completion_reason=None, completion_note=None, actor_id=None):
         period(start, end); official_start(start)
         with write_unit(db):
-            checked(db, Person, person_id); checked(db, Position, position_id)
+            checked(db, Person, person_id); target_position=checked(db, Position, position_id)
+            from app.services.organization_staff import assert_position_period
+            assert_position_period(db,target_position,start,end)
             record = PersonAssignment(person_id=person_id, staff_position_id=position_id, assigned_from=start, assigned_to=end, **order_values(order_number,order_date))
             StaffRepository.add(db, record); db.flush()
             for field, value in completion_values(release_number, release_date, completion_reason, completion_note).items(): setattr(record, field, value)
@@ -130,7 +135,9 @@ class StaffService:
             record = checked(db, PersonAssignment, key, revision)
             editable(record); official_start(start, record.assigned_from)
             before = audit_snapshot(record)
-            checked(db, Person, person_id); checked(db, Position, position_id)
+            checked(db, Person, person_id); target_position=checked(db, Position, position_id)
+            from app.services.organization_staff import assert_position_period
+            assert_position_period(db,target_position,start,end)
             record.person_id=person_id; record.staff_position_id=position_id
             record.assigned_from=start; record.assigned_to=end
             if details is not None:
@@ -144,6 +151,7 @@ class StaffService:
     def correct_position(db, key, revision, values):
         with write_unit(db):
             record=checked(db, Position, key, revision)
+            if record.annulled_at:raise ValueError('Анульовані реквізити посади зберігаються незмінними.')
             current={name: getattr(record,name) for name in POSITION_ATTRIBUTES}
             if set(values) - set(current):
                 raise ValueError("Можна виправити лише реквізити конкретної посади, без зміни версії.")
@@ -158,6 +166,7 @@ class StaffService:
         exact_date(end)
         with write_unit(db):
             version=checked(db, StaffVersion, key, revision)
+            if version.annulled_at:raise ValueError('Анульовану версію не можна закривати.')
             period(version.valid_from,end)
             if version.valid_to is not None and end > version.valid_to:
                 raise ValueError("Закриття не подовжує період; для виправлення використайте редагування версії.")
@@ -171,6 +180,12 @@ class StaffService:
                     record.completion_reason="version_closed"
                     record_change(db, record, 'complete', before, actor_id, 'Закриття версії штату')
             db.flush()  # version guard must see already-closed assignment periods
+            from app.repositories.organization_staff_repository import OrganizationStaffRepository as OrgRepo
+            for coverage in OrgRepo.coverages(db):
+                if coverage.staff_version_id==key and (coverage.valid_to is None or coverage.valid_to>end):
+                    if coverage.valid_from>end:raise ValueError('Є пізніше покриття підрозділу; спочатку узгодьте його період.')
+                    coverage.valid_to=end
+            db.flush()
             version.valid_to=end
             db.flush()
 
@@ -179,6 +194,7 @@ class StaffService:
         period(start,end)
         with write_unit(db):
             record=checked(db,StaffVersion,key,revision)
+            if record.annulled_at:raise ValueError('Анульовану версію не можна редагувати.')
             version_conflict(db,record.staff_structure_id,start,end,key)
             if not name.strip(): raise ValueError("Вкажіть назву версії.")
             record.name=name.strip();record.valid_from=start;record.valid_to=end
@@ -188,6 +204,8 @@ class StaffService:
     def assignment_snapshot(db, position_id, person_id, on, orders=None):
         exact_date(on)
         target=checked(db,Position,position_id)
+        from app.services.organization_staff import assert_position_period
+        assert_position_period(db,target,on,on)
         version=checked(db,StaffVersion,target.staff_version_id)
         if on<version.valid_from or (version.valid_to and on>version.valid_to):
             raise ValueError("Обрана дата не належить періоду цієї версії.")
@@ -239,7 +257,9 @@ class StaffService:
             position=checked(db,Position,position_id)
             version=checked(db,StaffVersion,position.staff_version_id)
             orders = expected.get('orders') or {}
-            end = domain_date(expected['end'], False) if 'end' in expected else version.valid_to
+            from app.services.organization_staff import effective_end,assert_position_period
+            end = domain_date(expected['end'], False) if 'end' in expected else effective_end(db,position,version,on)
+            assert_position_period(db,position,on,end)
             period(on, end)
             record = PersonAssignment(person_id=person_id, staff_position_id=position_id,
                 assigned_from=on, assigned_to=end, **order_values(orders.get('number'), domain_date(orders.get('date'), False)))
@@ -288,11 +308,19 @@ class StaffService:
         if not confirmed: raise ValueError('Підтвердьте анулювання призначення.')
         if not reason or len(reason) > 2000: raise ValueError('Причина анулювання обов’язкова: до 2000 символів.')
         with write_unit(db):
-            record = checked(db, PersonAssignment, key, revision)
-            editable(record); before = audit_snapshot(record)
-            record.annulled_at = datetime.now(UTC)
-            record.annulment_reason = reason; record.annulled_by = actor_id
-            record_change(db, record, 'annul', before, actor_id, reason)
+            StaffService.annul_assignment_locked(db,key,revision,reason,actor_id=actor_id)
+        return key
+
+    @staticmethod
+    def annul_assignment_locked(db,key,revision,reason,*,actor_id=None):
+        if not db.info.get('project2_write'):raise ValueError('Потрібна спільна кадрова транзакція.')
+        reason=(reason or '').strip()
+        if not reason or len(reason)>2000:raise ValueError('Причина анулювання обов’язкова: до 2000 символів.')
+        record = checked(db, PersonAssignment, key, revision)
+        editable(record); before = audit_snapshot(record)
+        record.annulled_at = datetime.now(UTC)
+        record.annulment_reason = reason; record.annulled_by = actor_id
+        record_change(db, record, 'annul', before, actor_id, reason)
         return key
 
     @staticmethod
@@ -300,6 +328,8 @@ class StaffService:
         with write_unit(db):
             record = checked(db, PersonAssignment, key, revision)
             if record.annulled_at is None: raise ValueError('Призначення вже не анульоване.')
+            from app.services.organization_staff import assert_position_period
+            assert_position_period(db,checked(db,Position,record.staff_position_id),record.assigned_from,record.assigned_to)
             # Restore the same existing period; no new or shifted future start.
             before = audit_snapshot(record)
             record.annulled_at = record.annulment_reason = record.annulled_by = None

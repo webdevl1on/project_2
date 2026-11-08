@@ -51,12 +51,13 @@ def populate(db, number=1):
 def test_catalogue_covers_all_displayable_mapped_attributes():
     # A new model attribute must be deliberately represented or excluded.
     # FK/PK link entities, date projections duplicate the canonical components.
+    # Organization FKs/source lifetime/annul metadata are managed in the explicit admin editor, not extra table columns in this stage.
     # Sex belongs to the new person form; adding a staff-table column is separate scope.
     exclusions = {Person: {"person_id", "sex", "personal_number"}, PersonName: {"person_name_id", "person_id"},
                   PersonRank: {"person_rank_id", "person_id", "rank_id", "rank_order_date"},
                   Passport: {"passport_id", "person_id", "passport_issued_date", "passport_expire_date"},
                   PersonServiceHistory: {"person_service_history_id", "person_id", "position_date", "order_date", "end_date", "end_day", "end_month", "end_year", "note", "revision"},
-                  Position: {"position_id", "staff_version_id", "created_at", "updated_at", "revision"}, Rank: {"rank_id"}}
+                  Position: {"position_id", "staff_version_id", "created_at", "updated_at", "revision", "org_unit_id", "managed_unit_id", "valid_from", "valid_to", "annulled_at", "annulment_reason", "annulled_by"}, Rank: {"rank_id"}}
     for model, excluded in exclusions.items():
         covered = {attr for field in FIELDS.values() if field.metadata()["source"]["model"] == model.__name__
                    for attr in field.metadata()["source"]["attributes"]}

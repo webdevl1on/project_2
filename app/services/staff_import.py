@@ -9,6 +9,12 @@ from app.models.reference_book import Position
 from app.services.staff_service import period, version_conflict, write_unit, checked
 
 
+def require_legacy_import(db):
+    from app.repositories.organization_staff_repository import OrganizationStaffRepository
+    if OrganizationStaffRepository.scoped(db):
+        raise ValueError('Для організаційних штаток використайте імпорт вибраного підрозділу в /admin/organization. Нові посади без організаційного ID не створюються.')
+
+
 def read_positions(source):
     errors=[]; rows=[]; seen=set()
     try:
@@ -42,6 +48,7 @@ def read_positions(source):
 
 
 def preview_import(db, source, structure_id, name, start, end, current):
+    require_legacy_import(db)
     period(start,end)
     if not name.strip() or len(name.strip())>150: raise ValueError("Назва версії: 1–150 символів.")
     if current:
@@ -50,7 +57,9 @@ def preview_import(db, source, structure_id, name, start, end, current):
         if start>today(): raise ValueError("Поточна версія не може починатися в майбутньому.")
     elif end is None:
         raise ValueError("Для архівної версії вкажіть точне завершення.")
-    if structure_id is not None: checked(db,StaffStructure,structure_id)
+    if structure_id is not None:
+        structure=checked(db,StaffStructure,structure_id)
+        if structure.org_unit_id is not None:raise ValueError('Структуру вже пов’язано з організаційним деревом. Використайте імпорт вибраного підрозділу в /admin/organization.')
     result=read_positions(source)
     if structure_id is not None:
         try: version_conflict(db,structure_id,start,end)
@@ -66,6 +75,7 @@ def import_version(db, prepared, import_key):
 
 
 def insert_prepared(db, prepared, import_key):
+    require_legacy_import(db)
     start=date.fromisoformat(prepared["start"]);end=date.fromisoformat(prepared["end"]) if prepared["end"] else None
     if StaffRepository.version_by_import_key(db, import_key):
         raise ValueError("Це завантаження вже підтверджено.")
@@ -75,7 +85,8 @@ def insert_prepared(db, prepared, import_key):
         if structure is None:
             structure=StaffStructure(code="main",name="Основний штат");StaffRepository.add(db, structure);db.flush()
         structure_id=structure.id
-    checked(db,StaffStructure,structure_id)
+    structure=checked(db,StaffStructure,structure_id)
+    if structure.org_unit_id is not None:raise ValueError('Для організаційної структури потрібен scoped-імпорт через /admin/organization.')
     version_conflict(db,structure_id,start,end)
     if StaffRepository.version_by_name(db, structure_id, prepared["name"]):
         raise ValueError("Версія з такою назвою вже існує.")

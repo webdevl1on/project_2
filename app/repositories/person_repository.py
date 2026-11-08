@@ -1,3 +1,4 @@
+from app.repositories.organization_staff_repository import effective_position
 from app.models.person import Person
 from app.models.person_identity import PersonName
 from app.models.person_military_service import PersonRank
@@ -115,7 +116,7 @@ class PersonRepository:
         if official_only:
             from app.models.staff import StaffVersion
             query = query.join(StaffVersion, StaffVersion.id==Position.staff_version_id).filter(
-                PersonAssignment.id.is_not(None), active(StaffVersion,'valid_from','valid_to',on))
+                PersonAssignment.id.is_not(None), active(StaffVersion,'valid_from','valid_to',on),effective_position(on))
         return query.all()
 
 
@@ -146,5 +147,5 @@ class ProfileRepository:
     def assignments(db,person_id,on=None):
         from app.models.staff import StaffVersion
         query=db.query(PersonAssignment,Position,StaffVersion).select_from(PersonAssignment).join(Position,Position.position_id==PersonAssignment.position_id).join(StaffVersion,StaffVersion.id==Position.staff_version_id).filter(PersonAssignment.person_id==person_id,PersonAssignment.annulled_at.is_(None))
-        if on is not None: query=query.filter(active(PersonAssignment,'assigned_from','assigned_to',on),active(StaffVersion,'valid_from','valid_to',on))
+        if on is not None: query=query.filter(active(PersonAssignment,'assigned_from','assigned_to',on),active(StaffVersion,'valid_from','valid_to',on),effective_position(on))
         return query.order_by(PersonAssignment.assigned_from.desc(),PersonAssignment.id.desc()).all()

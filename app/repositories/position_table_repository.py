@@ -1,5 +1,6 @@
 """Read queries for the staff table; whitelisted field metadata only."""
 from sqlalchemy import or_, and_
+from app.repositories.organization_staff_repository import effective_position
 
 from app.models.person import Person
 from app.models.person_identity import Passport, PersonName
@@ -38,6 +39,7 @@ class PositionTableRepository:
         query = (db.query(Position, PersonPosition, Person, PersonName, PersonRank, Rank, Passport, PersonServiceHistory)
                  .join(StaffVersion, StaffVersion.id == Position.staff_version_id)
                  .filter(StaffVersion.id == version_id if version_id is not None else active(StaffVersion,"valid_from","valid_to",on))
+                 .filter(StaffVersion.annulled_at.is_(None),effective_position(on))
                  .outerjoin(PersonPosition, and_(Position.position_id == PersonPosition.position_id, active(PersonPosition,"assigned_from","assigned_to",on)))
                  .outerjoin(Person, PersonPosition.person_id == Person.person_id))
         for model, selection in selections:

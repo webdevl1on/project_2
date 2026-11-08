@@ -26,6 +26,7 @@ class SystemTimestamps:
 class StaffStructure(SystemTimestamps, Base):
     __tablename__ = "staff_structures"
     id: Mapped[int] = mapped_column(primary_key=True)
+    org_unit_id: Mapped[int | None] = mapped_column(ForeignKey('org_units.id'),unique=True)
     code: Mapped[str] = mapped_column(String, unique=True)
     name: Mapped[str] = mapped_column(String)
     versions: Mapped[list["StaffVersion"]] = relationship(back_populates="structure")
@@ -38,11 +39,15 @@ class StaffVersion(SystemTimestamps, Base):
     name: Mapped[str] = mapped_column(String)
     valid_from: Mapped[date] = mapped_column(Date)
     valid_to: Mapped[date | None] = mapped_column(Date)
+    annulled_at: Mapped[datetime | None] = mapped_column(DateTime)
+    annulment_reason: Mapped[str | None] = mapped_column(String(2000))
+    annulled_by: Mapped[int | None] = mapped_column(ForeignKey('users.id'))
     import_key: Mapped[str | None] = mapped_column(String, unique=True)
     structure: Mapped[StaffStructure] = relationship(back_populates="versions")
     positions: Mapped[list["Position"]] = relationship(back_populates="staff_version")
     __table_args__ = (CheckConstraint("valid_to IS NULL OR valid_to >= valid_from"),
-                      UniqueConstraint("staff_structure_id", "name"))
+                      UniqueConstraint("staff_structure_id", "name"),
+                      CheckConstraint("(annulled_at IS NULL AND annulment_reason IS NULL AND annulled_by IS NULL) OR (annulled_at IS NOT NULL AND annulment_reason IS NOT NULL AND length(trim(annulment_reason)) BETWEEN 1 AND 2000)",name="org_version_annul_reason"))
 
     @validates("valid_from", "valid_to")
     def validate_date(self, key, value):
@@ -88,7 +93,7 @@ class PersonAssignment(SystemTimestamps, Base):
 # DB guards cover writes outside the services, including competing connections.
 _VERSION_GUARD = """
  SELECT CASE WHEN EXISTS (
-   SELECT 1 FROM staff_versions v WHERE v.id != NEW.id
+   SELECT 1 FROM staff_versions v WHERE v.id != NEW.id AND v.annulled_at IS NULL AND NEW.annulled_at IS NULL
    AND v.staff_structure_id=NEW.staff_structure_id
    AND v.valid_from<=coalesce(NEW.valid_to,'9999-12-31')
    AND NEW.valid_from<=coalesce(v.valid_to,'9999-12-31')
@@ -102,7 +107,7 @@ _VERSION_GUARD = """
 _ASSIGNMENT_GUARD = """
  SELECT CASE WHEN NEW.annulled_at IS NULL AND NOT EXISTS (
    SELECT 1 FROM positions p JOIN staff_versions v ON v.id=p.staff_version_id
-   WHERE p.position_id=NEW.staff_position_id AND NEW.assigned_from>=v.valid_from
+   WHERE p.position_id=NEW.staff_position_id AND v.annulled_at IS NULL AND NEW.assigned_from>=v.valid_from
    AND (v.valid_to IS NULL OR (NEW.assigned_to IS NOT NULL AND NEW.assigned_to<=v.valid_to))
  ) THEN RAISE(ABORT,'assignment outside version period') END;
  SELECT CASE WHEN NEW.annulled_at IS NULL AND EXISTS (

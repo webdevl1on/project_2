@@ -7,17 +7,24 @@ from app.services.person_picker import person_options
 from app.services.assignment_audit import snapshot as assignment_snapshot
 
 
+def composite_staff_context(db,version_id=None):
+    from app.repositories.organization_staff_repository import OrganizationStaffRepository
+    return version_id is None and OrganizationStaffRepository.scoped(db)
+
+
 def table_context(db, version_id=None, on=None):
     structures = StaffRepository.structures(db, ordered=True)
     versions = StaffRepository.versions(db, stable=True)
     chosen = next((item for item in versions if item.id == version_id), None)
+    if chosen is not None and chosen.annulled_at:raise ValueError('Версію анульовано. Історія збережена на сторінці історичних призначень.')
     if version_id is not None and chosen is None:
         raise ValueError("Версія не існує.")
-    if chosen is None and structures:
+    composite=composite_staff_context(db,version_id)
+    if chosen is None and structures and not composite:
         current = today()
         preferred = sorted(structures, key=lambda item: (item.code != "main", item.code))
         chosen = next((version for structure in preferred for version in versions
-                       if version.staff_structure_id == structure.id
+                       if version.annulled_at is None and version.staff_structure_id == structure.id
                        and version.valid_from <= current <= (version.valid_to or date.max)), None)
     if on is None:
         on = today()
