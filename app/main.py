@@ -94,3 +94,11 @@ app.include_router(access_control.router)
 async def permission_error(request:Request,error:PermissionError):
     from fastapi.responses import JSONResponse
     return JSONResponse({'detail':str(error) or 'Недостатньо прав доступу.'},status_code=403)
+
+from app.routers import backups
+app.include_router(backups.router)
+from app.database.backup_maintenance import MaintenanceUnavailable
+@app.exception_handler(MaintenanceUnavailable)
+async def maintenance_error(request:Request,error:MaintenanceUnavailable):
+    from fastapi.responses import JSONResponse
+    return JSONResponse({'detail':str(error)},status_code=503,headers={'Retry-After':'5'})

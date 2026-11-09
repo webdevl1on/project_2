@@ -4,6 +4,8 @@
 
 Security 1.1–1.3 забезпечують персональний вхід, MFA, CSRF і сесії 15 хв / 8 год. Security 1.4 додає scoped ACL поверх організаційної структури. Поточний head — **0009_access_control**, після 0008; див. [SECURITY.md](SECURITY.md) та [ACCESS_CONTROL.md](ACCESS_CONTROL.md).
 
+Security 1.5 додає [узгоджені зашифровані резервні копії й ізольоване відновлення](BACKUP_AND_RESTORE.md), без нової Alembic-ревізії. `testing` дозволяє також явно створені `project2_restore_<hex>` для запуску відновленої копії; pytest, seed і робочі середовища зберігають свої окремі обмеження.
+
 Перед ручним upgrade: перевірений backup БД/сховища та окремий backup MFA-ключів, доступ чинного Master і окремого Admin з MFA. `python -m alembic current` / `python -m alembic heads`, потім за окремим рішенням — `python -m alembic upgrade head`. Editor/Viewer стають User **без автоматичних предметних прав**; матриці потрібно явно налаштувати на `/admin/access`. Master не має автоматичного доступу до персональних даних; Admin має. ID, паролі, MFA, сесії й журнали зберігаються. Нові ACL-таблиці/unique User–Person/guards перевіряє schema checker. Startup не мігрує; reset не потрібний. Перевірки нового етапу виконуються тільки у випадкових схемах `project2_ci`, без використання dev/prod.
 
 ## Межі й карта аудиту
@@ -209,25 +211,21 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload
 
 ## Резервна копія та перевірене відновлення
 
-Перед production upgrade: зупиніть записи/сервер; запишіть commit і Alembic revision; створіть dump та узгоджену копію файлового сховища. Паролі — prompt/pgpass, без паролів у рядку команди:
+Поточна процедура Security 1.5 — [BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md): зашифрований узгоджений PostgreSQL snapshot + документи/фото, незалежно зашифрована капсула критичних MFA/signing/RP-параметрів, маніфест і перевірка кожного файла. Старе незалежне `pg_dump` + `Copy-Item` активного каталогу не є повним узгодженим backup і більше не є рекомендованою процедурою.
+
+Потрібні PostgreSQL client tools **17**, приватний зашифрований staging, два окремі keyring поза Git/backup, явний `PROJECT2_BACKUP_CONFIG`, чинний deployment release та OS-планувальник. Нової Alembic-ревізії для цього модуля немає: head **0009_access_control**. Жодна робоча БД автоматично не змінюється.
 
 ```powershell
-pg_dump -h 127.0.0.1 -U project2_prod -d project2_prod -W -Fc -f "C:\project2-data\production\backups\project2-before-upgrade.dump"
-pg_restore --list "C:\project2-data\production\backups\project2-before-upgrade.dump"
-Get-FileHash "C:\project2-data\production\backups\project2-before-upgrade.dump" -Algorithm SHA256
-Copy-Item "C:\project2-data\production\documents" "D:\protected-backups\before-upgrade-documents" -Recurse
-Copy-Item "C:\project2-data\production\photos" "D:\protected-backups\before-upgrade-photos" -Recurse
+$env:PROJECT2_ENV_FILE = 'C:\project2-secrets\backup.env'
+.venv\Scripts\python.exe -m app.services.backup create
+.venv\Scripts\python.exe -m app.services.backup verify --id <ID_КОПІЇ>
 ```
 
-Backup має містити повні файли, включно з логічно вилученими історичними копіями. Використовуйте захищений диск, NTFS ACL і шифрування відповідно до локальної політики. Зіставте кількість/розміри/SHA256 файлів оригіналу та копії. Ключі конфігурації резервуйте окремо захищеним способом, не в Git.
+Команди запитують чинну Master-сесію зі свіжою MFA через прихований prompt. Щоденні full та самодостатні точки кожні 30 хвилин робить системний worker, а не сторінка браузера. `/admin/backups` показує стан Master/Admin; критичні запуски доступні Master. RPO ≤1 година залежить від фактичного інтервалу успішних snapshot, а для втрати майданчика — перевірених зовнішніх реплік.
 
-`pg_restore --list` перевіряє лише читання каталогу; потрібне реальне відновлення **на окремому тестовому сервері**, не development із реальними даними і не робоча production. Наприклад, на ізольованому localhost:55432 створіть порожню project2_ci з окремою роллю. Не використовуйте `--clean` на існуючій робочій БД:
+Відновлення лише до **нової порожньої** `project2_restore_<hex>` на ізольованому PostgreSQL: підписаний plan, preview, підтвердження, `pg_restore --single-transaction`, schema/row/file/MFA checks, staged files. Без `--clean` і без HTTP restore. Старі сесії відновленої копії відкликаються; source не змінюється. `PROJECT2_ENV=testing` дозволяє запуск цієї ізольованої копії з незалежними каталогами; pytest дозволений як і раніше тільки у project2_ci. Робоче перемикання — окреме ручне вікно з попереднім цілим rollback-комплектом, описане в runbook.
 
-```powershell
-pg_restore -h 127.0.0.1 -p 55432 -U project2_ci -d project2_ci -W --no-owner --no-privileges --exit-on-error "C:\project2-data\production\backups\project2-before-upgrade.dump"
-```
-
-З окремим `PROJECT2_ENV=testing`, URL порту 55432 і копією сховища: `alembic current`, schema checker, контрольні COUNT, зв'язки FK та вибіркова захищена видача файлів. Перевіряйте restore тим самим major pg_restore або новішим, ніж pg_dump. Після успіху — контрольований upgrade production, schema check, smoke, повернення сервера. При невдачі зберігайте несправну БД для аналізу; відновлюйте dump у нову порожню БД і перемикайте конфігурацію лише після перевірки. Автоматичного копіювання production → development немає.
+Повна інструкція Windows/Linux, external marker, retention/quota, escrow/rotation, аварійне підтвердження Master та регулярні дозволені CI drills — [BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md). Автоматичні reset, міграції чи production restore не запускаються.
 
 ## Відомі прогалини і діагностика
 

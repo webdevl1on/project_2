@@ -1,6 +1,6 @@
 # Архітектура project_2
 
-Карта коду гілки `testing` та поточних Security 1.4 / організаційної структури у `feature/security`. Актуальний код має пріоритет; стан реалізації та результати перевірок наведені в [CURRENT_STATE.md](CURRENT_STATE.md).
+Карта коду гілки `testing` та поточних Security 1.5 / організаційної структури у `feature/security`. Актуальний код має пріоритет; стан реалізації та результати перевірок наведені в [CURRENT_STATE.md](CURRENT_STATE.md).
 
 ## Зберігання та міграції
 
@@ -26,6 +26,7 @@ PostgreSQL — цільова БД; `Settings` вимагає явні PROJECT2_
 | Керування користувачами / Master | `app/account_policy.py`, `app/models/accounts.py`, `app/repositories/account_repository.py`, `app/services/accounts.py`, `account_management.py`, `promote_master.py`, `app/routers/account_management.py`, `app/templates/admin/user*.html`, `account_audit.html`, `app/templates/account_password.html`, `app/static/js/account_management.js`, `migrations/versions/0006_account_management.py` |
 | MFA / Passkey / власні сесії | `app/models/mfa.py`, `app/services/mfa.py`, `mfa_keys.py`, `recover_master_mfa.py`, `app/repositories/mfa_repository.py`, `app/security/mfa_config.py`, `app/routers/mfa.py`, `app/static/js/security_mfa.js`, `security_session.js`, `migrations/versions/0007_mfa_sessions.py` |
 | Scoped ACL / матриці / права за посадою | `docs/ACCESS_CONTROL.md`, `access_catalog.py`, `models/access.py`, `services/access*.py`, `repositories/access_repository.py`, `security/access*.py`, `routers/access_control.py`, `templates/admin/access.html`, `0009_access_control.py` |
+| Backup / узгоджений snapshot / ізольоване відновлення | `docs/BACKUP_AND_RESTORE.md`, `routers/backups.py`, `services/backups/`, `services/backup.py`, `repositories/backup_repository.py`, `database/backup_maintenance.py`, `templates/admin/backups.html`, `static/js/backups.js`, `scripts/backup/` |
 | Організаційне дерево / незалежні штатки | `docs/ORGANIZATION.md`, `models/organization.py`, `organization_staff.py`, `services/organization.py`, `organization_staff.py`, `organization_excel.py`, `organization_import.py`, `repositories/organization*_repository.py`, `routers/organization*.py`, `templates/admin/organization*.html`, `static/js/organization*.js`, `0008_organization.py` |
 | Журнал і стан події на дату | `docs/EVENT_CORRECTIONS.md`, `app/models/event_correction.py`, `app/services/event_corrections.py`, `docs/EVENT_CONTROL.md`, `app/services/event_rules.py`, `app/static/js/journal_controls.js`, `docs/EVENT_VIEWS.md`, `app/event_display.py`, `app/services/event_views.py`, `app/routers/event_journal.py`, `app/templates/event_journal.html`, `app/static/js/event_journal.js`, `app/static/css/event_views.css` |
 | Події зі штатки | `docs/PERSON_EVENTS.md`, `app/routers/person_events.py`, `app/services/person_events.py`, `app/services/service_for_person_event.py`, `app/repositories/event_repository.py`, `app/templates/components/person_events.html`, `app/static/js/person_events.js` |
@@ -102,6 +103,14 @@ flowchart LR
 `person_read.py` готує дані списку/карток; `staff_read.py` — версії та дату перегляду, історію й дані підтвердження. `service_person_positions.py` координує читання та обчислює значення/попередження/варіанти фільтрів; SQL виконує PositionTableRepository. ORM-записи залишаються доступними Jinja2, включно з наявними lazy-колекціями картки людини; повне переведення шаблонів на DTO не виконувалося.
 
 ## Моделі та зв'язки
+
+### Узгоджені резервні копії (Security 1.5)
+
+`/admin/backups` делегує службові запуски `services/backups/commands.py`, де перевіряються персональні Master/Admin і свіжа MFA для критичних дій. Durable signed queue читає одноразовий `python -m app.services.backup run-once`, який запускає Task Scheduler/systemd. Немає фонової задачі в web-процесі або restore HTTP endpoint.
+
+`BackupEngine → BackupRepository` експортує PostgreSQL snapshot, бере короткий snapshot gate, закріплює незмінні файли чинного сховища та копіює фото; `pg_dump --snapshot` продовжується після дозволу звичайних записів. `database/backup_maintenance.py` розширює наявні межі транзакцій та ORM Session DML спільним advisory gate; конфлікт повертає 503/Retry-After. SQLAlchemy-моделі, PostgreSQL DDL й предметна логіка не змінюються.
+
+`crypto/bundle/store` забезпечують AES-GCM архів, незалежну капсулу секретів, перевірку маніфесту/посилань, підписані чергу/каталог/одноразові плани й операційний журнал поза БД. Це дозволяє журналювати помилки та recovery при недоступності source. Предметний/Account/AccessAudit входить до dump без дублювання. `restore.py` приймає лише нову ізольовану БД, перевіряє результат і публікує staged файли; відновлені bearer-сесії/flows відкликаються. `drills.py` дозволяє лише вузько затверджені Master регулярні restore у disposable CI. Схема залишається 0009; докладний runbook і межі — [BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md).
 
 | Файл / клас | Таблиця | Призначення та зв'язки |
 | --- | --- | --- |

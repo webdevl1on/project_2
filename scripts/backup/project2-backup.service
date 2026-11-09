@@ -1,0 +1,18 @@
+# Review paths/account before explicit installation; never install from a browser.
+[Unit]
+Description=Project2 encrypted backup worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=project2
+Group=project2
+WorkingDirectory=/opt/project_2
+Environment=PROJECT2_ENV_FILE=/etc/project2/backup.env
+ExecStart=/opt/project_2/.venv/bin/python -m app.services.backup run-once
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+TimeoutStartSec=4h

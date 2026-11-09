@@ -17,10 +17,12 @@ def service_transaction(db, *, commit=True, immediate=False):
     if immediate and not commit:
         raise ValueError("Блокування запису потребує власної транзакції.")
     try:
+        from app.database.backup_maintenance import protect_write
         if immediate:
             db.rollback()
             if db.get_bind().dialect.name == "sqlite":
                 db.connection().exec_driver_sql("BEGIN IMMEDIATE")
+        protect_write(db)
         previous=db.info.get('project2_write',False)
         db.info['project2_write']=True
         from app.services.access_context import authorization_snapshot

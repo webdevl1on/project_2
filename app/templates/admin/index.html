@@ -3,6 +3,7 @@
 {% include 'components/security_session.html' %}</head>
 <body class="container py-4">
 {% include "components/app_navigation.html" %}<h1>Адміністрування</h1>
+<section class="card my-3"><div class="card-body"><h2 class="h4">Резервне копіювання</h2><a class="btn btn-outline-primary" href="/admin/backups">Копії, перевірки та стан резервування</a></div></section>
 {% if message %}<div class="alert alert-success" role="status">{{ message }}</div>{% endif %}
 {% if security_user.role=='admin' %}<section class="card my-3"><div class="card-body"><h2 class="h4">Словники відмінків</h2>
 <p>Перевірені форми прізвищ, імен та по батькові. Персональні форми людей зберігаються окремо.</p>

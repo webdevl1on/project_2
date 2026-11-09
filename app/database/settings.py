@@ -1,7 +1,7 @@
 """Explicit environment/connection policy. Never fall back to a working SQLite."""
 from dataclasses import dataclass
 from pathlib import Path
-import os
+import os,re
 from sqlalchemy.engine import make_url
 from dotenv import load_dotenv
 
@@ -22,7 +22,7 @@ class Settings:
         try:url=make_url(raw)
         except Exception:raise ValueError('Некоректний DATABASE_URL.') from None
         if url.drivername not in ('postgresql+psycopg','sqlite'):raise ValueError('Потрібен postgresql+psycopg або явна legacy SQLite.')
-        if mode=='testing' and url.drivername.startswith('postgresql') and url.database!='project2_ci':raise ValueError('PostgreSQL тести дозволені лише у project2_ci.')
+        if mode=='testing' and url.drivername.startswith('postgresql') and url.database!='project2_ci' and not re.fullmatch('project2_restore_[a-f0-9]{8,32}',url.database or ''):raise ValueError('Testing потребує project2_ci або явно ізольовану project2_restore_<hex>.')
         if mode=='development' and url.drivername.startswith('postgresql') and url.database!='project2_dev':raise ValueError('Development потребує окремої project2_dev.')
         if mode=='production':
             if url.database!='project2_prod':raise ValueError('Production потребує project2_prod з окремим обліковим записом.')

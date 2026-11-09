@@ -1,5 +1,33 @@
 # Поточний стан project_2
 
+## Поточне оновлення: Security 1.5
+
+`feature/security`, початковий HEAD **ea7f6da**, початкове дерево чисте. Перевірено актуальний `origin/testing=00cf012`; `testing` не змінено. Додано [узгоджене зашифроване резервування та ізольоване відновлення](BACKUP_AND_RESTORE.md), повторно використано персональні сесії/MFA/CSRF/ролі, DocumentStorage, Settings/schema checker і maintenance lease. Нових залежностей, ORM-таблиць чи Alembic-ревізій немає: **0009_access_control**.
+
+- Кожна точка містить PostgreSQL snapshot, документи/фото й захищений маніфест; критичні MFA/signing/RP-параметри — в окремій капсулі під іншим ключем. Короткий shared/exclusive write gate та pin незмінних файлів узгоджують БД зі сховищем, потім звичайні записи продовжуються. Читання не блокується.
+- Системний worker із durable signed queue, щоденна full та самодостатні точки кожні 30 хвилин, окрема перевірена зовнішня репліка, opt-in retention зі збереженням двох перевірених новіших копій, quota, підписаний операційний журнал та failure alerts. Task Scheduler/systemd — явне ручне налаштування.
+- `/admin/backups`: Master/Admin бачать стан без секретів, Master зі свіжою MFA запускає create/verify. User не має доступу. HTTP restore/download немає.
+- CLI restore має одноразовий підписаний preview/plan, окрему порожню `project2_restore_<hex>`, schema/count/file/MFA checks, staged files, інвалідацію скопійованих sessions/flows і quarantine при помилці. Offline-процедура перевіряє локального OS administrator та справжні пароль+MFA відновленого Master. Регулярний реальний CI drill потребує окремого Master permit ≤30 днів.
+
+Фактично виконані перевірки цього етапу, синтетичні дані й ізольовані БД:
+
+| Перевірка | Результат |
+| --- | --- |
+| До змін: `.venv/bin/python -m pytest tests/ -q` | **1202 passed, 102 skipped**; PostgreSQL ще без URL. |
+| Фінальний `PROJECT2_TEST_DATABASE_URL=<власний ізольований project2_ci> .venv/bin/python -m pytest tests/ -q --tb=short` | **1333 passed**, 303,06 с, без skipped; повний набір включає PostgreSQL 17 / 116 PG-тестів. |
+| Після останніх уточнень recovery/publish та заборони публічних шляхів: `tests/test_backups.py tests/test_backup_http.py tests/postgresql/test_backups.py` | **25 passed**; це повтор підмножини повного набору, не додаткові унікальні тести. |
+| `node --test tests/js/*.test.cjs` | **57 passed**. |
+| Chromium: `tests/browser/backups_live.cjs`, викликається PG pytest | **3 PASS**: реальні queue/worker/create/verify, секрети/архіви не розкриваються, вузький екран без pageerror. |
+| `COLUMN_STAGE=security_mfa ... node tests/browser/column_visibility.cjs` | **3 PASS**: enrollment/TOTP, backup login/сесії, справжня WebAuthn-криптоперевірка з Chromium CTAP2 virtual authenticator та UV. |
+| Python AST / Jinja / Node syntax / CLI help / Alembic heads / diff check | Успішно; 292 Python-файли, 72 шаблони, єдиний head 0009. |
+| systemd units | `systemd-analyze verify` на копіях із підставленим фактичним deployment-шляхом — exit 0. Оригінальний `/opt/project_2/...` placeholder тут відсутній; сервіс/таймер не встановлювалися й не запускалися. |
+
+Під час PG-тестів реально відновлювали dump, захищені документи/фото, User/ACL/MFA й перевіряли source-незмінність, one-use/concurrent plans, перевищення квоти, неправильні ключі/маніфест, невдалий postcheck, retention-захист старої копії, зовнішній marker, offline Master+MFA та підписаний регулярний drill. Використано лише власний disposable PostgreSQL **17.11** / project2_ci, випадкові схеми та нові random recovery DB; робочі dev/prod не використовувалися.
+
+Останній повторний замір: **5 001 особа + 24 MiB файлів**, архів **26 327 110 байтів**, backup **0,56 с**, gate **0,0045 с**, restore **0,84 с**; Linux, локальний теплий Docker/диск, без мережевого перенесення й часу оператора. Це не production SLA: RPO ≤1 година / RTO ≤4 години ще не підтверджені тривалим спостереженням/великим або Windows/WAN випробуванням. PowerShell/Task Scheduler, реальний зовнішній том і робочий cutover не виконувалися. Залишаються два попередні deprecation warnings Starlette/httpx та AnyIO. Повний браузерний suite цього етапу не запускався; виконано наведені два релевантні Chromium suite.
+
+Автоматичного production restore, WAL/PITR, S3 API, WORM, hot failover та ротації операційного журналу немає. Потрібні ручні приватні каталоги/ключі/escrow, конфігурація, планувальник, failure monitoring та дозвіл isolated drills. Власний тестовий PostgreSQL-контейнер після перевірок зупинено. Робочі БД/ключі/старі backup не змінювалися; reset, міграції робочої БД, commit/push/merge не виконувалися. Повний перелік 42 створених/змінених файлів, процедури й межі — [BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md).
+
 ## Поточне оновлення: Security 1.4
 
 Гілка `feature/security`, база організаційного етапу — `2faf17f`. Додані Master/Admin/User, scoped ALLOW/DENY, зв’язок User–Person, шаблони й кілька scoped-призначень, затверджені політики керівних позицій, фіксовані тимчасові набори, обмежене делегування, дедупліковані завдання перевірки й append-only аудит. `/admin/access` — серверна матриця з деревом, позиціями, категоріями, read/edit/спеціальними діями, поясненнями та керуванням джерелами.

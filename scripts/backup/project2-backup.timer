@@ -1,0 +1,10 @@
+[Unit]
+Description=Check Project2 backup queue and schedule every minute
+
+[Timer]
+OnCalendar=*-*-* *:*:00
+Persistent=true
+Unit=project2-backup.service
+
+[Install]
+WantedBy=timers.target

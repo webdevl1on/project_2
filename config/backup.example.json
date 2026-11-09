@@ -1,0 +1,19 @@
+{
+  "release": "SET_ACTUAL_GIT_COMMIT",
+  "key_file": "C:/project2-secrets/backup-keys.json",
+  "secrets_key_file": "C:/project2-secrets/recovery-keys.json",
+  "secrets": "C:/project2-recovery-capsules",
+  "staging": "C:/project2-backup-staging",
+  "external": "D:/project2-offsite",
+  "external_marker": "SET_VERIFIED_VOLUME_ID",
+  "interval_minutes": 30,
+  "daily_hour": 2,
+  "full_days": 14,
+  "checkpoint_hours": 48,
+  "max_bytes": 107374182400,
+  "prune": false,
+  "alert_command": [],
+  "tool_dir": "C:/Program Files/PostgreSQL/17/bin",
+  "drill_root": "C:/project2-recovery-drills",
+  "drill_hours": 168
+}

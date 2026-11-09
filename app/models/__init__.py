@@ -64,3 +64,4 @@ from app.models.access import AccessTemplate,TemplateAssignment,PositionAccessPo
 # Queue changes in the same transaction as staffing/account/policy changes.
 from app.services import access_reviews as _access_reviews
 from app.security import access_writes as _access_writes
+from app.database import backup_maintenance as _backup_maintenance

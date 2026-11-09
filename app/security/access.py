@@ -18,7 +18,9 @@ async def enforce(request,db):
         if module=='account_management' and path.startswith('/admin/') or module=='accounts' and name=='create':
             if user.role not in ('master','admin'):raise HTTPException(403,'Потрібні системні повноваження.')
         return
-    if module=='access_control':return  # Its services require fresh MFA and bounded management authority.
+    if module in ('access_control','backups'):
+        if module=='backups' and user.role not in ('master','admin'):raise HTTPException(403,'Потрібні системні повноваження.')
+        return  # Services require fresh MFA and bounded management authority.
     if path in ('/admin','/admin/login','/admin/logout'):
         if user.role not in ('master','admin'):raise HTTPException(403,'Потрібні системні повноваження.')
         return

@@ -51,6 +51,8 @@ def write_unit(db):
         raise ValueError("Спочатку завершіть поточні незбережені зміни.")
     db.rollback()
     try:
+        from app.database.backup_maintenance import protect_write
+        protect_write(db)
         if db.bind.dialect.name == "sqlite":
             db.connection().exec_driver_sql("BEGIN IMMEDIATE")
         else:
