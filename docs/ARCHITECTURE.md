@@ -1,6 +1,6 @@
 # Архітектура project_2
 
-Карта коду гілки `testing` та поточних Security 1.5 / організаційної структури у `feature/security`. Актуальний код має пріоритет; стан реалізації та результати перевірок наведені в [CURRENT_STATE.md](CURRENT_STATE.md).
+Карта коду гілки `testing` та поточних Security 1.5 / організаційної структури / єдиної дизайн-системи у `feature/security`. Актуальний код має пріоритет; стан реалізації та результати перевірок наведені в [CURRENT_STATE.md](CURRENT_STATE.md).
 
 ## Зберігання та міграції
 
@@ -49,6 +49,10 @@ PostgreSQL — цільова БД; `Settings` вимагає явні PROJECT2_
 | Підключення застосунку, БД, тестів | `app/main.py`, `app/templating.py`, `app/database/`, `requirements.txt`, `tests/conftest.py` |
 
 ## Компоненти та потік запиту
+
+Єдина UI-оболонка — `templates/layouts/base.html` та `auth.html`; 39 повних шаблонів використовують inheritance. `components/ui.html`, `ui_panels.html` і `ui_icons.html` надають спільні презентаційні компоненти. `design_tokens.css`/`themes.css` визначають light/dark/military, `ui_components.css`/`ui_layout.css` узгоджують Bootstrap та адаптивність; сторінкові стилі складних таблиць збережено з semantic colors. `theme_manager.js` застосовує root data-theme до першого paint й зберігає лише код теми. `app_navigation.html`/`navigation.js` використовують Bootstrap Offcanvas без зміни робочої ширини. UI boolean `ui_org_visible` повторно використовує чинний evaluator, не змінює ACL. Докладна карта сторінок, компонентів і наступних тем — [UI_DESIGN_SYSTEM.md](UI_DESIGN_SYSTEM.md).
+
+`profile_layout.js` впорядковує/ховає лише серверно дозволені блоки без збереження значень чи прав. `record_panels.js` представляє оригінальні DOM-записи документів/медицини/інших відомостей як список і деталі, не створює другого CRUD-контролера. Scoped `person_access.html` зберігає всі серверні умови; заборонені категорії не одержують фіктивних locked-блоків. `/docs` та `/redoc` повертають `api_docs.html` зі старими захисними залежностями та офіційними widgets; зміни Python — тільки HTML-підключення та UI-метадані, без моделей/міграцій/предметних сервісів.
 
 Вебзастосунок — FastAPI з серверним рендерингом Jinja2. [app/main.py](../app/main.py) створює `app` і підключає роутери осіб, історії ПІБ/звань, таблиці посад, штату, відмінків, адміністрування, географії, контактів, хронології, підстав служби та TCC-адміністрування. Спільні JavaScript/CSS розташовано в `app/static/`, частина сторінкової логіки залишається в HTML. `StaticFiles` у `app/main.py` обслуговує `/static` з абсолютного шляху `BASE_DIR / "static"`. Bootstrap завантажується з `cdn.jsdelivr.net`. Окремого frontend-збирання у репозиторії немає. PySide6 є в залежностях, але не є точкою входу поточного вебінтерфейсу.
 

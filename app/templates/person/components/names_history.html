@@ -22,7 +22,7 @@
 
 
         {% for names in person.names %}
-        <tr {% if names.is_active %} style="border: rgb(10, 50, 184) solid;" {% endif %}>
+        <tr {% if names.is_active %} style="border: var(--color-focus) solid;" {% endif %}>
             <td>{{loop.index}}</td>
             <td>{{names.surname}}</td>
             <td>{{names.name}}</td>

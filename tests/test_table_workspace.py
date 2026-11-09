@@ -22,6 +22,6 @@ def test_people_page_has_shared_controls_empty_table_and_real_navigation(client)
     assert 'id="persons" data-column-table' in page.text
     assert 'data-row-height-custom' in page.text and 'data-selection-mode' in page.text
     assert 'table_appearance.js' in page.text and 'table_workspace.js' in page.text
-    assert 'aria-current="page">Люди' in page.text
+    assert 'aria-current="page"' in page.text and '<span>Особовий склад</span>' in page.text and 'id="app-sidebar"' in page.text
     assert 'column-toggle' not in page.text.replace('data-column-toggle','')
     assert 'name="direction"' in page.text

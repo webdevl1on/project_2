@@ -1,0 +1,1660 @@
+{
+  "person_create.html": {
+    "id": [
+      "rank_id",
+      "sex_{{ value }}",
+      "tax_number"
+    ],
+    "name": [
+      "csrf",
+      "rank_id",
+      "sex",
+      "tax_number"
+    ],
+    "data": [
+      "data-error-fields",
+      "data-form-error",
+      "data-name-case-form",
+      "data-person-create",
+      "data-person-details"
+    ],
+    "scripts": [
+      "/static/js/date_input.js",
+      "/static/js/name_cases.js"
+    ]
+  },
+  "login.html": {
+    "id": [
+      "personal-login"
+    ],
+    "name": [
+      "password",
+      "return_to",
+      "username",
+      "viewport"
+    ],
+    "data": [
+      "data-login-error"
+    ],
+    "scripts": [
+      "/static/js/login.js"
+    ]
+  },
+  "staff_import_preview.html": {
+    "id": [],
+    "name": [
+      "csrf",
+      "token"
+    ],
+    "data": [],
+    "scripts": []
+  },
+  "person_detail.html": {
+    "id": [],
+    "name": [],
+    "data": [],
+    "scripts": []
+  },
+  "person_full_info.html": {
+    "id": [
+      "addresses",
+      "contacts",
+      "documents",
+      "events",
+      "general",
+      "medical-ui-metadata",
+      "names",
+      "person-contacts",
+      "person-geography",
+      "personTabs",
+      "positions",
+      "profile-overview",
+      "ranks",
+      "service-bases",
+      "service-history",
+      "tab-{{ key }}",
+      "{{ additional_kind }}",
+      "{{ medical_kind }}",
+      "{{ person_id }}"
+    ],
+    "name": [
+      "csrf",
+      "personal_number",
+      "viewport"
+    ],
+    "data": [
+      "data-bs-target",
+      "data-bs-toggle",
+      "data-person-id",
+      "data-personnel-form",
+      "data-url"
+    ],
+    "scripts": [
+      "/static/js/contacts.js",
+      "/static/js/date_input.js",
+      "/static/js/document_ui.js",
+      "/static/js/geography.js",
+      "/static/js/medical.js",
+      "/static/js/person_profile.js",
+      "/static/js/personnel_forms.js",
+      "/static/js/profile_dates.js",
+      "/static/js/profile_records.js",
+      "/static/js/profile_ui.js",
+      "/static/js/service_bases.js"
+    ]
+  },
+  "event_problems.html": {
+    "id": [
+      "{{ item.event_id }}",
+      "{{ item.person_id }}"
+    ],
+    "name": [
+      "viewport"
+    ],
+    "data": [
+      "data-date-scope",
+      "data-event-problem",
+      "data-events-event-id",
+      "data-events-open",
+      "data-events-person-label",
+      "data-person-id"
+    ],
+    "scripts": [
+      "/static/js/person_events.js",
+      "/static/js/profile_dates.js"
+    ]
+  },
+  "person_form.html": {
+    "id": [
+      "name",
+      "patronymic",
+      "sex",
+      "surname",
+      "tax_number"
+    ],
+    "name": [
+      "csrf",
+      "name",
+      "patronymic",
+      "sex",
+      "surname",
+      "tax_number"
+    ],
+    "data": [],
+    "scripts": [
+      "/static/js/date_input.js"
+    ]
+  },
+  "mfa.html": {
+    "id": [],
+    "name": [
+      "code",
+      "method",
+      "viewport"
+    ],
+    "data": [
+      "data-code-list",
+      "data-codes",
+      "data-copy-codes",
+      "data-download-codes",
+      "data-enroll",
+      "data-finish",
+      "data-mfa-error",
+      "data-mfa-mode",
+      "data-passkey-auth",
+      "data-passkey-register",
+      "data-passkey-unavailable",
+      "data-prove",
+      "data-prove-form",
+      "data-qr",
+      "data-recovery-warning",
+      "data-secret",
+      "data-totp-confirm",
+      "data-totp-setup",
+      "data-totp-start"
+    ],
+    "scripts": [
+      "/static/js/security_mfa.js"
+    ]
+  },
+  "person_positions.html": {
+    "id": [
+      "active-column-filters",
+      "assignment-editor-{{ item.position.position_id }}",
+      "occupancy",
+      "position-filters",
+      "{{ item.assignment.person_id }}",
+      "{{ table_columns.id }}"
+    ],
+    "name": [
+      "as_of",
+      "assignment_order_date",
+      "assignment_order_number",
+      "csrf",
+      "direction",
+      "filter_order",
+      "mirage",
+      "note",
+      "occupancy",
+      "on",
+      "person_id",
+      "position_id",
+      "return_query",
+      "sort_by",
+      "token",
+      "transfer_release_order_date",
+      "transfer_release_order_number",
+      "version_id",
+      "viewport",
+      "{{ key }}",
+      "{{ key }}_priority"
+    ],
+    "data": [
+      "data-assignment-cancel",
+      "data-assignment-close",
+      "data-assignment-draft",
+      "data-assignment-editor",
+      "data-assignment-status",
+      "data-assignment-toggle",
+      "data-bs-auto-close",
+      "data-bs-toggle",
+      "data-column-empty",
+      "data-column-hide",
+      "data-column-key",
+      "data-column-select",
+      "data-column-table",
+      "data-column-value",
+      "data-contains-apply",
+      "data-contains-clear",
+      "data-contains-input",
+      "data-date-scope",
+      "data-event-presence-on",
+      "data-event-presence-person",
+      "data-events-open",
+      "data-events-person-label",
+      "data-filter-key",
+      "data-history-warnings",
+      "data-person-id",
+      "data-personnel-form",
+      "data-row-key",
+      "data-staff-compact",
+      "data-staff-quick-filter",
+      "data-staff-tools",
+      "data-table-filters",
+      "data-valid-from",
+      "data-valid-to"
+    ],
+    "scripts": [
+      "/static/js/column_filter_menu.js",
+      "/static/js/column_interactions.js",
+      "/static/js/column_presets.js",
+      "/static/js/column_tree.js",
+      "/static/js/column_visibility.js",
+      "/static/js/date_filter.js",
+      "/static/js/event_ui.js",
+      "/static/js/person_events.js",
+      "/static/js/person_picker.js",
+      "/static/js/personnel_forms.js",
+      "/static/js/profile_dates.js",
+      "/static/js/staff_assignments.js",
+      "/static/js/staff_event_presence.js",
+      "/static/js/table_appearance.js",
+      "/static/js/table_filters.js",
+      "/static/js/table_history.js",
+      "/static/js/table_selection.js",
+      "/static/js/table_state.js",
+      "/static/js/table_workspace.js"
+    ]
+  },
+  "account_security.html": {
+    "id": [],
+    "name": [
+      "password",
+      "viewport"
+    ],
+    "data": [
+      "data-add-factor",
+      "data-backup-generate",
+      "data-code-list",
+      "data-codes",
+      "data-copy-codes",
+      "data-download-codes",
+      "data-mfa-error",
+      "data-mfa-mode",
+      "data-passkeys",
+      "data-reauth",
+      "data-remove-totp",
+      "data-security-summary"
+    ],
+    "scripts": [
+      "/static/js/security_mfa.js"
+    ]
+  },
+  "person_access.html": {
+    "id": [
+      "medical-ui-metadata",
+      "person-contacts",
+      "person-geography",
+      "{{ person_id }}"
+    ],
+    "name": [
+      "csrf",
+      "viewport",
+      "{{ k }}"
+    ],
+    "data": [
+      "data-access-profile",
+      "data-access-section",
+      "data-can-edit",
+      "data-events-open",
+      "data-events-person-label",
+      "data-person-id",
+      "data-personnel-form",
+      "data-url"
+    ],
+    "scripts": [
+      "/static/js/{{ script }}.js"
+    ]
+  },
+  "account_sessions.html": {
+    "id": [],
+    "name": [
+      "viewport"
+    ],
+    "data": [
+      "data-mfa-error",
+      "data-mfa-mode",
+      "data-revoke-others",
+      "data-session-list"
+    ],
+    "scripts": [
+      "/static/js/security_mfa.js"
+    ]
+  },
+  "event_journal.html": {
+    "id": [
+      "event-journal-data"
+    ],
+    "name": [
+      "as_of",
+      "direction",
+      "end",
+      "event_type",
+      "filter_order",
+      "scale",
+      "search",
+      "sort",
+      "start",
+      "unit",
+      "viewport",
+      "{{ key }}"
+    ],
+    "data": [
+      "data-column-table",
+      "data-date-scope",
+      "data-journal-actions",
+      "data-journal-active-filters",
+      "data-journal-add",
+      "data-journal-column",
+      "data-journal-copy-tools",
+      "data-journal-event-count",
+      "data-journal-events",
+      "data-journal-events-tab",
+      "data-journal-export",
+      "data-journal-filters",
+      "data-journal-message",
+      "data-journal-next",
+      "data-journal-period",
+      "data-journal-person",
+      "data-journal-presence",
+      "data-journal-presence-tab",
+      "data-journal-prev",
+      "data-journal-rows",
+      "data-journal-summary",
+      "data-journal-summary-title",
+      "data-journal-tab",
+      "data-journal-unit",
+      "data-journal-wrap",
+      "data-month-apply",
+      "data-month-select",
+      "data-month-step",
+      "data-month-title",
+      "data-month-year",
+      "data-staff-day",
+      "data-staff-today",
+      "data-table-viewport"
+    ],
+    "scripts": [
+      "/static/js/column_filter_menu.js",
+      "/static/js/column_interactions.js",
+      "/static/js/event_journal.js",
+      "/static/js/event_ui.js",
+      "/static/js/journal_controls.js",
+      "/static/js/person_events.js",
+      "/static/js/profile_dates.js",
+      "/static/js/table_filters.js",
+      "/static/js/table_selection.js",
+      "/static/js/table_state.js",
+      "/static/js/table_workspace.js"
+    ]
+  },
+  "search_person.html": {
+    "id": [],
+    "name": [
+      "person_id"
+    ],
+    "data": [],
+    "scripts": []
+  },
+  "staff_error.html": {
+    "id": [],
+    "name": [],
+    "data": [],
+    "scripts": []
+  },
+  "account_password.html": {
+    "id": [],
+    "name": [
+      "csrf",
+      "viewport",
+      "{{ name }}"
+    ],
+    "data": [
+      "data-account-error",
+      "data-account-form"
+    ],
+    "scripts": [
+      "/static/js/account_management.js"
+    ]
+  },
+  "staff_history.html": {
+    "id": [
+      "history-audit",
+      "history-audit-title",
+      "history-editor",
+      "history-editor-title",
+      "history-records",
+      "history-state",
+      "history-state-title",
+      "history-transfer",
+      "history-transfer-title",
+      "position-{{ position.position_id }}",
+      "{{ position.position_id }}",
+      "{{ record.id }}"
+    ],
+    "name": [
+      "assigned_from",
+      "assigned_to",
+      "assignment_order_date",
+      "assignment_order_number",
+      "completion_note",
+      "completion_reason",
+      "confirmed",
+      "csrf",
+      "position_id",
+      "q",
+      "reason",
+      "release_order_date",
+      "release_order_number",
+      "revision",
+      "transfer_release_order_date",
+      "transfer_release_order_number",
+      "version_id",
+      "viewport"
+    ],
+    "data": [
+      "data-annul-reason",
+      "data-annulled-group",
+      "data-assignment-id",
+      "data-audit-content",
+      "data-bs-dismiss",
+      "data-history-add",
+      "data-history-annul",
+      "data-history-audit",
+      "data-history-edit",
+      "data-history-editor",
+      "data-history-position",
+      "data-history-restore",
+      "data-history-state-description",
+      "data-history-version",
+      "data-legacy-future",
+      "data-position-id",
+      "data-position-label",
+      "data-transfer-back",
+      "data-transfer-confirm",
+      "data-transfer-error",
+      "data-transfer-message",
+      "data-transfer-orders"
+    ],
+    "scripts": [
+      "/static/js/person_picker.js",
+      "/static/js/profile_dates.js",
+      "/static/js/staff_history.js",
+      "/static/js/staff_history_forms.js"
+    ]
+  },
+  "person_name_cases.html": {
+    "id": [],
+    "name": [
+      "csrf"
+    ],
+    "data": [
+      "data-error-fields",
+      "data-fixed-sex",
+      "data-name-case-form"
+    ],
+    "scripts": [
+      "/static/js/name_cases.js"
+    ]
+  },
+  "persons.html": {
+    "id": [
+      "persons"
+    ],
+    "name": [
+      "direction",
+      "sort_by",
+      "viewport"
+    ],
+    "data": [
+      "data-bs-toggle",
+      "data-column-empty",
+      "data-column-hide",
+      "data-column-key",
+      "data-column-select",
+      "data-column-table",
+      "data-column-value",
+      "data-row-key"
+    ],
+    "scripts": [
+      "/static/js/{{ script }}.js"
+    ]
+  },
+  "person_created.html": {
+    "id": [],
+    "name": [],
+    "data": [],
+    "scripts": []
+  },
+  "person/person_view.html": {
+    "id": [],
+    "name": [],
+    "data": [],
+    "scripts": []
+  },
+  "components/staff_controls.html": {
+    "id": [
+      "staff-assignment-confirm",
+      "staff-confirm-title"
+    ],
+    "name": [],
+    "data": [
+      "data-assignment-confirm-message",
+      "data-assignment-confirm-yes",
+      "data-bs-dismiss"
+    ],
+    "scripts": []
+  },
+  "components/date_input.html": {
+    "id": [
+      "{{ input_id }}"
+    ],
+    "name": [
+      "{{ name }}"
+    ],
+    "data": [
+      "data-date-input",
+      "data-date-part",
+      "data-date-policy"
+    ],
+    "scripts": []
+  },
+  "components/security_session.html": {
+    "id": [],
+    "name": [
+      "project2-csrf"
+    ],
+    "data": [],
+    "scripts": [
+      "/static/js/security_session.js"
+    ]
+  },
+  "components/staff_import.html": {
+    "id": [
+      "staff-import-modal",
+      "staff-import-title"
+    ],
+    "name": [
+      "csrf",
+      "current",
+      "file",
+      "name",
+      "structure_id",
+      "valid_from",
+      "valid_to"
+    ],
+    "data": [
+      "data-bs-dismiss",
+      "data-bs-target",
+      "data-bs-toggle",
+      "data-current-version"
+    ],
+    "scripts": []
+  },
+  "components/journal_header.html": {
+    "id": [],
+    "name": [],
+    "data": [
+      "data-bs-auto-close",
+      "data-bs-toggle",
+      "data-column-key",
+      "data-journal-count",
+      "data-journal-extra",
+      "data-journal-filter-key",
+      "data-journal-select-column",
+      "data-journal-sort",
+      "data-journal-sort-command",
+      "data-sort-direction"
+    ],
+    "scripts": []
+  },
+  "components/table_copy.html": {
+    "id": [],
+    "name": [
+      "{{ table_id }}-copy-format"
+    ],
+    "data": [
+      "data-copy-format",
+      "data-copy-status",
+      "data-selection-clear",
+      "data-selection-mode",
+      "data-table-copy"
+    ],
+    "scripts": []
+  },
+  "components/event_icons.html": {
+    "id": [
+      "event-icon-alert",
+      "event-icon-calendar",
+      "event-icon-case",
+      "event-icon-check",
+      "event-icon-clock",
+      "event-icon-dash",
+      "event-icon-medical",
+      "event-icon-person",
+      "event-icon-plane"
+    ],
+    "name": [],
+    "data": [],
+    "scripts": []
+  },
+  "components/event_badge.html": {
+    "id": [],
+    "name": [],
+    "data": [
+      "data-column-value"
+    ],
+    "scripts": []
+  },
+  "components/assignment_audit.html": {
+    "id": [],
+    "name": [],
+    "data": [],
+    "scripts": []
+  },
+  "components/value_filter.html": {
+    "id": [],
+    "name": [],
+    "data": [],
+    "scripts": []
+  },
+  "components/assignment_operations.html": {
+    "id": [],
+    "name": [
+      "assignment_order_date",
+      "assignment_order_number",
+      "confirmed",
+      "csrf",
+      "is_active",
+      "note",
+      "on",
+      "reason",
+      "release_effective",
+      "release_order_date",
+      "release_order_number",
+      "revision",
+      "transfer_release_order_date",
+      "transfer_release_order_number",
+      "{{ key }}",
+      "{{ prefix }}_order_date",
+      "{{ prefix }}_order_number",
+      "{{ prefix }}_{{ part }}"
+    ],
+    "data": [
+      "data-assignment-release",
+      "data-mirage-convert",
+      "data-personnel-form"
+    ],
+    "scripts": []
+  },
+  "components/person_picker.html": {
+    "id": [],
+    "name": [
+      "person_id",
+      "{{ item.label }}"
+    ],
+    "data": [
+      "data-bs-auto-close",
+      "data-bs-toggle",
+      "data-person-label",
+      "data-person-name",
+      "data-person-no-results",
+      "data-person-option",
+      "data-person-picker",
+      "data-person-position",
+      "data-person-search",
+      "data-person-value"
+    ],
+    "scripts": []
+  },
+  "components/column_visibility.html": {
+    "id": [
+      "{{ config.id }}-columns-error",
+      "{{ config.id }}-columns-toggle",
+      "{{ config.id }}-preset-delete",
+      "{{ config.id }}-preset-delete-title",
+      "{{ config.id }}-preset-edit-name",
+      "{{ config.id }}-preset-editor",
+      "{{ config.id }}-preset-editor-title",
+      "{{ config.id }}-preset-name",
+      "{{ config.id }}-preset-save",
+      "{{ config.id }}-preset-save-title",
+      "{{ prefix }}-column-choice-{{ column.key }}",
+      "{{ prefix }}-group-choice-{{ group.key }}",
+      "{{ prefix }}-group-{{ group.key }}"
+    ],
+    "name": [],
+    "data": [
+      "data-bs-auto-close",
+      "data-bs-dismiss",
+      "data-bs-toggle",
+      "data-cell-fill",
+      "data-column-all",
+      "data-column-apply",
+      "data-column-chevron",
+      "data-column-children",
+      "data-column-choice",
+      "data-column-choice-row",
+      "data-column-config",
+      "data-column-error",
+      "data-column-expand",
+      "data-column-filters",
+      "data-column-font",
+      "data-column-font-reset",
+      "data-column-group",
+      "data-column-group-choice",
+      "data-column-picker",
+      "data-column-reset",
+      "data-column-storage-error",
+      "data-column-toggle",
+      "data-font-column",
+      "data-preset-back",
+      "data-preset-conflict",
+      "data-preset-create",
+      "data-preset-delete",
+      "data-preset-delete-cancel",
+      "data-preset-delete-confirm",
+      "data-preset-delete-error",
+      "data-preset-delete-message",
+      "data-preset-delete-modal",
+      "data-preset-editor-error",
+      "data-preset-editor-form",
+      "data-preset-editor-modal",
+      "data-preset-editor-name",
+      "data-preset-editor-save",
+      "data-preset-editor-tree",
+      "data-preset-editor-warning",
+      "data-preset-list",
+      "data-preset-name",
+      "data-preset-notice",
+      "data-preset-overwrite",
+      "data-preset-save-actions",
+      "data-preset-save-error",
+      "data-preset-save-form",
+      "data-preset-save-modal",
+      "data-preset-selected",
+      "data-row-height",
+      "data-row-height-custom",
+      "data-table-back",
+      "data-table-font",
+      "data-table-format",
+      "data-table-forward",
+      "data-table-scale",
+      "data-visibility-dropdown",
+      "data-visibility-tree"
+    ],
+    "scripts": []
+  },
+  "components/date_filter.html": {
+    "id": [
+      "{{ table_id }}"
+    ],
+    "name": [],
+    "data": [
+      "data-bs-auto-close",
+      "data-bs-toggle",
+      "data-column-hide",
+      "data-column-select",
+      "data-column-value",
+      "data-date-apply",
+      "data-date-boundary",
+      "data-date-cancel",
+      "data-date-choices",
+      "data-date-clear",
+      "data-date-column-key",
+      "data-date-error",
+      "data-date-field",
+      "data-date-incomplete",
+      "data-date-menu",
+      "data-date-mode",
+      "data-date-options",
+      "data-date-parts",
+      "data-date-priority",
+      "data-date-priority-list",
+      "data-date-range",
+      "data-date-search",
+      "data-date-sort",
+      "data-date-state",
+      "data-date-table-id"
+    ],
+    "scripts": []
+  },
+  "components/name_case_fields.html": {
+    "id": [
+      "{{ kind }}",
+      "{{ kind }}_verified",
+      "{{ kind }}_{{ case }}"
+    ],
+    "name": [
+      "{{ kind }}",
+      "{{ kind }}_bound_base",
+      "{{ kind }}_bound_sex",
+      "{{ kind }}_verified",
+      "{{ kind }}_{{ case }}"
+    ],
+    "data": [
+      "data-base-word",
+      "data-bound-base",
+      "data-bound-sex",
+      "data-case",
+      "data-case-status",
+      "data-case-verified",
+      "data-clear-cases",
+      "data-keep-cases",
+      "data-name-part",
+      "data-stale-actions",
+      "data-use-dictionary"
+    ],
+    "scripts": []
+  },
+  "components/app_navigation.html": {
+    "id": [],
+    "name": [
+      "csrf"
+    ],
+    "data": [
+      "data-personal-logout"
+    ],
+    "scripts": []
+  },
+  "components/geography_type.html": {
+    "id": [
+      "{{ block }}-{{ key }}",
+      "{{ block }}-{{ key }}-hint",
+      "{{ block }}-{{ key }}-options"
+    ],
+    "name": [
+      "{{ key }}"
+    ],
+    "data": [],
+    "scripts": []
+  },
+  "components/person_events.html": {
+    "id": [
+      "event-editor-title",
+      "person-events-modal",
+      "person-events-title"
+    ],
+    "name": [
+      "completion_confirmed",
+      "date_end",
+      "date_start",
+      "duration",
+      "event_status",
+      "event_subtype_id",
+      "event_type_id",
+      "expected_state",
+      "location",
+      "note",
+      "order_date",
+      "order_number",
+      "planned_duration",
+      "planned_end",
+      "purpose",
+      "reason"
+    ],
+    "data": [
+      "data-bs-dismiss",
+      "data-event-annul-confirm",
+      "data-event-annul-description",
+      "data-event-annul-error",
+      "data-event-annul-form",
+      "data-event-annul-no",
+      "data-event-cancel",
+      "data-event-editor",
+      "data-event-editor-title",
+      "data-event-form",
+      "data-event-new",
+      "data-event-type-confirm",
+      "data-event-type-confirm-text",
+      "data-event-type-no",
+      "data-event-type-yes",
+      "data-events-conflicts",
+      "data-events-list",
+      "data-events-message",
+      "data-events-person",
+      "data-events-reload"
+    ],
+    "scripts": []
+  },
+  "admin/login.html": {
+    "id": [
+      "token"
+    ],
+    "name": [
+      "csrf",
+      "token"
+    ],
+    "data": [],
+    "scripts": []
+  },
+  "admin/index.html": {
+    "id": [
+      "file",
+      "mode"
+    ],
+    "name": [
+      "csrf",
+      "file",
+      "mode"
+    ],
+    "data": [],
+    "scripts": []
+  },
+  "admin/organization.html": {
+    "id": [],
+    "name": [
+      "confirmed",
+      "dissolved_on",
+      "effective_from",
+      "formed_on",
+      "kind",
+      "name",
+      "note",
+      "on",
+      "parent_id",
+      "reason",
+      "revision",
+      "unit_id",
+      "valid_from",
+      "valid_to",
+      "viewport"
+    ],
+    "data": [
+      "data-org-collapse",
+      "data-org-create-child",
+      "data-org-create-panel",
+      "data-org-create-parent",
+      "data-org-data",
+      "data-org-empty",
+      "data-org-error",
+      "data-org-expand",
+      "data-org-form",
+      "data-org-history",
+      "data-org-message",
+      "data-org-parent-options",
+      "data-org-roster",
+      "data-org-roster-panel",
+      "data-org-select-hint",
+      "data-org-selected",
+      "data-org-staff-link",
+      "data-org-status",
+      "data-org-title",
+      "data-org-tree",
+      "data-org-unit-id",
+      "data-organization",
+      "data-required-parent",
+      "data-selected-unit"
+    ],
+    "scripts": [
+      "/static/js/organization.js",
+      "/static/js/profile_dates.js"
+    ]
+  },
+  "admin/backups.html": {
+    "id": [],
+    "name": [
+      "viewport"
+    ],
+    "data": [
+      "data-backup-create",
+      "data-backup-drill",
+      "data-backup-events",
+      "data-backup-external",
+      "data-backup-failure",
+      "data-backup-jobs",
+      "data-backup-last",
+      "data-backup-list",
+      "data-backup-message",
+      "data-backup-next",
+      "data-backup-panel",
+      "data-backup-refresh",
+      "data-backup-state",
+      "data-backup-warning"
+    ],
+    "scripts": [
+      "/static/js/backups.js"
+    ]
+  },
+  "admin/organization_staff.html": {
+    "id": [
+      "{{ c.id }}"
+    ],
+    "name": [
+      "confirm_removal",
+      "confirmed",
+      "end",
+      "file",
+      "mode",
+      "name",
+      "on",
+      "reason",
+      "receipt_id",
+      "scope_id",
+      "structure_id",
+      "unit_id",
+      "version_id",
+      "viewport"
+    ],
+    "data": [
+      "data-close-coverage",
+      "data-id",
+      "data-map-list",
+      "data-map-panel",
+      "data-map-positions",
+      "data-map-structure",
+      "data-mapping-version",
+      "data-org-staff",
+      "data-preview-dependencies",
+      "data-preview-notes",
+      "data-preview-panel",
+      "data-preview-rows",
+      "data-preview-summary",
+      "data-reassignment-list",
+      "data-receipt-list",
+      "data-removal-list",
+      "data-revision",
+      "data-staff-confirm",
+      "data-staff-data",
+      "data-staff-error",
+      "data-staff-message",
+      "data-staff-on",
+      "data-staff-preview",
+      "data-withdraw"
+    ],
+    "scripts": [
+      "/static/js/organization_staff.js",
+      "/static/js/profile_dates.js"
+    ]
+  },
+  "admin/access.html": {
+    "id": [],
+    "name": [
+      "action",
+      "category",
+      "confirmed",
+      "copy",
+      "effect",
+      "ends_at",
+      "id",
+      "is_active",
+      "name",
+      "person_id",
+      "position_id",
+      "reason",
+      "starts_at",
+      "template_id",
+      "unit_id",
+      "viewport"
+    ],
+    "data": [
+      "data-access-admin",
+      "data-access-collapse",
+      "data-access-delegate",
+      "data-access-error",
+      "data-access-expand",
+      "data-access-explain",
+      "data-access-explanation",
+      "data-access-link",
+      "data-access-matrix",
+      "data-access-message",
+      "data-access-reviews",
+      "data-access-rule",
+      "data-access-rule-list",
+      "data-access-save",
+      "data-access-search",
+      "data-access-sources",
+      "data-access-state",
+      "data-access-user",
+      "data-action",
+      "data-category",
+      "data-delegate-caps",
+      "data-load-proposal",
+      "data-policy-caps",
+      "data-policy-position",
+      "data-position-policy",
+      "data-protected-role",
+      "data-template-assign",
+      "data-template-caps",
+      "data-template-editor",
+      "data-temporary-access",
+      "data-temporary-caps",
+      "data-temporary-position"
+    ],
+    "scripts": [
+      "/static/js/access_matrix.js"
+    ]
+  },
+  "admin/tcc_preview.html": {
+    "id": [],
+    "name": [
+      "confirm_updates",
+      "csrf",
+      "reviewed",
+      "token"
+    ],
+    "data": [
+      "data-count"
+    ],
+    "scripts": []
+  },
+  "admin/user_detail.html": {
+    "id": [],
+    "name": [
+      "active",
+      "confirm_password",
+      "confirmed",
+      "csrf",
+      "display_name",
+      "password",
+      "reason",
+      "revision",
+      "role",
+      "viewport"
+    ],
+    "data": [
+      "data-account-error",
+      "data-account-form",
+      "data-mfa-error",
+      "data-mfa-reset",
+      "data-target"
+    ],
+    "scripts": [
+      "/static/js/account_management.js",
+      "/static/js/security_mfa.js"
+    ]
+  },
+  "admin/users.html": {
+    "id": [
+      "{{ account.id }}"
+    ],
+    "name": [
+      "q",
+      "viewport"
+    ],
+    "data": [
+      "data-account-id"
+    ],
+    "scripts": []
+  },
+  "admin/account_audit.html": {
+    "id": [],
+    "name": [
+      "viewport"
+    ],
+    "data": [
+      "data-account-audit"
+    ],
+    "scripts": []
+  },
+  "admin/dictionary_form.html": {
+    "id": [
+      "base_form",
+      "is_verified",
+      "kind",
+      "sex",
+      "{{ case }}"
+    ],
+    "name": [
+      "base_form",
+      "csrf",
+      "is_verified",
+      "kind",
+      "revision",
+      "sex",
+      "{{ case }}"
+    ],
+    "data": [],
+    "scripts": []
+  },
+  "admin/dictionaries.html": {
+    "id": [],
+    "name": [
+      "kind",
+      "q"
+    ],
+    "data": [],
+    "scripts": []
+  },
+  "admin/tcc_form.html": {
+    "id": [
+      "parent",
+      "type",
+      "{{ field }}"
+    ],
+    "name": [
+      "csrf",
+      "is_active",
+      "parent_tcc_id",
+      "revision",
+      "type",
+      "{{ field }}"
+    ],
+    "data": [],
+    "scripts": []
+  },
+  "admin/staff.html": {
+    "id": [],
+    "name": [
+      "code",
+      "confirmed",
+      "csrf",
+      "name",
+      "revision",
+      "structure_id",
+      "valid_from",
+      "valid_to",
+      "version_id",
+      "{{ field.key }}"
+    ],
+    "data": [],
+    "scripts": [
+      "/static/js/staff_history_forms.js",
+      "/static/js/staff_import.js"
+    ]
+  },
+  "admin/error.html": {
+    "id": [],
+    "name": [],
+    "data": [],
+    "scripts": []
+  },
+  "admin/import_preview.html": {
+    "id": [
+      "confirm_updates",
+      "reviewed"
+    ],
+    "name": [
+      "confirm_updates",
+      "csrf",
+      "reviewed",
+      "token"
+    ],
+    "data": [
+      "data-count",
+      "data-import-counts"
+    ],
+    "scripts": []
+  },
+  "admin/tcc.html": {
+    "id": [
+      "q",
+      "tcc-file",
+      "tcc-mode"
+    ],
+    "name": [
+      "csrf",
+      "file",
+      "mode",
+      "q"
+    ],
+    "data": [],
+    "scripts": []
+  },
+  "admin/user_new.html": {
+    "id": [],
+    "name": [
+      "confirm_password",
+      "csrf",
+      "display_name",
+      "password",
+      "role",
+      "username",
+      "viewport"
+    ],
+    "data": [
+      "data-account-error",
+      "data-account-form"
+    ],
+    "scripts": [
+      "/static/js/account_management.js"
+    ]
+  },
+  "person/components/profile_header.html": {
+    "id": [],
+    "name": [],
+    "data": [],
+    "scripts": []
+  },
+  "person/components/contacts.html": {
+    "id": [
+      "contact-new-{{ kind }}",
+      "{{ record.id }}"
+    ],
+    "name": [
+      "action",
+      "contact_type",
+      "csrf",
+      "is_primary",
+      "revision",
+      "{{ field }}"
+    ],
+    "data": [
+      "data-contact-card",
+      "data-contact-clear",
+      "data-contact-form",
+      "data-contact-id",
+      "data-contact-message",
+      "data-contact-new",
+      "data-copy-contact",
+      "data-error-for",
+      "data-profile-record-new",
+      "data-profile-record-open"
+    ],
+    "scripts": []
+  },
+  "person/components/additional_records.html": {
+    "id": [
+      "{{ person_id }}"
+    ],
+    "name": [],
+    "data": [
+      "data-additional-audit",
+      "data-additional-auth",
+      "data-additional-cancel",
+      "data-additional-content",
+      "data-additional-editor",
+      "data-additional-fields",
+      "data-additional-form",
+      "data-additional-list",
+      "data-additional-message",
+      "data-additional-new",
+      "data-additional-panel",
+      "data-additional-reload",
+      "data-person-id"
+    ],
+    "scripts": []
+  },
+  "person/components/documents.html": {
+    "id": [
+      "document-archive-title",
+      "{{ person_id }}"
+    ],
+    "name": [
+      "type"
+    ],
+    "data": [
+      "data-bs-dismiss",
+      "data-discard-confirm",
+      "data-document-archive",
+      "data-document-archive-list",
+      "data-document-audit",
+      "data-document-auth",
+      "data-document-cancel",
+      "data-document-categories",
+      "data-document-content",
+      "data-document-current-list",
+      "data-document-discard-modal",
+      "data-document-draft-files",
+      "data-document-editor",
+      "data-document-editor-title",
+      "data-document-fields",
+      "data-document-form",
+      "data-document-history",
+      "data-document-list",
+      "data-document-message",
+      "data-document-new",
+      "data-document-panel",
+      "data-document-queue",
+      "data-document-reload",
+      "data-document-replacement",
+      "data-document-type",
+      "data-document-viewer",
+      "data-driving-add",
+      "data-driving-rows",
+      "data-person-id",
+      "data-view-next",
+      "data-view-prev",
+      "data-view-title",
+      "data-view-zoom"
+    ],
+    "scripts": []
+  },
+  "person/components/profile_overview.html": {
+    "id": [],
+    "name": [],
+    "data": [
+      "data-profile-block",
+      "data-profile-tab"
+    ],
+    "scripts": []
+  },
+  "person/components/rank_history.html": {
+    "id": [
+      "deleteRankRecordLabel",
+      "deleteRankRecord{{ person_rank.person_rank_id }}",
+      "editRankModal{{ person_rank.person_rank_id }}",
+      "rank_id",
+      "rank_order_number"
+    ],
+    "name": [
+      "confirmation",
+      "csrf",
+      "rank_id",
+      "rank_order_number"
+    ],
+    "data": [
+      "data-bs-dismiss",
+      "data-bs-target",
+      "data-bs-toggle",
+      "data-profile-history-form"
+    ],
+    "scripts": []
+  },
+  "person/components/medical.html": {
+    "id": [
+      "{{ person_id }}"
+    ],
+    "name": [
+      "basis_document_id",
+      "password",
+      "username",
+      "{{ key }}"
+    ],
+    "data": [
+      "data-active-exam",
+      "data-dev-auth-warning",
+      "data-exam-auto",
+      "data-injury-choice",
+      "data-medical-audit",
+      "data-medical-auth",
+      "data-medical-cancel",
+      "data-medical-content",
+      "data-medical-editor",
+      "data-medical-field",
+      "data-medical-form",
+      "data-medical-list",
+      "data-medical-login",
+      "data-medical-message",
+      "data-medical-new",
+      "data-medical-panel",
+      "data-pending-exams",
+      "data-person-id",
+      "data-task-history"
+    ],
+    "scripts": []
+  },
+  "person/components/service_bases.html": {
+    "id": [
+      "basis-editor-{{ record.id }}",
+      "basis-new-editor",
+      "tcc-regions",
+      "tcc-settlements",
+      "{{ prefix }}-document",
+      "{{ prefix }}-mobilization",
+      "{{ prefix }}-number",
+      "{{ prefix }}-region",
+      "{{ prefix }}-search",
+      "{{ prefix }}-settlement",
+      "{{ prefix }}-type",
+      "{{ prefix }}-unit",
+      "{{ prefix }}-{{ field }}"
+    ],
+    "name": [
+      "contract_unit",
+      "csrf",
+      "document_tcc_name",
+      "document_verified",
+      "enlistment_order_number",
+      "is_current",
+      "mobilization_date",
+      "region",
+      "revision",
+      "service_type",
+      "settlement",
+      "tcc_office_id",
+      "{{ field }}"
+    ],
+    "data": [
+      "data-basis-fields",
+      "data-new-basis",
+      "data-personnel-form",
+      "data-profile-record-new",
+      "data-profile-record-open",
+      "data-service-basis",
+      "data-service-basis-form",
+      "data-tcc-hint",
+      "data-tcc-query",
+      "data-tcc-search"
+    ],
+    "scripts": []
+  },
+  "person/components/profile_photo.html": {
+    "id": [],
+    "name": [],
+    "data": [],
+    "scripts": []
+  },
+  "person/components/modal_windows.html": {
+    "id": [
+      "addNewName",
+      "addNewNameLabel",
+      "addNewRank",
+      "addNewRankLabel",
+      "name",
+      "name_latin",
+      "patronymic",
+      "patronymic_latin",
+      "rank_id",
+      "rank_order_number",
+      "surname",
+      "surname_latin"
+    ],
+    "name": [
+      "csrf",
+      "name",
+      "name_latin",
+      "patronymic",
+      "patronymic_latin",
+      "rank_id",
+      "rank_order_number",
+      "surname",
+      "surname_latin"
+    ],
+    "data": [
+      "data-bs-dismiss",
+      "data-profile-history-form"
+    ],
+    "scripts": []
+  },
+  "person/components/service_chronology.html": {
+    "id": [
+      "service-history-new-editor"
+    ],
+    "name": [
+      "assigned_from",
+      "assigned_to",
+      "csrf",
+      "person_id",
+      "position_id",
+      "revision"
+    ],
+    "data": [
+      "data-personnel-form",
+      "data-profile-record-new",
+      "data-profile-record-open",
+      "data-service-history-card"
+    ],
+    "scripts": []
+  },
+  "person/components/names_history.html": {
+    "id": [
+      "deleteNameRecordLabel",
+      "deleteNameRecord{{names.person_name_id}}",
+      "editNameModal{{names.person_name_id}}",
+      "name",
+      "name_latin",
+      "patronymic",
+      "patronymic_latin",
+      "surname",
+      "surname_latin"
+    ],
+    "name": [
+      "confirmation",
+      "csrf",
+      "name",
+      "name_latin",
+      "patronymic",
+      "patronymic_latin",
+      "surname",
+      "surname_latin"
+    ],
+    "data": [
+      "data-bs-dismiss",
+      "data-bs-target",
+      "data-bs-toggle",
+      "data-profile-history-form"
+    ],
+    "scripts": []
+  },
+  "person/components/access_overview.html": {
+    "id": [],
+    "name": [],
+    "data": [],
+    "scripts": []
+  },
+  "person/components/full_info_top_navigation.html": {
+    "id": [],
+    "name": [],
+    "data": [],
+    "scripts": []
+  },
+  "person/components/geography.html": {
+    "id": [
+      "{{ block }}-{{ key }}"
+    ],
+    "name": [
+      "csrf",
+      "record_id",
+      "revision",
+      "street_id",
+      "{{ key }}",
+      "{{ key }}_id"
+    ],
+    "data": [
+      "data-block",
+      "data-copy-registration",
+      "data-geo-block",
+      "data-geo-clear-form",
+      "data-geo-empty-message",
+      "data-geo-form",
+      "data-geo-history",
+      "data-geo-kind",
+      "data-geo-meaningful",
+      "data-geo-results",
+      "data-geo-summary",
+      "data-geo-warning"
+    ],
+    "scripts": []
+  }
+}

@@ -1,0 +1,9 @@
+{% extends 'layouts/base.html' %}
+{% from 'components/ui.html' import page_header,breadcrumbs %}
+{% block title %}Документація API{% endblock %}
+{% block head %}{% if api_kind=='swagger' %}<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">{% endif %}{% endblock %}
+{% block content %}{{ breadcrumbs([('/admin','Адміністрування'),(none,'Документація API')]) }}
+{{ page_header('Документація API','Технічний інтерфейс · чинна персональна сесія та серверні перевірки доступу') }}
+<div class="ui-api-docs" data-api-kind="{{ api_kind }}"><div id="{{ 'swagger-ui' if api_kind=='swagger' else 'redoc' }}"></div></div>
+{% if api_kind=='swagger' %}<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>{% else %}<script src="https://cdn.jsdelivr.net/npm/redoc@2/bundles/redoc.standalone.js"></script>{% endif %}
+<script src="/static/js/api_docs.js"></script>{% endblock %}

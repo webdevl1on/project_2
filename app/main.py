@@ -65,18 +65,14 @@ def protected_openapi():
 
 @app.get('/docs', include_in_schema=False)
 def protected_docs(request: Request):
-    from fastapi.openapi.docs import get_swagger_ui_html
-    from fastapi.responses import HTMLResponse
-    from html import escape
-    html=get_swagger_ui_html(openapi_url='/openapi.json',title='project_2 API').body.decode()
-    extra=f'<meta name="project2-csrf" content="{escape(request.state.csrf_token)}"><script src="/static/js/security_session.js"></script>'
-    return HTMLResponse(html.replace('</head>',extra+'</head>'))
+    from app.templating import templates
+    return templates.TemplateResponse(request=request,name='api_docs.html',context={'api_kind':'swagger'})
 
 
 @app.get('/redoc', include_in_schema=False)
-def protected_redoc():
-    from fastapi.openapi.docs import get_redoc_html
-    return get_redoc_html(openapi_url='/openapi.json',title='project_2 API')
+def protected_redoc(request: Request):
+    from app.templating import templates
+    return templates.TemplateResponse(request=request,name='api_docs.html',context={'api_kind':'redoc'})
 
 from app.routers import account_management
 app.include_router(account_management.router)

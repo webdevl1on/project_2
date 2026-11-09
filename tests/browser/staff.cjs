@@ -55,7 +55,7 @@ module.exports=async({context,base,adminToken})=>{
             assert.equal(await row(10).locator('[data-person-value]').inputValue(),'3');
         });
         await scenario('history shows retained source and explicit atomic version closure',async()=>{
-            await page.getByRole('link',{name:'Історія штату',exact:true}).click();
+            await page.getByRole('button',{name:'Відкрити головне меню',exact:true}).click();await page.locator('#app-sidebar.show').waitFor();await page.getByRole('link',{name:'Історія штату',exact:true}).click();
             assert.ok((await page.locator('body').innerText()).includes('Історичні призначення'));
             assert.equal(await page.locator('[data-history-edit]').count(),4);
             await context.request.post(base+'/auth/login',{data:{username:'browser-admin',password:adminToken}});await page.goto(base+'/admin/staff');

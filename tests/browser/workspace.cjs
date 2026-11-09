@@ -13,7 +13,7 @@ module.exports=async({context,base})=>{
  try{
   await visit('/person-positions');await page.evaluate(()=>localStorage.clear());await page.reload();
   await scenario('shared active navigation, compact default rows and genuine profile links',async()=>{
-   assert.equal(await page.locator('.app-navigation [aria-current="page"]').innerText(),'Штатка');
+   await page.getByRole('button',{name:'Відкрити головне меню',exact:true}).click();await page.locator('#app-sidebar.show').waitFor();assert.equal(await page.locator('.app-navigation [aria-current="page"]').innerText(),'Штатка');await page.keyboard.press('Escape');await page.locator('#app-sidebar.show').waitFor({state:'hidden'});
    assert.equal(await row(10).locator('[data-assignment-editor]').isHidden(),true);
    assert.equal(await row(10).locator('[data-column-key="row_number"] a').getAttribute('href'),'/person_full_info/1');
    assert.equal(await row(30).locator('[data-column-key="row_number"] a').count(),0);
@@ -110,7 +110,7 @@ module.exports=async({context,base})=>{
    assert.equal(await row(10).locator('[data-column-key="name_short"]').getAttribute('data-user-fill'),null);
   });
   await scenario('people reuse presets, drag, widths, selection and independent appearance state',async()=>{
-   await visit('/persons');assert.equal(await page.locator('.app-navigation [aria-current="page"]').innerText(),'Люди');
+   await visit('/persons');await page.getByRole('button',{name:'Відкрити головне меню',exact:true}).click();await page.locator('#app-sidebar.show').waitFor();assert.equal(await page.locator('.app-navigation [aria-current="page"]').innerText(),'Особовий склад');await page.keyboard.press('Escape');await page.locator('#app-sidebar.show').waitFor({state:'hidden'});
    assert.equal(await table().locator('th:visible').count(),7);assert.equal(await table().locator('tbody tr').first().evaluate(n=>n.getBoundingClientRect().height),40);
    await table().locator('thead th[data-column-key="name"]').dragTo(table().locator('thead th[data-column-key="surname"]'),{sourcePosition:{x:12,y:10},targetPosition:{x:12,y:10}});
    assert.deepEqual((await table().locator('thead th:visible').evaluateAll(nodes=>nodes.map(n=>n.dataset.columnKey))).slice(0,3),['person_id','name','surname']);

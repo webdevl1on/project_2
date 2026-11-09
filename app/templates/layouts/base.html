@@ -1,0 +1,28 @@
+<!doctype html>
+{% from 'components/ui.html' import breadcrumbs as ui_breadcrumbs %}
+<html lang="uk" data-theme="light" data-bs-theme="light"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}PROJECT 2{% endblock %}</title>
+<script src="/static/js/theme_manager.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+<link href="/static/css/design_tokens.css" rel="stylesheet"><link href="/static/css/themes.css" rel="stylesheet">
+{% block head %}{% endblock %}
+<link href="/static/css/app_layout.css" rel="stylesheet"><link href="/static/css/ui_components.css" rel="stylesheet"><link href="/static/css/ui_layout.css" rel="stylesheet">
+{% include 'components/security_session.html' %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js" integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous"></script>
+<script src="/static/js/navigation.js" defer></script>
+</head><body class="ui-shell {% block body_class %}{% endblock %}">
+<a href="#app-workspace" class="ui-skip-link">До вмісту сторінки</a>
+{% set ui_page_title=self.title() %}
+{% block navigation %}{% include 'components/app_navigation.html' %}{% endblock %}
+<div id="app-workspace" class="ui-workspace {% block workspace_class %}{% endblock %}" role="{% block workspace_role %}main{% endblock %}" tabindex="-1">
+{% block breadcrumbs %}
+{% set ui_path=request.url.path if request is defined else '' %}
+{% if security_user is defined and security_user %}
+{% if security_user.role in ['master','admin'] and ui_path.startswith('/admin/') %}{{ ui_breadcrumbs([('/admin','Адміністрування'),(none,self.title())]) }}
+{% elif ui_path.startswith('/persons/') %}{{ ui_breadcrumbs([('/persons','Особовий склад'),(none,self.title())]) }}
+{% elif ui_path.startswith('/account/') and ui_path!='/account/security' %}{{ ui_breadcrumbs([('/account/security','Безпека облікового запису'),(none,self.title())]) }}
+{% elif ui_path=='/staff/history' %}{{ ui_breadcrumbs([('/person-positions','Штатка'),(none,self.title())]) }}{% endif %}
+{% endif %}{% endblock %}{% block page_header %}{% endblock %}{% block content %}{% endblock %}
+</div>{% block panels %}{% endblock %}<script src="/static/js/record_panels.js"></script>{% block scripts %}{% endblock %}
+</body></html>

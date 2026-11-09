@@ -20,7 +20,7 @@
 
 
         {% for person_rank in person.ranks %}
-        <tr {% if person_rank.is_active %} style="border: rgb(10, 50, 184) solid;" {% endif %}>
+        <tr {% if person_rank.is_active %} style="border: var(--color-focus) solid;" {% endif %}>
             <td>{{loop.index}}</td>
             <td>{{ person_rank.rank.nominative }}</td>
             <td>{{ person_rank.rank_order_number }}</td>

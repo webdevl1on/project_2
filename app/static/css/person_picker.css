@@ -7,6 +7,6 @@
 .person-assignment-form [data-assignment-status] { width: 100%; }
 
 .staff-history-form [aria-invalid="true"] {
-    outline: 2px solid var(--bs-danger, #dc3545);
+    outline: 2px solid var(--bs-danger, var(--color-danger));
     outline-offset: 2px;
 }

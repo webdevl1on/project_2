@@ -22,7 +22,7 @@ module.exports=async({context,base,adminToken})=>{
   await page.goto(base+'/auth/login?return_to='+encodeURIComponent('//evil.example'));await page.locator('[name=username]').fill('browser-viewer');await page.locator('[name=password]').fill(adminToken);await Promise.all([page.waitForURL('**/persons'),page.getByRole('button',{name:'Увійти',exact:true}).click()]);
   assert.equal((await context.request.get(base+'/admin')).status(),403);assert.equal((await context.request.post(base+'/staff/structures',{form:{code:'denied',name:'denied'}})).status(),403);
   console.log('PASS security: session expiry is visible; unsafe return is rejected and viewer cannot administer or write');
-  await page.locator('[data-personal-logout] button').click();await page.waitForURL('**/auth/login');assert.equal((await context.request.get(base+'/persons')).status(),401);
+  await page.getByRole('button',{name:'Меню користувача та тема оформлення'}).click();await page.locator('[data-personal-logout] button').click();await page.waitForURL('**/auth/login');assert.equal((await context.request.get(base+'/persons')).status(),401);
   console.log('PASS security: logout revokes the personal session and denies protected reads');
   const native=await context.browser().newContext({javaScriptEnabled:false});
   try{

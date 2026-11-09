@@ -1,5 +1,35 @@
 # Поточний стан project_2
 
+## Поточне оновлення: єдина дизайн-система
+
+`feature/security`, початковий HEAD **cea24ab**, початкове дерево чисте. [UI_DESIGN_SYSTEM.md](UI_DESIGN_SYSTEM.md) описує компоненти, охоплення, теми, підключення нової сторінки та обмеження. Основні референси — `01_sidebar_open_closed.webp` і `02_three_themes_open_closed.webp`; прикладні дані й нереалізовані функції з макетів не додавалися.
+
+- **39 повних шаблонів** переведено на спільний Jinja layout, включно з двома legacy-шаблонами без активних обробників. Усі активні HTML-сторінки, вкладки й AJAX-фрагменти отримують спільні tokens/Bootstrap-компоненти. Технічні `/docs` і `/redoc` залишилися за своїми адресами з чинним захистом.
+- **Light / Dark / Military**, раннє застосування без очікування DOM, меню користувача, localStorage `project2:ui-theme`, синхронізація вкладок, безпечний fallback і замінюваний storage adapter. Нових налаштувань у БД/API немає.
+- Верхня панель, Bootstrap Offcanvas із backdrop/Escape/focus та дозволеними реальними переходами. Меню закрите за замовчуванням, накладається поверх вмісту й не змінює геометрію таблиць. Немає фіктивного глобального пошуку чи сповіщень.
+- Компактний огляд анкети, порядок/приховування/reset дозволених блоків (`project2:profile-layout:v1`), спільний список/перегляд оригінальних вузлів документів, медичних та додаткових записів; мобільне розгортання. Вкладка подій повної Admin-анкети повторно використовує чинний PersonEvents modal.
+- Табличні controllers, localStorage-контракти, presets/filters/resize/drag/copy/Undo/Redo/user fills, validators, Person Picker, файли, MFA/CSRF/сесії й серверні ACL повторно використані. Предметні моделі, сервіси, правила доступу, міграції та сховище не змінювалися. Python-зміни обмежені HTML-відповідями `/docs`/`/redoc` та навігаційним boolean на основі чинного ACL evaluator.
+
+Фактичні перевірки на синтетичних даних:
+
+| Перевірка | Результат |
+| --- | --- |
+| До змін: `.venv/bin/python -m pytest tests/ -q` | **1217 passed, 116 skipped**; PostgreSQL ще без URL. |
+| Повний `PROJECT2_TEST_DATABASE_URL=<власний project2_ci> .venv/bin/python -m pytest tests/ -q --tb=short` | **1338 passed**, 359,18 с, без skipped; включно зі 116 PostgreSQL-тестами та реальним backup/restore drill. |
+| Після фінальних змін шаблонів: UI, application security та ACL HTTP | **211 passed**; повтор підмножини повного набору. |
+| `node --test tests/js/*.test.cjs` | **61 passed**, без skipped. |
+| Chromium, нові `ui_design` та `ui_api` | **11 PASS**: три теми, контраст семантичних пар, 390/768/1280/1920 px, геометрія/focus меню, перезапуск браузера, анкета/чернетки/записи, вхід/MFA, справжні Swagger/ReDoc widgets зі збереженням пошуку. |
+| Повний `PYTHON=.venv/bin/python CHROMIUM_PATH=/usr/bin/chromium node tests/browser/column_visibility.cjs` | **214 PASS**, exit 0; включає нові UI suite, таблиці/історію/події/анкету/документи/медицину, керування акаунтами, ACL, TOTP і криптографічно перевірений Passkey через Chromium CTAP2 virtual authenticator. |
+| Окремі Chromium suite | Перевірено workspace, документи, workflow документів, додаткові записи, дати, штатні операції та security; це повторні перевірки, не додаткові унікальні Python-тести. |
+| Після останніх косметичних правок | **7 passed**: UI/template/табличні контракти; повтор `ui_api` — **2 PASS**. |
+| Python AST / Jinja / Node syntax / Alembic heads / diff check | Успішно: 293 Python-файли, 79 шаблонів, єдиний head **0009_access_control**. |
+
+Залишилися два попередні deprecation warnings Starlette/httpx та AnyIO. Старі числа нижче стосуються попередніх етапів.
+
+Заборонені ACL-категорії не передаються у HTML/JSON/storage й не з’являються в налаштуваннях огляду. Чинний сервер не має окремого реєстру дозволених назв прихованих полів: locked macro підготовлено, але заблоковані назви/картки без таких метаданих не вигадувалися. Нативні file/calendar/prompt/confirm/WebAuthn-діалоги оформлює браузер/ОС. Firefox/Safari, реальні сенсорні пристрої, системний high-contrast і production-обсяги не перевірені. Серверне збереження теми та майбутні модулі з ілюстрацій не реалізовувалися.
+
+Робота лише в `feature/security`, **85 створених/змінених файлів**; повний перелік — [UI_DESIGN_SYSTEM.md](UI_DESIGN_SYSTEM.md#змінені-файли). Власний disposable PostgreSQL-контейнер після перевірок зупинено. Робочі БД, ключі, архіви та дані не змінювалися; reset, робочі міграції, commit/push/merge не виконувалися. Alembic head залишається **0009_access_control**.
+
 ## Поточне оновлення: Security 1.5
 
 `feature/security`, початковий HEAD **ea7f6da**, початкове дерево чисте. Перевірено актуальний `origin/testing=00cf012`; `testing` не змінено. Додано [узгоджене зашифроване резервування та ізольоване відновлення](BACKUP_AND_RESTORE.md), повторно використано персональні сесії/MFA/CSRF/ролі, DocumentStorage, Settings/schema checker і maintenance lease. Нових залежностей, ORM-таблиць чи Alembic-ревізій немає: **0009_access_control**.

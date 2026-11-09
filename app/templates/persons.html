@@ -1,11 +1,12 @@
+{% extends 'layouts/base.html' %}
 {% from 'components/column_visibility.html' import column_visibility with context %}
 {% set columns=table_columns.groups|map(attribute='columns')|sum(start=[]) %}
-<!doctype html><html lang="uk"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Люди</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="/static/css/column_visibility.css" rel="stylesheet"><link href="/static/css/app_layout.css" rel="stylesheet">{% include 'components/security_session.html' %}</head>
-<body class="container-fluid table-page">
-{% include 'components/app_navigation.html' %}
-<div class="page-heading"><h1>Люди</h1><a class="btn btn-sm btn-primary" href="/persons/new">Додати людину</a></div>
+{% block title %}Люди{% endblock %}
+{% block head %}<link href="/static/css/column_visibility.css" rel="stylesheet">{% endblock %}
+{% block body_class %}table-page{% endblock %}
+{% from 'components/ui.html' import page_header %}
+{% block content %}
+{% call page_header('Люди','Особовий склад · актуальні відомості та облікові дані') %}<a class="btn btn-primary" href="/persons/new">Додати людину</a>{% endcall %}
 <form method="get" action="/persons" class="d-flex gap-2 flex-wrap mb-2" aria-label="Сортування людей">
 <label class="small">Сортування<select class="form-select form-select-sm" name="sort_by">{% for key,label in [('surname','Прізвище'),('name',"Ім’я"),('birth_year','Дата народження'),('rank','Звання'),('id','ID')] %}<option value="{{ key }}" {{ 'selected' if sort_by==key else '' }}>{{ label }}</option>{% endfor %}</select></label>
 <label class="small">Напрямок<select class="form-select form-select-sm" name="direction"><option value="asc" {{ 'selected' if direction=='asc' else '' }}>За зростанням</option><option value="desc" {{ 'selected' if direction=='desc' else '' }}>За спаданням</option></select></label>
@@ -22,6 +23,6 @@
 <tr data-row-key="person:{{ item.person.person_id }}">{% for column in columns %}<td data-column-key="{{ column.key }}" {% if not column.default_visible %}hidden{% endif %}><span data-column-value title="{{ values[column.key] }}">{% if column.key=='person_id' %}<a href="/person_full_info/{{ item.person.person_id }}">{{ values[column.key] }}</a>{% else %}{{ values[column.key] }}{% endif %}</span></td>{% endfor %}</tr>
 {% else %}<tr><td data-column-empty colspan="{{ columns|length }}">Поки що немає жодної людини.</td></tr>{% endfor %}
 </tbody></table></div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
 {% for script in ['table_state','column_tree','column_presets','column_interactions','table_filters','table_history','table_selection','table_appearance','column_visibility','table_workspace'] %}<script src="/static/js/{{ script }}.js"></script>{% endfor %}
-</body></html>
+{% endblock %}

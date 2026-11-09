@@ -11,8 +11,11 @@ def security_context(request):
         e=getattr(request.state,'access_evaluator',None)
         return bool(e and e.allowed(category,action,**scope))
     e=getattr(request.state,'access_evaluator',None)
+    user=getattr(request.state,'authenticated_user',None)
+    # Navigation metadata only: reuse the evaluator's existing read decision for real units.
+    org_visible=bool(user and (user.role=='admin' or e and (e.allowed('organization') or any(e.allowed('organization',unit_id=key) for key in e.states))))
     return {'acl_allow':allowed,'acl_manage':bool(e and e.can_manage_rules),'security_csrf':getattr(request.state,'csrf_token',''),
-            'security_user':getattr(request.state,'authenticated_user',None)}
+            'security_user':user,'ui_org_visible':org_visible}
 
 
 templates = Jinja2Templates(directory="app/templates", context_processors=[security_context])

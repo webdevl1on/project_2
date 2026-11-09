@@ -1,20 +1,9 @@
-<!DOCTYPE html>
-<html lang="uk">
-
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="/static/css/person_profile.css" rel="stylesheet">
-    <link href="/static/css/profile_records.css" rel="stylesheet">
-    <title>{{ current_name.surname }} {{ current_name.name }}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet"
-        integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
-<link href="/static/css/app_layout.css" rel="stylesheet">
-{% include 'components/security_session.html' %}</head>
-
-<body style="padding: 10px;">
-{% include "components/app_navigation.html" %}
-
-    {% include "person/components/full_info_top_navigation.html" %}
+{% extends 'layouts/base.html' %}
+{% block title %}{{ current_name.surname }} {{ current_name.name }}{% endblock %}
+{% block head %}<link href="/static/css/person_profile.css" rel="stylesheet">
+    <link href="/static/css/profile_records.css" rel="stylesheet">{% endblock %}
+{% block content %}
+{% include "person/components/full_info_top_navigation.html" %}
 
     {% if request.query_params.get("personnel_message") %}<p class="alert alert-success" role="status">{{ request.query_params.get("personnel_message") }}</p>{% endif %}
     {% include "person/components/profile_header.html" %}
@@ -36,13 +25,11 @@
     <div class="tab-pane fade" id="contacts" role="tabpanel" aria-labelledby="tab-contacts"><div id="person-contacts" data-url="/persons/{{ person_id }}/contacts">{% include 'person/components/contacts.html' %}</div></div>
     <div class="tab-pane fade" id="documents" role="tabpanel" aria-labelledby="tab-documents">{% include 'person/components/documents.html' %}</div>
     {% for additional_kind in ['education','family','directives'] %}<div class="tab-pane fade" id="{{ additional_kind }}" role="tabpanel" aria-labelledby="tab-{{ additional_kind }}">{% include 'person/components/additional_records.html' %}</div>{% endfor %}
-    <div class="tab-pane fade" id="events" role="tabpanel" aria-labelledby="tab-events">Розділ у розробці.</div>
+    <div class="tab-pane fade" id="events" role="tabpanel" aria-labelledby="tab-events"><button type="button" data-events-open data-person-id="{{ person_id }}" data-events-person-label="{{ current_name.surname if current_name else '' }} {{ current_name.name if current_name else '' }}" class="btn btn-primary">Події військовослужбовця</button></div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
-        integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI" crossorigin="anonymous">
-        </script>
 
-    <script src="/static/js/profile_ui.js"></script>
+
+    <script src="/static/js/profile_ui.js"></script><script src="/static/js/profile_layout.js"></script>
     <script src="/static/js/profile_dates.js"></script>
     <script src="/static/js/date_input.js"></script>
     <script src="/static/js/geography.js"></script>
@@ -50,10 +37,10 @@
     <script src="/static/js/contacts.js"></script>
     <script src="/static/js/personnel_forms.js"></script>
     <script src="/static/js/service_bases.js"></script>
+{% include 'components/person_events.html' %}
+<script src="/static/js/person_events.js"></script>
 <script id="medical-ui-metadata" type="application/json">{{ medical_metadata|tojson }}</script>
 <script src="/static/js/medical.js"></script>
 <script src="/static/js/document_ui.js"></script>
 <script src="/static/js/profile_records.js"></script>
-</body>
-
-</html>
+{% endblock %}
