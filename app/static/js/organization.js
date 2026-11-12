@@ -4,8 +4,8 @@
  const root=document.querySelector('[data-organization]');if(!root)return;
  let tree=JSON.parse(root.querySelector('[data-org-data]').textContent),selected=Number(root.dataset.selectedUnit)||null,dragged=null,selectionRequest=0,attachParentFor=null;
  const expanded=new Set(),forms=[...root.querySelectorAll('[data-org-form]')],message=root.querySelector('[data-org-message]');
- const names={unit:'Військова частина',regiment:'Полк',battalion:'Батальйон',company:'Рота',platoon:'Взвод',squad:'Відділення',other:'Інший підрозділ'};
- const operations={create:'Створено',state:'Назва / основне підпорядкування',dissolve:'Розформовано',annul:'Анульовано',order:'Порядок відображення',operational:'Оперативне підпорядкування',coverage:'Джерело штатки',map:'Явне зіставлення',import:'Імпорт штатки',withdraw:'Відкликання імпорту',position:'Виправлення посади',position_annul:'Анулювання посади',reassignment:'Повторне призначення'};
+ const metadata=JSON.parse(root.querySelector('[data-org-kinds]').textContent),names=metadata.labels;
+ const operations={create:'Створено',state:'Назва / ієрархічний рівень / основне підпорядкування',dissolve:'Розформовано',annul:'Анульовано',order:'Порядок відображення',operational:'Оперативне підпорядкування',coverage:'Джерело штатки',map:'Явне зіставлення',import:'Імпорт штатки',withdraw:'Відкликання імпорту',position:'Виправлення посади',position_annul:'Анулювання посади',reassignment:'Повторне призначення'};
  const allNodes=()=>new Map([...tree.units,...(tree.inactive_units||[])].map(unit=>[unit.id,unit]));
  const label=id=>id===null||id===undefined?'Без батьківського':`${allNodes().get(id)?.name||'Підрозділ'} · ID ${id}`;
  const display=value=>window.ProfileDates?.format(value)||value||'по цей час';
@@ -24,6 +24,17 @@
    if([...field.options].some(option=>option.value===previous))field.value=previous;
   }
  }
+ function creationTypes(){
+  const form=root.querySelector('[data-org-form=create]'),parent=allNodes().get(Number(form.elements.parent_id.value)),child=allNodes().get(attachParentFor);
+  const min=parent?.hierarchy_level||0,max=child?.hierarchy_level||8;
+  for(const option of form.elements.kind.options){if(!option.value)continue;const level=metadata.levels[option.value];option.hidden=option.disabled=Boolean(parent&&parent.hierarchy_level==null)|| (option.value==='other'?max-min<=1:!(level>min&&level<max));}
+  if(form.elements.kind.selectedOptions[0]?.disabled)form.elements.kind.value='';
+  const other=form.elements.kind.value==='other',field=form.elements.hierarchy_level;
+  field.closest('[data-org-level-field]').hidden=!other;field.disabled=!other;field.required=other;
+  for(const option of field.options){if(!option.value)continue;option.hidden=option.disabled=!(Number(option.value)>min&&Number(option.value)<max);}
+  if(field.selectedOptions[0]?.disabled)field.value='';
+ }
+ const createForm=root.querySelector('[data-org-form=create]');createForm.elements.parent_id.addEventListener('change',creationTypes);createForm.elements.kind.addEventListener('change',creationTypes);
  function renderTree(){
   const holder=root.querySelector('[data-org-tree]');holder.replaceChildren();const list=document.createElement('ul');list.className='org-tree';list.dataset.orgParent='';holder.append(list);
   const nodes=new Map(tree.units.map(unit=>[unit.id,unit])),elements=new Map();
@@ -44,7 +55,7 @@
   for(const unit of tree.units){const target=unit.parent_id===null?list:elements.get(unit.parent_id)?.children;if(target)target.append(elements.get(unit.id).item);}
   root.querySelector('[data-org-empty]').hidden=tree.units.length>0;
   if(tree.inactive_units?.length){const archive=document.createElement('details');archive.className='org-operation';const summary=document.createElement('summary');summary.textContent='Неактивні / анульовані підрозділи';archive.append(summary);for(const unit of tree.inactive_units){const row=document.createElement('div');row.append(button(`${unit.name} · ID ${unit.id} · ${unit.annulled_at?'анульований':unit.dissolved_on?'розформований':'ще не сформований'}`,()=>selectUnit(unit.id)));archive.append(row);}holder.append(archive);}
-  parentOptions();
+  parentOptions();creationTypes();
  }
  async function refresh(){tree=await request('/admin/organization/tree?on='+encodeURIComponent(tree.on));renderTree();urlSelection();if(selected)await selectUnit(selected);}
  async function sort(parent,ids){
@@ -74,6 +85,7 @@
    root.querySelector('[data-org-form=name] [name=name]').value=state?.name||'';root.querySelector('[data-org-form=parent] [name=parent_id]').value=current?.parent_id??state?.primary_parent_id??'';
    root.querySelector('[data-org-create-child]').disabled=Boolean(unit.annulled_at);root.querySelector('[data-org-create-parent]').disabled=Boolean(unit.annulled_at);
    const staff=root.querySelector('[data-org-staff-link]');staff.href='/admin/organization/staff?unit_id='+id+'&on='+encodeURIComponent(tree.on);
+   const levelEditor=root.querySelector('[data-org-level-editor]');levelEditor.hidden=unit.kind!=='other';const levelForm=levelEditor.querySelector('form');levelForm.elements.hierarchy_level.value=unit.hierarchy_level||'';levelForm.elements.effective_from.value=unit.formed_on;
    renderHistory(data);root.dispatchEvent(new CustomEvent('organization:selected',{bubbles:true,detail:{unit:{...unit,name:state?.name},tree,on:tree.on,history:data}}));
   }catch(error){notify(error.message,true);}
  }
@@ -91,8 +103,8 @@
    finally{form.dataset.pending='0';button.disabled=Boolean(form.closest('[data-org-selected]')&&allNodes().get(selected)?.annulled_at);}
   });
  }
- root.querySelector('[data-org-create-child]').addEventListener('click',()=>{attachParentFor=null;const panel=root.querySelector('[data-org-create-panel]');panel.open=true;panel.querySelector('[name=parent_id]').value=selected||'';panel.querySelector('[name=name]').focus();});
- root.querySelector('[data-org-create-parent]').addEventListener('click',()=>{attachParentFor=selected;const panel=root.querySelector('[data-org-create-panel]');panel.open=true;panel.querySelector('[name=parent_id]').value='';panel.querySelector('[name=name]').focus();notify('Створіть новий батьківський підрозділ, потім окремо підтвердьте основне підпорядкування вибраної дитини.');});
+ root.querySelector('[data-org-create-child]').addEventListener('click',()=>{attachParentFor=null;const panel=root.querySelector('[data-org-create-panel]');panel.open=true;panel.querySelector('[name=parent_id]').value=selected||'';creationTypes();panel.querySelector('[name=name]').focus();});
+ root.querySelector('[data-org-create-parent]').addEventListener('click',()=>{attachParentFor=selected;const panel=root.querySelector('[data-org-create-panel]');panel.open=true;panel.querySelector('[name=parent_id]').value='';creationTypes();panel.querySelector('[name=name]').focus();notify('Створіть новий батьківський підрозділ, потім окремо підтвердьте основне підпорядкування вибраної дитини.');});
  root.querySelector('[data-org-expand]').addEventListener('click',()=>root.querySelectorAll('[data-org-unit]>details').forEach(node=>node.open=true));root.querySelector('[data-org-collapse]').addEventListener('click',()=>root.querySelectorAll('[data-org-unit]>details').forEach(node=>node.open=false));
  window.ProfileDates?.enhance(root);renderTree();if(selected)selectUnit(selected);
 })();

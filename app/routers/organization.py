@@ -4,7 +4,7 @@ from fastapi import APIRouter,Depends,HTTPException,Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from app.database.db import get_db
-from app.models.organization import KINDS
+from app.models.organization import KINDS,KIND_LABELS,KIND_LEVELS
 from app.security.accounts import current_user
 from app.services.organization import OrganizationService,authorize
 from app.services.staff_service import domain_date,today
@@ -29,6 +29,7 @@ class InputError(ValueError):
 
 def number(value,field,optional=False):
     if optional and value in (None,''):return None
+    if field=='hierarchy_level' and type(value) is float and not value.is_integer():raise InputError('Потрібен цілий ієрархічний рівень.',field)
     if type(value) is bool:raise InputError('Потрібен коректний ID або revision.',field)
     try:return int(value)
     except (ValueError,TypeError):raise InputError('Потрібен коректний ID або revision.',field) from None
@@ -62,7 +63,7 @@ def page(request:Request,on:str|None=None,unit_id:int|None=None,user=Depends(cur
         from app.services.access_views import prune_tree
         tree=prune_tree(db,tree)
     except ValueError as error:raise HTTPException(422,str(error)) from None
-    return templates.TemplateResponse(request=request,name='admin/organization.html',context={'organization_tree':tree,'organization_kinds':KINDS,'selected_unit_id':unit_id})
+    return templates.TemplateResponse(request=request,name='admin/organization.html',context={'organization_tree':tree,'organization_kinds':KINDS,'organization_labels':KIND_LABELS,'organization_levels':KIND_LEVELS,'selected_unit_id':unit_id})
 
 
 @router.get('/tree')
@@ -92,7 +93,7 @@ async def create(request:Request,user=Depends(current_user),db:Session=Depends(g
     try:
         data=await payload(request)
         key=OrganizationService.create(db,user.id,data.get('kind'),data.get('name'),calendar(data.get('formed_on'),'formed_on'),
-            parent_id=number(data.get('parent_id'),'parent_id',True))
+            parent_id=number(data.get('parent_id'),'parent_id',True),hierarchy_level=number(data.get('hierarchy_level'),'hierarchy_level',True))
         return {'ok':True,'unit_id':key,'message':'Підрозділ створено. Він може залишатися порожнім.'}
     except PermissionError as error:raise HTTPException(403,str(error)) from None
     except ValueError as error:return failure(error)
@@ -113,7 +114,7 @@ async def reorder(request:Request,user=Depends(current_user),db:Session=Depends(
 
 @router.post('/units/{key:int}/{action}')
 async def change(request:Request,key:int,action:str,user=Depends(current_user),db:Session=Depends(get_db)):
-    names={'name':'edit','parent':'reparent','operational':'operational','dissolve':'dissolve','annul':'annul'}
+    names={'name':'edit','level':'edit','parent':'reparent','operational':'operational','dissolve':'dissolve','annul':'annul'}
     if action not in names:raise HTTPException(404,'Невідома операція.')
     permission(db,user,names[action])
     try:
@@ -121,6 +122,9 @@ async def change(request:Request,key:int,action:str,user=Depends(current_user),d
         if action=='name':
             OrganizationService.revise(db,user.id,key,revision,calendar(data.get('effective_from'),'effective_from'),name=data.get('name'))
             message='Нову назву збережено з указаної дати.'
+        elif action=='level':
+            OrganizationService.revise(db,user.id,key,revision,calendar(data.get('effective_from'),'effective_from'),hierarchy_level=number(data.get('hierarchy_level'),'hierarchy_level'))
+            message='Ієрархічний рівень явно визначено; перевірено всю історію підпорядкування.'
         elif action=='parent':
             OrganizationService.revise(db,user.id,key,revision,calendar(data.get('effective_from'),'effective_from'),parent_id=number(data.get('parent_id'),'parent_id',True))
             message='Основне підпорядкування збережено з указаної дати.'

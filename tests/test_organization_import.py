@@ -24,9 +24,9 @@ def fields(number,name='Стрілець'):
 
 def excel(rows,depth=1):
     book=Workbook();ws=book.active;ws.title='positions'
-    ws.append(['parent',*[f'child_{i}' for i in range(1,depth+1)],*POSITION_ATTRIBUTES]);ws.append(['пояснення'])
+    ws.append(['parent',*[f'child_{i}' for i in range(1,depth+1)],*[f'child_{i}_{suffix}' for i in range(1,depth+1) for suffix in ['kind','level']],*POSITION_ATTRIBUTES]);ws.append(['пояснення'])
     for path,number,name in rows:
-        ws.append([*path,*[None]*(depth+1-len(path)),*fields(number,name).values()])
+        ws.append([*path,*[None]*(depth+1-len(path)),*[value for i in range(1,depth+1) for value in (('platoon',None) if i==1 and path[i:i+1] and 'взвод' in path[i] else ('other',4+i))],*fields(number,name).values()])
     stream=BytesIO();book.save(stream);book.close();return stream.getvalue()
 
 
@@ -291,7 +291,7 @@ def test_legacy_import_cannot_reintroduce_unbound_sources_after_mapping(store):
 def test_invalid_excel_values_are_persisted_as_unresolved_rows_not_imported(store):
     from openpyxl import load_workbook
     db,actor,ids,_=store
-    book=load_workbook(BytesIO(excel([(['1 рота'],5,'Радист')])));book['positions'].cell(3,3,D(2020,1,1))
+    book=load_workbook(BytesIO(excel([(['1 рота'],5,'Радист')])));book['positions'].cell(3,next(c.column for c in book['positions'][1] if c.value=='position_number'),D(2020,1,1))
     stream=BytesIO();book.save(stream);book.close()
     prepared=service.preview(db,actor,stream.getvalue(),ids['company'],'add',ON)
     assert prepared['rows'][0]['status']=='conflict' and not prepared['rows'][0]['position_valid']

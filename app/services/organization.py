@@ -3,7 +3,7 @@ from app.services.access_context import actor_operation
 from contextlib import contextmanager
 from datetime import date,datetime,UTC,timedelta
 from unicodedata import normalize as unicode_normalize
-from app.models.organization import OrgUnit,OrgUnitState,OperationalSubordination,OrgAudit,KINDS,ROSTER_KINDS
+from app.models.organization import OrgUnit,OrgUnitState,OperationalSubordination,OrgAudit,KINDS,ROSTER_KINDS,level_of
 from app.models.staff import exact_date
 from app.repositories.organization_repository import OrganizationRepository as Repo
 from app.services.staff_service import write_unit,period
@@ -55,8 +55,20 @@ def active(unit,on):return unit.annulled_at is None and unit.formed_on<=on<= (un
 def state_at(states,key,on):
     return next((s for s in states if s.org_unit_id==key and s.valid_from<=on<= (s.valid_to or date.max)),None)
 
+def explicit_level(kind,value):
+    if kind=='other':
+        if type(value) is not int or not 1<=value<=7:raise ValueError('Для іншого підрозділу явно вкажіть ієрархічний рівень від 1 до 7.')
+        return value
+    if value is not None:raise ValueError('Для визначеного типу ієрархічний рівень задано автоматично.')
+    return None
+
+def hierarchy_edge(child,parent):
+    child_level,parent_level=level_of(child),level_of(parent)
+    if child_level is None or parent_level is None:raise ValueError('Спочатку явно визначте ієрархічний рівень іншого підрозділу.')
+    if child_level<=parent_level:raise ValueError('Недопустима ієрархія: дочірній підрозділ має бути нижчого рівня за батьківський.')
+
 def snapshot(db,unit):
-    return {'id':unit.id,'kind':unit.kind,'formed_on':unit.formed_on.isoformat(),'dissolved_on':unit.dissolved_on.isoformat() if unit.dissolved_on else None,
+    return {'id':unit.id,'kind':unit.kind,'hierarchy_level':level_of(unit),'formed_on':unit.formed_on.isoformat(),'dissolved_on':unit.dissolved_on.isoformat() if unit.dissolved_on else None,
             'sort_order':unit.sort_order,'revision':unit.revision,'annulled_at':unit.annulled_at.isoformat() if unit.annulled_at else None,
             'annulment_reason':unit.annulment_reason,'annulled_by':unit.annulled_by,
             'states':[{'id':s.id,'name':s.name,'normalized_name':s.normalized_name,'primary_parent_id':s.primary_parent_id,
@@ -67,7 +79,7 @@ def audit(db,unit,actor,operation,before,why=None,**values):
     Repo.add(db,OrgAudit(org_unit_id=unit.id,actor_user_id=actor,operation=operation,before=before,after={**snapshot(db,unit),**values},reason=why))
     db.flush()
 
-def validate_tree(db):
+def validate_tree(db,strict_unit=None):
     """Check all effective boundaries; future/past cycles and sibling collisions count."""
     db.flush();units={u.id:u for u in Repo.units(db) if u.annulled_at is None};states=Repo.states(db)
     boundaries=set()
@@ -101,6 +113,22 @@ def validate_tree(db):
         for key,item in current.items():
             if item.primary_parent_id is not None and item.primary_parent_id not in current:
                 raise ValueError('Батьківський підрозділ не існує протягом усього обраного періоду; спочатку змініть підпорядкування дітей.')
+        if strict_unit in current:
+            children={key:[] for key in current}
+            for key,item in current.items():
+                if item.primary_parent_id in children:children[item.primary_parent_id].append(key)
+            stack=[strict_unit];seen=set()
+            while stack:
+                key=stack.pop()
+                if key in seen:continue
+                seen.add(key)
+                if level_of(units[key]) is None:raise ValueError('Спочатку явно визначте ієрархічні рівні всього дочірнього дерева.')
+                stack.extend(children[key])
+        for key,item in current.items():
+            if item.primary_parent_id is not None:
+                child,parent=units[key],units[item.primary_parent_id]
+                # Legacy other units remain unclassified until an explicit audited decision.
+                if level_of(child) is not None and level_of(parent) is not None:hierarchy_edge(child,parent)
         # Iterative traversal supports arbitrary depth without Python recursion limits.
         complete=set()
         for key in current:
@@ -113,13 +141,13 @@ def validate_tree(db):
 class OrganizationService:
     @staticmethod
     @actor_operation
-    def create(db,actor_id,kind,name,formed_on,*,parent_id=None,dissolved_on=None):
+    def create(db,actor_id,kind,name,formed_on,*,parent_id=None,dissolved_on=None,hierarchy_level=None):
         with organization_write(db,actor_id,'create'):
-            return create_locked(db,actor_id,kind,name,formed_on,parent_id=parent_id,dissolved_on=dissolved_on)
+            return create_locked(db,actor_id,kind,name,formed_on,parent_id=parent_id,dissolved_on=dissolved_on,hierarchy_level=hierarchy_level)
 
     @staticmethod
     @actor_operation
-    def revise(db,actor_id,key,revision,effective_from,*,name=None,parent_id=UNSET):
+    def revise(db,actor_id,key,revision,effective_from,*,name=None,parent_id=UNSET,hierarchy_level=UNSET):
         exact_date(effective_from)
         with organization_write(db,actor_id,'reparent' if parent_id is not UNSET and name is None else 'edit'):
             unit=checked(db,key,revision);before=snapshot(db,unit);states=Repo.states(db,key);old=state_at(states,key,effective_from)
@@ -127,17 +155,24 @@ class OrganizationService:
             if parent_id is not UNSET and parent_id is not None:checked(db,parent_id)
             new_name=old.name if name is None else name.strip() if isinstance(name,str) else name
             normalized=normalize(new_name);parent=old.primary_parent_id if parent_id is UNSET else parent_id
-            if parent!=old.primary_parent_id:
+            parent_changed=parent!=old.primary_parent_id
+            if parent_changed:
                 authorize(db,actor_id,'reparent',key)
                 if parent is not None:authorize(db,actor_id,'reparent',parent)
             if new_name!=old.name:authorize(db,actor_id,'edit',key)
-            end=old.valid_to
-            if effective_from==old.valid_from:
-                old.name=new_name;old.normalized_name=normalized;old.primary_parent_id=parent
-            else:
-                old.valid_to=effective_from-timedelta(days=1);db.flush()
-                Repo.add(db,OrgUnitState(org_unit_id=key,name=new_name,normalized_name=normalized,primary_parent_id=parent,valid_from=effective_from,valid_to=end))
-            unit.revision+=1;validate_tree(db);audit(db,unit,actor_id,'state',before)
+            if hierarchy_level is not UNSET:
+                authorize(db,actor_id,'edit',key)
+                if unit.kind!='other':raise ValueError('Рівень визначеного типу не редагується.')
+                unit.hierarchy_level=explicit_level(unit.kind,hierarchy_level)
+            if parent!=old.primary_parent_id and parent is not None:hierarchy_edge(unit,checked(db,parent))
+            if hierarchy_level is UNSET or name is not None or parent_id is not UNSET:
+                end=old.valid_to
+                if effective_from==old.valid_from:
+                    old.name=new_name;old.normalized_name=normalized;old.primary_parent_id=parent
+                else:
+                    old.valid_to=effective_from-timedelta(days=1);db.flush()
+                    Repo.add(db,OrgUnitState(org_unit_id=key,name=new_name,normalized_name=normalized,primary_parent_id=parent,valid_from=effective_from,valid_to=end))
+            unit.revision+=1;validate_tree(db,strict_unit=unit.id if hierarchy_level is not UNSET or parent_changed and parent is not None else None);audit(db,unit,actor_id,'state',before)
         return key
 
     @staticmethod
@@ -230,7 +265,7 @@ class OrganizationService:
         for unit in units:
             state=state_at(states,unit.id,on)
             if state is None:raise ValueError('Історія організаційної структури неповна.')
-            result.append({'id':unit.id,'kind':unit.kind,'eligible_roster':unit.kind in ROSTER_KINDS,'name':state.name,'parent_id':state.primary_parent_id,
+            result.append({'id':unit.id,'kind':unit.kind,'hierarchy_level':level_of(unit),'eligible_roster':unit.kind in ROSTER_KINDS,'name':state.name,'parent_id':state.primary_parent_id,
                            'children':[],'operational_parent_ids':[edge.parent_id for edge in operational if edge.org_unit_id==unit.id and edge.valid_from<=on<= (edge.valid_to or date.max)],'sort_order':unit.sort_order,'revision':unit.revision,
                            'formed_on':unit.formed_on.isoformat(),'dissolved_on':unit.dissolved_on.isoformat() if unit.dissolved_on else None})
         for node in result:node['operational_parent_id']=node['operational_parent_ids'][0] if len(node['operational_parent_ids'])==1 else None
@@ -244,7 +279,7 @@ class OrganizationService:
             earlier=[state for state in states if state.org_unit_id==unit.id and state.valid_from<=on]
             all_states=[state for state in states if state.org_unit_id==unit.id]
             state=earlier[-1] if earlier else (all_states[0] if all_states else None)
-            inactive.append({'id':unit.id,'kind':unit.kind,'eligible_roster':unit.kind in ROSTER_KINDS,'name':state.name if state else 'Без історії назви','revision':unit.revision,
+            inactive.append({'id':unit.id,'kind':unit.kind,'hierarchy_level':level_of(unit),'eligible_roster':unit.kind in ROSTER_KINDS,'name':state.name if state else 'Без історії назви','revision':unit.revision,
                              'formed_on':unit.formed_on.isoformat(),'dissolved_on':unit.dissolved_on.isoformat() if unit.dissolved_on else None,
                              'annulled_at':unit.annulled_at.isoformat() if unit.annulled_at else None,'annulment_reason':unit.annulment_reason})
         return {'units':result,'inactive_units':inactive,'roots':roots,'on':on.isoformat()}
@@ -278,17 +313,19 @@ class OrganizationService:
 
 
 @actor_operation
-def create_locked(db,actor_id,kind,name,formed_on,*,parent_id=None,dissolved_on=None,validate=True):
+def create_locked(db,actor_id,kind,name,formed_on,*,parent_id=None,dissolved_on=None,hierarchy_level=None,validate=True):
     """Participate in an existing write unit; caller commits the full import atomically."""
     if not db.info.get('project2_write'):raise ValueError('create_locked потребує зовнішньої write unit.')
     Repo.lock(db);authorize(db,actor_id,'create');period(formed_on,dissolved_on);normalized=normalize(name)
     if kind not in KINDS:raise ValueError('Невідомий вид підрозділу.')
+    hierarchy_level=explicit_level(kind,hierarchy_level)
     if parent_id is not None:checked(db,parent_id)
     from app.services.access_views import scoped
     e=scoped(db)
     if e and not e.allowed('organization','edit',unit_id=parent_id):raise PermissionError('Недостатньо прав на створення підрозділу в цій області.')
     db.info['access_new_unit_parent']=parent_id
-    unit=Repo.add(db,OrgUnit(kind=kind,formed_on=formed_on,dissolved_on=dissolved_on));db.flush()
+    unit=Repo.add(db,OrgUnit(kind=kind,hierarchy_level=hierarchy_level,formed_on=formed_on,dissolved_on=dissolved_on));db.flush()
+    if parent_id is not None:hierarchy_edge(unit,checked(db,parent_id))
     Repo.add(db,OrgUnitState(org_unit_id=unit.id,name=name.strip(),normalized_name=normalized,primary_parent_id=parent_id,valid_from=formed_on,valid_to=dissolved_on))
     if validate:validate_tree(db)
     audit(db,unit,actor_id,'create',{})

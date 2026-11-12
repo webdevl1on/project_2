@@ -4,6 +4,7 @@ from sqlalchemy import ForeignKey,Date,DateTime,String,Integer,JSON,UniqueConstr
 from sqlalchemy.orm import Mapped,mapped_column
 from app.database.base import Base
 from app.models.staff import SystemTimestamps
+from app.models.organization import ROSTER_KINDS
 
 class OrgCoverage(SystemTimestamps,Base):
     __tablename__='org_staff_coverage'
@@ -86,13 +87,14 @@ def organization_staff_guards(metadata,connection,**kwargs):
       SELECT CASE WHEN NEW.annulled_at IS NOT NULL AND EXISTS(SELECT 1 FROM positions WHERE staff_version_id=NEW.id AND annulled_at IS NULL) THEN RAISE(ABORT,'version has active positions') END;
       SELECT CASE WHEN EXISTS(SELECT 1 FROM org_staff_coverage WHERE staff_version_id=NEW.id AND annulled_at IS NULL AND (NEW.annulled_at IS NOT NULL OR valid_from<NEW.valid_from OR (NEW.valid_to IS NOT NULL AND (valid_to IS NULL OR valid_to>NEW.valid_to)))) THEN RAISE(ABORT,'coverage outside version period') END;
     END""")
-    connection.exec_driver_sql("""CREATE TRIGGER IF NOT EXISTS org_unit_staff_dependencies BEFORE UPDATE ON org_units BEGIN
-      SELECT CASE WHEN NEW.kind NOT IN ('unit','regiment','battalion','company') AND EXISTS(SELECT 1 FROM staff_structures WHERE org_unit_id=NEW.id) THEN RAISE(ABORT,'independent staff owner must be company or higher') END;
+    owner_kinds=",".join("'"+kind+"'" for kind in sorted(ROSTER_KINDS))
+    connection.exec_driver_sql(f"""CREATE TRIGGER IF NOT EXISTS org_unit_staff_dependencies BEFORE UPDATE ON org_units BEGIN
+      SELECT CASE WHEN NEW.kind NOT IN ({owner_kinds}) AND EXISTS(SELECT 1 FROM staff_structures WHERE org_unit_id=NEW.id) THEN RAISE(ABORT,'independent staff owner must be company or higher') END;
       SELECT CASE WHEN NEW.annulled_at IS NOT NULL AND EXISTS(SELECT 1 FROM positions WHERE (org_unit_id=NEW.id OR managed_unit_id=NEW.id) AND annulled_at IS NULL) THEN RAISE(ABORT,'organization has staffing dependencies') END;
       SELECT CASE WHEN EXISTS(SELECT 1 FROM org_staff_coverage WHERE org_unit_id=NEW.id AND annulled_at IS NULL AND (NEW.annulled_at IS NOT NULL OR valid_from<NEW.formed_on OR (NEW.dissolved_on IS NOT NULL AND (valid_to IS NULL OR valid_to>NEW.dissolved_on)))) THEN RAISE(ABORT,'coverage outside organization lifetime') END;
     END""")
     for action in ('INSERT','UPDATE'):
-        connection.exec_driver_sql(f"""CREATE TRIGGER IF NOT EXISTS org_structure_owner_{action.lower()} BEFORE {action} ON staff_structures WHEN NEW.org_unit_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM org_units WHERE id=NEW.org_unit_id AND annulled_at IS NULL AND kind IN ('unit','regiment','battalion','company')) BEGIN SELECT RAISE(ABORT,'independent staff owner must be company or higher'); END""")
+        connection.exec_driver_sql(f"""CREATE TRIGGER IF NOT EXISTS org_structure_owner_{action.lower()} BEFORE {action} ON staff_structures WHEN NEW.org_unit_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM org_units WHERE id=NEW.org_unit_id AND annulled_at IS NULL AND kind IN ({owner_kinds})) BEGIN SELECT RAISE(ABORT,'independent staff owner must be company or higher'); END""")
         connection.exec_driver_sql(f"""CREATE TRIGGER IF NOT EXISTS org_assignment_source_{action.lower()} BEFORE {action} ON person_assignments WHEN NEW.annulled_at IS NULL BEGIN
           SELECT CASE WHEN EXISTS(SELECT 1 FROM positions p WHERE p.position_id=NEW.staff_position_id AND (p.annulled_at IS NOT NULL OR (p.valid_from IS NOT NULL AND NEW.assigned_from<p.valid_from) OR (p.valid_to IS NOT NULL AND (NEW.assigned_to IS NULL OR NEW.assigned_to>p.valid_to)))) THEN RAISE(ABORT,'assignment outside position period') END;
           SELECT CASE WHEN EXISTS(SELECT 1 FROM positions p WHERE p.position_id=NEW.staff_position_id AND p.org_unit_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM org_staff_coverage c JOIN org_units u ON u.id=c.org_unit_id WHERE c.org_unit_id=p.org_unit_id AND c.staff_version_id=p.staff_version_id AND c.annulled_at IS NULL AND u.annulled_at IS NULL AND NEW.assigned_from>=u.formed_on AND (u.dissolved_on IS NULL OR (NEW.assigned_to IS NOT NULL AND NEW.assigned_to<=u.dissolved_on)) AND c.valid_from<=NEW.assigned_from AND (c.valid_to IS NULL OR (NEW.assigned_to IS NOT NULL AND NEW.assigned_to<=c.valid_to)))) THEN RAISE(ABORT,'assignment outside effective staffing source') END;

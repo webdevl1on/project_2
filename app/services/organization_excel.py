@@ -19,6 +19,10 @@ MAX_EXPANDED_BYTES = 50 * 1024 * 1024
 _CHILD = re.compile(r"child_([1-9][0-9]{0,4})\Z")
 
 
+def _json_cell(value):
+    return value if value is None or isinstance(value,(str,int,float,bool)) else str(value)
+
+
 def _name_key(value):
     # Deliberately identical to organization.normalize, without importing ORM code.
     if not isinstance(value, str) or not value.strip() or len(value) > 500:
@@ -61,6 +65,10 @@ def _headers(sheet):
     children = []
     for name in header:
         if name in POSITION_ATTRIBUTES or name == "parent":
+            continue
+        metadata=re.fullmatch(r'child_([1-9][0-9]{0,4})_(kind|level)',name)
+        if metadata:
+            if f'child_{metadata.group(1)}' not in header:raise ValueError('Тип/рівень потребує відповідної колонки child_N.')
             continue
         match = _CHILD.fullmatch(name)
         if not match:
@@ -141,6 +149,7 @@ def read_positions(source, root_name):
             if any(value is not None and str(value).strip() for value in values[len(header):]):
                 row_errors.append("Дані в колонці без системного заголовка.")
             rows.append({"row_number": row_number, "path": path, "path_keys": keys,
+                         "unit_specs":[{'kind':_json_cell(record.get(f'child_{i}_kind')),'hierarchy_level':_json_cell(record.get(f'child_{i}_level'))} for i in range(1,len(path))],
                          "position": position, "position_valid":not position_errors, "errors": row_errors})
     finally:
         book.close()

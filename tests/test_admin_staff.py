@@ -60,3 +60,35 @@ def test_admin_staff_retains_admin_access(store,monkeypatch):
     try:
         with AnonymousClient(app,base_url='https://testserver') as client:assert client.get('/admin/staff').status_code in (401,503)
     finally:app.dependency_overrides.clear()
+
+
+def test_admin_staff_labels_dates_and_management_layout(store,monkeypatch):
+    monkeypatch.setenv('PROJECT2_AUTH_ENABLED','0')
+    structure,versions,_,_=setup(store)
+    structure.code='main';structure.name='main';versions[1].name='Тестовий штат';store.commit()
+    def db():yield store
+    app.dependency_overrides[get_db]=db
+    try:
+        with TestClient(app) as client:
+            response=client.get('/admin/staff');doc=html.fromstring(response.text)
+            labels=doc.xpath('//*[@data-staff-selection]//select[@name="version_id"]/option/text()')
+            assert 'Тестовий штат · 01.06.2026 — відкрита' in labels
+            assert 'Архів · 01.01.2026 — 31.05.2026' in labels
+            assert 'main (main)' not in response.text
+            assert len(doc.xpath('//*[@data-staff-management]/section[contains(@class,"col-lg-6")]'))==2
+            assert doc.xpath('//*[@data-staff-positions]//form[starts-with(@action,"/staff/positions/")]')
+            assert 'Не додає підрозділ до організаційного дерева' in response.text
+            assert '/static/js/profile_dates.js' in response.text
+    finally:app.dependency_overrides.clear()
+
+
+def test_version_period_message_only_for_dependent_assignments(store):
+    import pytest
+    from app.services.staff_service import StaffService
+    _,versions,positions,people=setup(store);v=versions[1]
+    StaffService.create_assignment(store,people[0].person_id,positions[1].position_id,D(2026,6,1),None)
+    with pytest.raises(ValueError,match='Неможливо змінити період штатки: є призначення'):
+        StaffService.correct_version(store,v.id,v.revision,'Чернетка',D(2026,7,1),None)
+    assert store.get(StaffVersion,v.id).name=='Поточний'
+    with pytest.raises(ValueError,match='Завершення не може передувати початку'):
+        StaffService.correct_version(store,v.id,v.revision,'Чернетка',D(2026,7,1),D(2026,6,1))

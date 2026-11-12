@@ -28,7 +28,7 @@ def _assignment(row):
             'completion_reason':row.completion_reason,'completion_note':row.completion_note}
 
 def _tree_signature(nodes,ids,exclude=()):
-    fields=('id','kind','name','parent_id','revision','formed_on','dissolved_on')
+    fields=('id','kind','hierarchy_level','name','parent_id','revision','formed_on','dissolved_on')
     data=[{key:node.get(key) for key in fields} for node in nodes if node['id'] in ids and node['id'] not in exclude]
     return hashlib.sha256(json.dumps(sorted(data,key=lambda n:n['id']),ensure_ascii=False,sort_keys=True).encode()).hexdigest()
 
@@ -40,6 +40,27 @@ def _resolve(nodes,scope_id,path):
         if not children:return None,None
         current=children[0]['id']
     return current,None
+
+def _path_hierarchy(nodes,scope_id,item):
+    from types import SimpleNamespace
+    current=next(node for node in nodes if node['id']==scope_id)
+    for i,key in enumerate(item['path_keys'][1:]):
+        existing=next((node for node in nodes if node['parent_id']==current.get('id') and organization.normalize(node['name'])==key),None) if current.get('id') else None
+        spec=(item.get('unit_specs') or [{}]*len(item['path_keys']))[i]
+        if existing:
+            if spec.get('kind') and spec['kind']!=existing['kind']:raise ValueError('Тип існуючого підрозділу не можна змінити через імпорт.')
+            raw=spec.get('hierarchy_level')
+            if raw is not None and organization.explicit_level(existing['kind'],raw)!=existing['hierarchy_level']:raise ValueError('Рівень існуючого підрозділу не змінюється через імпорт.')
+            child=existing
+        else:
+            kind=spec.get('kind')
+            if kind not in organization.KINDS:raise ValueError('Для нового підрозділу вкажіть child_N_kind та для other — child_N_level або спочатку створіть підрозділ у дереві.')
+            raw=spec.get('hierarchy_level')
+            if type(raw) is float and raw.is_integer():raw=int(raw)
+            level=organization.explicit_level(kind,raw)
+            child={'kind':kind,'hierarchy_level':level,'id':None}
+        organization.hierarchy_edge(SimpleNamespace(**child),SimpleNamespace(**current))
+        current=child
 
 def _source(db,scope_id,on,mode):
     current=staff.snapshot(db,scope_id,on)
@@ -101,6 +122,8 @@ def preview(db,actor,source,scope_id,mode,on,end=None,name='',version_id=None):
         unit_id,issue=_resolve(current['nodes'],scope_id,item['path_keys']);candidate['unit_id']=unit_id
         issues=list(item.get('errors',[]))
         if issue:issues.append(issue)
+        try:_path_hierarchy(current['nodes'],scope_id,item)
+        except ValueError as error:issues.append(str(error))
         if not item.get('position_valid',True):
             candidate['status']='conflict';candidate['issues']=issues;rows.append(candidate);continue
         matches=by_number.get(item['position']['position_number'],[])
@@ -121,6 +144,17 @@ def preview(db,actor,source,scope_id,mode,on,end=None,name='',version_id=None):
         if issues:candidate['status']='conflict'
         candidate['issues']=issues
         rows.append(candidate)
+    definitions={}
+    for row in rows:
+        for index,spec in enumerate(row.get('unit_specs',[])):
+            if not spec.get('kind'):continue
+            path=tuple(row['path_keys'][:index+2]);signature=(spec['kind'],spec.get('hierarchy_level'))
+            previous=definitions.setdefault(path,(set(),[]));previous[0].add(signature);previous[1].append(row)
+    for signatures,affected_rows in definitions.values():
+        if len(signatures)>1:
+            for affected in affected_rows:
+                affected['status']='conflict'
+                affected['issues'].append('Різні типи або рівні одного нового підрозділу в рядках Excel.')
     return {'identity_key':secrets.token_hex(32),'scope_id':scope_id,'owner_id':current['owner']['id'],'mode':mode,
             'on':on.isoformat(),'end':_iso(end),'source_on':source_on.isoformat(),'name':name.strip(),'version_id':version.id if version else None,
             'tree_signature':_tree_signature(current['nodes'],current['owner_unit_ids']),
@@ -148,11 +182,16 @@ def _receipt(db,actor,prepared):
 @actor_operation
 def _path_unit(db,actor,prepared,item,current,effects,on):
     nodes=current['nodes'];current_id=prepared['scope_id'];created=list(effects.get('created_unit_ids',[]))
-    for display,key in zip(item['path'][1:],item['path_keys'][1:]):
+    for index,(display,key) in enumerate(zip(item['path'][1:],item['path_keys'][1:])):
         choices=[node for node in nodes if node['parent_id']==current_id and organization.normalize(node['name'])==key]
         if len(choices)>1:raise ValueError('Неоднозначне підпорядкування; повторіть явне зіставлення.')
-        if choices:current_id=choices[0]['id'];continue
-        current_id=organization.create_locked(db,actor,'other',display,on,parent_id=current_id,validate=False)
+        if choices:
+            spec=item.get('unit_specs',[{}]*len(item['path']))[index]
+            if spec.get('kind') and spec['kind']!=choices[0]['kind']:raise ValueError('Тип підрозділу змінився після preview; повторіть перевірку.')
+            current_id=choices[0]['id'];continue
+        spec=item['unit_specs'][index]
+        raw=spec.get('hierarchy_level');raw=int(raw) if type(raw) is float and raw.is_integer() else raw
+        current_id=organization.create_locked(db,actor,spec.get('kind'),display,on,parent_id=current_id,hierarchy_level=raw,validate=False)
         created.append(current_id)
         # Refresh the lightweight effective tree so deeper path nodes use real parent IDs.
         nodes[:]=organization.OrganizationService.tree(db,on)['units']

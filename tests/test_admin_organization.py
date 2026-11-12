@@ -55,7 +55,7 @@ def test_admin_page_has_distinct_dated_forms_and_shared_components(organization_
     page=client.get('/admin/organization?on=2026-06-01');assert page.status_code==200
     doc=html.fromstring(page.text)
     assert doc.xpath('//*[@data-org-tree]') and doc.xpath('//*[@data-org-form="create"]')
-    assert {node.get('data-org-form') for node in doc.xpath('//*[@data-org-form]')}=={'create','name','parent','operational','dissolve','annul'}
+    assert {node.get('data-org-form') for node in doc.xpath('//*[@data-org-form]')}=={'create','name','level','parent','operational','dissolve','annul'}
     assert '/static/js/profile_dates.js' in page.text and '/static/js/security_session.js' in page.text
     assert doc.xpath('//input[@name="on" and @value="2026-06-01"]')
     assert doc.xpath('//*[@data-org-roster-panel]')
@@ -139,3 +139,14 @@ def test_dissolution_and_annulment_are_explicit_separate_history_states(organiza
         assert db.get(OrgUnit,annulled).annulled_at and db.get(OrgUnit,annulled).dissolved_on is None
     payload=state(client);assert not payload['units']
     assert {node['id'] for node in payload['inactive_units']}=={dissolved,annulled}
+
+
+def test_http_rejects_inverse_hierarchy_and_requires_other_level(organization_client):
+    client,_,_=organization_client
+    platoon=create(client,'Взвод',kind='platoon')
+    bad=client.post('/admin/organization/units',json={'name':'Полк у взводі','kind':'regiment','formed_on':'2026-01-01','parent_id':platoon})
+    assert bad.status_code==409 and 'ієрархія' in bad.json()['detail']
+    bad=client.post('/admin/organization/units',json={'name':'Інший','kind':'other','formed_on':'2026-01-01'})
+    assert bad.status_code==409 and 'рівень' in bad.json()['detail']
+    good=client.post('/admin/organization/units',json={'name':'Інший','kind':'other','hierarchy_level':6,'formed_on':'2026-01-01','parent_id':platoon})
+    assert good.status_code==200

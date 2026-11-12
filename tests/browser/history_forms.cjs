@@ -50,8 +50,8 @@ module.exports=async({context,base,adminToken})=>{
         await scenario('position and version refusals retain drafts; successful correction updates data',async()=>{
             const version=page.locator('form[action$="/correct"]').filter({has:page.locator('[name="valid_from"]')});
             await version.locator('..').locator(':scope > summary').click();
-            await version.locator('[name="name"]').fill('Збережена чернетка');await version.locator('[name="valid_from"]').fill('2027-01-01');
-            const before=await values(version);await version.locator('button').click();
+            await version.locator('[name="name"]').fill('Збережена чернетка');await version.locator('[data-exact-date-for="valid_from"]').fill('01.01.2027');
+            const before=await values(version);await version.locator('button:not([type=button])').click();
             await version.locator('[data-history-form-error]:visible').waitFor();assert.deepEqual(await values(version),before);
             const position=page.locator('form[action^="/staff/positions/"]').first();await position.locator('..').locator(':scope > summary').click();
             await position.locator('[name="name_short"]').fill('Виправлена посада');

@@ -16,10 +16,10 @@ def organizational(pg_factory):
     return pg_factory,actor
 
 def unit(factory,actor,name,*,parent=None):
-    with factory() as db:return Service.create(db,actor,'company',name,D(2020,1,1),parent_id=parent)
+    with factory() as db:return Service.create(db,actor,'platoon' if parent else 'company',name,D(2020,1,1),parent_id=parent)
 
 def raw_unit(connection,name,parent=None):
-    key=connection.scalar(text("INSERT INTO org_units(kind,formed_on,sort_order,created_at,updated_at,revision) VALUES ('company','2020-01-01',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1) RETURNING id"))
+    key=connection.scalar(text("INSERT INTO org_units(kind,formed_on,sort_order,created_at,updated_at,revision) VALUES (:kind,'2020-01-01',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1) RETURNING id"),{'kind':'platoon' if parent else 'company'})
     connection.execute(text("INSERT INTO org_unit_states(org_unit_id,name,normalized_name,primary_parent_id,valid_from,created_at,updated_at,revision) VALUES (:key,:name,'deliberately-not-canonical',:parent,'2020-01-01',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1)"),{'key':key,'name':name,'parent':parent})
     return key
 
@@ -39,10 +39,10 @@ def test_raw_sql_historical_cycle_only_when_periods_intersect(organizational):
     factory,actor=organizational;engine=factory.kw['bind'];a=unit(factory,actor,'А');b=unit(factory,actor,'Б',parent=a)
     with factory() as db:
         Service.revise(db,actor,b,db.get(OrgUnit,b).revision,D(2020,6,1),parent_id=None)
-        Service.revise(db,actor,a,db.get(OrgUnit,a).revision,D(2020,6,1),parent_id=b)
+        with pytest.raises(ValueError,match='ієрархія'):Service.revise(db,actor,a,db.get(OrgUnit,a).revision,D(2020,6,1),parent_id=b)
     with pytest.raises(DBAPIError),engine.begin() as db:
         db.execute(text("UPDATE org_unit_states SET primary_parent_id=:b WHERE org_unit_id=:a AND valid_from='2020-01-01'"),{'a':a,'b':b})
-    with factory() as db:assert Service.tree(db,D(2020,7,1))['roots']==[b]
+    with factory() as db:assert Service.tree(db,D(2020,7,1))['roots']==[a,b]
 
 
 def test_raw_sql_multiple_operational_parents_and_temporal_cycles(organizational):
@@ -84,7 +84,7 @@ def test_concurrent_primary_reparents_do_not_create_cycle(organizational):
                 barrier.wait(timeout=5);db.execute(text('UPDATE org_unit_states SET primary_parent_id=:parent WHERE org_unit_id=:child'),{'child':pair[0],'parent':pair[1]})
             return True
         except DBAPIError:return False
-    with ThreadPoolExecutor(max_workers=2) as pool:assert sorted(pool.map(change,[(a,b),(b,a)]))==[False,True]
+    with ThreadPoolExecutor(max_workers=2) as pool:assert sorted(pool.map(change,[(a,b),(b,a)]))==[False,False]
 
 
 def test_postgresql_org_audit_failure_rolls_back_history(organizational):

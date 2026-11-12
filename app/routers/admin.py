@@ -151,4 +151,4 @@ def staff_page(request:Request,version_id:int|None=None,structure_id:str='',db:S
     from app.table_fields import FIELDS
     selected=int(structure_id) if structure_id.isdecimal() else None
     context=history_context(db,version_id,selected)
-    return render(request,'admin/staff.html',owner,**context,staff_structures=context['structures'],chosen_version=context['chosen'],selected_structure_id=selected,position_fields=[{'key':f.attribute,'label':f.label} for f in FIELDS.values() if f.source=='position'],message=request.query_params.get('message',''))
+    return render(request,'admin/staff.html',owner,**context,version_assignment_periods=[{'start':r.assigned_from.isoformat(),'end':r.assigned_to.isoformat() if r.assigned_to else None} for r,_ in context['records'] if r.annulled_at is None],staff_structures=context['structures'],chosen_version=context['chosen'],selected_structure_id=selected,position_fields=[{'key':f.attribute,'label':f.label} for f in FIELDS.values() if f.source=='position'],message=request.query_params.get('message',''))

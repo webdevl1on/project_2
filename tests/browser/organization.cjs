@@ -26,7 +26,7 @@ module.exports=async({context,base,adminToken})=>{
   assert.equal((await tree('2020-02-29')).units.find(unit=>unit.id===root).parent_id,null);assert.equal((await tree('2020-03-01')).units.find(unit=>unit.id===root).parent_id,parentId);
   console.log('PASS organization: later parent creation requires a separate effective-date reparent action and preserves earlier history');
 
-  let deep=other;for(let level=0;level<9;level++)deep=(await api('/admin/organization/units',{name:'Рівень '+level,kind:'other',formed_on:'2020-01-01',parent_id:deep})).unit_id;
+  let deep=other;for(let level=5;level<=7;level++)deep=(await api('/admin/organization/units',{name:'Рівень '+level,kind:'other',hierarchy_level:level,formed_on:'2020-01-01',parent_id:deep})).unit_id;
   const childA=(await api('/admin/organization/units',{name:'Перший взвод',kind:'platoon',formed_on:'2020-01-01',parent_id:root})).unit_id;
   const childB=(await api('/admin/organization/units',{name:'Другий взвод',kind:'platoon',formed_on:'2020-01-01',parent_id:root})).unit_id;
   await page.goto(base+'/admin/organization?on=2020-06-01&unit_id='+root);await page.locator('[data-org-expand]').click();assert.equal(await page.locator(`[data-org-select="${deep}"]`).isVisible(),true);
@@ -35,12 +35,18 @@ module.exports=async({context,base,adminToken})=>{
   await page.waitForFunction(()=>!document.querySelector('[data-org-message]')?.hidden);let current=await tree('2020-06-01');assert.equal(current.units.find(unit=>unit.id===childB).parent_id,root);assert.ok(current.units.find(unit=>unit.id===childB).sort_order<current.units.find(unit=>unit.id===childA).sort_order);
   const stale=await context.request.post(base+'/admin/organization/reorder',{data:{on:'2020-06-01',parent_id:root,ids:[childA,childB],revisions}});assert.equal(stale.status(),409);
   const cross=await context.request.post(base+'/admin/organization/reorder',{data:{on:'2020-06-01',parent_id:root,ids:[childA,other],revisions:{[childA]:1,[other]:1}}});assert.equal(cross.status(),409);
-  console.log('PASS organization: arbitrary-depth rendering and sibling Drag & Drop preserve parents; stale and cross-parent reorder are rejected');
+  console.log('PASS organization: full permitted-depth rendering and sibling Drag & Drop preserve parents; stale and cross-parent reorder are rejected');
 
   await select(childA);await open('operational');await form('operational').locator('[name=parent_id]').selectOption(String(other));await date(form('operational'),'valid_from').fill('01.05.2020');await save('operational');current=await tree('2020-06-01');assert.equal(current.units.find(unit=>unit.id===childA).parent_id,root);assert.ok(current.units.find(unit=>unit.id===childA).operational_parent_ids.includes(other));
   await open('name');await form('name').locator('[name=name]').fill('Незбережена чернетка');await date(form('name'),'effective_from').fill('31.02.2020');await form('name').locator('button:not([type=button])').click();assert.equal(await form('name').locator('[name=name]').inputValue(),'Незбережена чернетка');assert.equal(new URL(page.url()).searchParams.get('unit_id'),String(childA));
   await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
   console.log('PASS organization: operational links remain separate, incomplete-calendar edits keep drafts, and the editor fits a narrow viewport');
+
+  await select(childA);await page.locator('[data-org-create-child]').click();
+  assert.equal(await form('create').locator('[name=kind] option[value=regiment]').evaluate(n=>n.disabled&&n.hidden),true);
+  await form('create').locator('[name=kind]').selectOption('other');await form('create').locator('[name=hierarchy_level]').selectOption('6');await form('create').locator('[name=name]').fill('Інший з явним рівнем');await date(form('create'),'formed_on').fill('01.01.2020');await save('create');
+  assert.equal((await tree('2020-06-01')).units.find(u=>u.name==='Інший з явним рівнем').hierarchy_level,6);
+  console.log('PASS organization: child creation filters types and accepts an explicit valid other-unit level');
 
   await api('/auth/users',{username:'org-browser-viewer',display_name:'Тестовий спостерігач дерева',role:'user',password:adminToken});
   const raw=await browserContextNoMfa(context,base);try{assert.equal((await raw.request.get(base+'/admin/organization')).status(),401);}finally{await raw.close();}

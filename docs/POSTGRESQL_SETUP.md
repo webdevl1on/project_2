@@ -2,7 +2,10 @@
 
 Цільова СУБД — PostgreSQL **17**, синхронний psycopg 3 / SQLAlchemy. SQLite залишається лише для явних legacy-утиліт і наявних тестів. Перенесення старих персональних даних не реалізоване й автоматично не виконується.
 
-Security 1.1–1.3 забезпечують персональний вхід, MFA, CSRF і сесії 15 хв / 8 год. Security 1.4 додає scoped ACL поверх організаційної структури. Поточний head — **0009_access_control**, після 0008; див. [SECURITY.md](SECURITY.md) та [ACCESS_CONTROL.md](ACCESS_CONTROL.md).
+Security 1.1–1.3 забезпечують персональний вхід, MFA, CSRF і сесії 15 хв / 8 год. Security 1.4 додає scoped ACL поверх організаційної структури. Поточний head — **0010_organization_hierarchy**, після 0009; див. [SECURITY.md](SECURITY.md) та [ACCESS_CONTROL.md](ACCESS_CONTROL.md).
+
+`0010_organization_hierarchy` додає рівень other, нові види та основну ієрархію; [ORGANIZATION.md](ORGANIZATION.md). Старі other залишають NULL. Старі зворотні/однакові рівні відомих типів блокують upgrade з ID проблеми; виправте підпорядкування явно старим інтерфейсом до міграції. Відмова відкочує DDL і не змінює даних. Перед ручним upgrade — перевірений backup. Ревізія застосовувалася тут лише до ізольованих випадкових схем project2_ci, не dev/prod. Reset не потрібний.
+
 
 Security 1.5 додає [узгоджені зашифровані резервні копії й ізольоване відновлення](BACKUP_AND_RESTORE.md), без нової Alembic-ревізії. `testing` дозволяє також явно створені `project2_restore_<hex>` для запуску відновленої копії; pytest, seed і робочі середовища зберігають свої окремі обмеження.
 
@@ -213,7 +216,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload
 
 Поточна процедура Security 1.5 — [BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md): зашифрований узгоджений PostgreSQL snapshot + документи/фото, незалежно зашифрована капсула критичних MFA/signing/RP-параметрів, маніфест і перевірка кожного файла. Старе незалежне `pg_dump` + `Copy-Item` активного каталогу не є повним узгодженим backup і більше не є рекомендованою процедурою.
 
-Потрібні PostgreSQL client tools **17**, приватний зашифрований staging, два окремі keyring поза Git/backup, явний `PROJECT2_BACKUP_CONFIG`, чинний deployment release та OS-планувальник. Нової Alembic-ревізії для цього модуля немає: head **0009_access_control**. Жодна робоча БД автоматично не змінюється.
+Потрібні PostgreSQL client tools **17**, приватний зашифрований staging, два окремі keyring поза Git/backup, явний `PROJECT2_BACKUP_CONFIG`, чинний deployment release та OS-планувальник. Для самого модуля резервування нової Alembic-ревізії не додавалося (етап на 0009); поточний head після виправлень ієрархії — **0010_organization_hierarchy**. Жодна робоча БД автоматично не змінюється.
 
 ```powershell
 $env:PROJECT2_ENV_FILE = 'C:\project2-secrets\backup.env'
@@ -291,7 +294,7 @@ python -c "from app.database.db import engine; from app.database.schema_check im
 
 ## Організаційна структура — 0008_organization
 
-Організаційна ревізія — **0008_organization** після 0007; поточний head — **0009_access_control**. Вісім нових таблиць дерева/оперативного підпорядкування/аудиту/покриття/квитанцій/перепризначення, nullable організаційні FK старих StaffStructure/Position, періоди й логічне анулювання Position та метадані анулювання StaffVersion. Старі люди, накази, призначення, User/MFA й аудит зберігаються; автоматичного зіставлення й минулих фіктивних подій немає.
+Організаційна ревізія — **0008_organization** після 0007; поточний head — **0010_organization_hierarchy**. Вісім нових таблиць дерева/оперативного підпорядкування/аудиту/покриття/квитанцій/перепризначення, nullable організаційні FK старих StaffStructure/Position, періоди й логічне анулювання Position та метадані анулювання StaffVersion. Старі люди, накази, призначення, User/MFA й аудит зберігаються; автоматичного зіставлення й минулих фіктивних подій немає.
 
 Нова ревізія замінює активний UNIQUE номера посади й EXCLUDE періоду версій на предикати `annulled_at IS NULL`; відкладений EXCLUDE OrgCoverage дає одне джерело на unit/date. Заморожені SQL `organization_tree_guards.sql` та `organization_staff_guards.sql` перевіряють дерево на всіх періодах, життя підрозділів, належність посад, чинність призначень і незмінність історії/аудиту. Schema checker вимагає нові таблиці, колонки, guards, CHECK та активні предикати.
 

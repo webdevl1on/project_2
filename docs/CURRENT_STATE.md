@@ -1,5 +1,77 @@
 # Поточний стан project_2
 
+## Виправлення чотирьох зауважень ручного тестування
+
+`feature/security`, початковий HEAD **138acaa**, початкове дерево чисте. Реалізовано лише погоджені зміни:
+
+- Семантичні рівні 1–7, нові Загін/Батарея/Розрахунок/Екіпаж, явний рівень other, заборона рівних/зворотних основних зв’язків і перевірка всіх історичних/майбутніх меж та дочірнього дерева. Будь-який тип може бути самостійним, проміжні рівні можна пропускати. UI фільтрує типи за серверним реєстром; HTTP/сервіс/Excel перевіряють повторно. Оперативні зв’язки не обмежуються основними рівнями. Загін/Батарея підтримують незалежні штатки; Розрахунок/Екіпаж — ні.
+- `/admin/staff`: назви версій без технічної структури/коду, серверний format_calendar_date, ДД.ММ.РРРР та «відкрита». Усі точні поля сторінки використовують ProfileDates із чинними ISO named inputs.
+- Пояснення незалежної структури, реквізитів версії та наслідків закриття; закриття позначене як критичне з чинним підтвердженням. Попередня підказка про залежні призначення та точне повідомлення StaffService лише для виходу призначень за змінюваний період, без зміни інших правил/помилок.
+- Компактний верхній вибір, дві робочі колонки й повноширинний блок посад з адаптивною сіткою. Збережено всі маршрути, preview/підтвердження імпорту, revision, кадрові перевірки, чернетки при помилках та три чинні теми.
+
+Адитивна **0010_organization_hierarchy** після 0009: nullable OrgUnit.hierarchy_level для legacy other, розширені CHECK, PostgreSQL input/deferred guards і оновлені власники штаток. Старі ревізії/SQL не змінено. При наявній неправильній ієрархії відомих типів міграція відмовляє з ID й відкочує DDL: підпорядкування потрібно явно виправити старим інтерфейсом перед upgrade. Старі other не перекласифіковуються; рівень визначається окремим авторизованим рішенням з OrgAudit, без фіктивного автора чи переписування назв. Для нових ланок Excel потрібні явні child_N_kind/child_N_level або попереднє створення в дереві. Деталі — [ORGANIZATION.md](ORGANIZATION.md), [STAFF_HISTORY.md](STAFF_HISTORY.md), [POSTGRESQL_SETUP.md](POSTGRESQL_SETUP.md).
+
+Фактичні перевірки, синтетичні дані:
+
+| Перевірка | Результат |
+| --- | --- |
+| Повний `PROJECT2_TEST_DATABASE_URL=<власний project2_ci> PROJECT2_TEST_PG_TOOLS=<client tools 17> .venv/bin/python -m pytest tests/ -q --tb=short` | **1367 passed**, 308,17 с, без skipped; включно з PostgreSQL, ACL/MFA/backup-restore регресією. |
+| Після завершальних уточнень та двох доданих сценаріїв: організація/Excel/HTTP/штатні форми/історія/UI + PostgreSQL organization suite | **179 passed**, 47,84 с; це повтор релевантної підмножини, не додаткові 179 унікальних тестів. Включає безпечну відмову upgrade на старій неправильній ієрархії й некоректні/суперечливі Excel metadata. |
+| `node --test tests/js/*.test.cjs` | **61 passed**, без skipped. |
+| Chromium: staff_review, organization, organization_staff, staff, history_forms, assignment_history, access_control, security | **44 PASS**, усі suite завершилися exit 0. Нові 3 staff_review та додатковий сценарій explicit other; решта — регресія. |
+| Адаптивність | Реальні форми /admin/staff, **390/768/1280/1920 px**, light/dark/military, дві/одна колонка, без горизонтального overflow/pageerror; скриншоти переглянуті. |
+| AST / усі Jinja / змінені JS syntax / Alembic heads / diff check | Успішно; єдиний head **0010_organization_hierarchy**. |
+
+Повний Chromium suite всього застосунку цього етапу не запускався: виконано перелічені вісім релевантних suite. Залишилися два попередні deprecation warnings Starlette/httpx та AnyIO. Firefox/Safari та реальні мобільні пристрої не перевірялися. Невирішених відомих дефектів у чотирьох погоджених зауваженнях немає; ручне опрацювання старих неправильних зв’язків/невідомих рівнів є передумовою застосування правил, а не автоматичною зміною даних.
+
+Робочі БД, дані та ключі не змінювалися. Міграції виконувалися лише в ізольованому disposable PostgreSQL 17.11 / project2_ci, випадкові схеми; власний контейнер після тестів зупинено. Reset, робочі міграції, commit/push/merge не виконувалися.
+
+
+
+<details><summary>Змінені та створені файли цього виправлення (37)</summary>
+
+```text
+app/database/postgresql.py
+app/models/organization.py
+app/models/organization_staff.py
+app/routers/admin.py
+app/routers/organization.py
+app/services/organization.py
+app/services/organization_excel.py
+app/services/organization_import.py
+app/services/staff_service.py
+app/static/css/staff_admin.css
+app/static/js/organization.js
+app/static/js/staff_admin.js
+app/templates/admin/organization.html
+app/templates/admin/organization_staff.html
+app/templates/admin/staff.html
+app/templates/components/staff_import.html
+docs/ACCESS_CONTROL.md
+docs/ARCHITECTURE.md
+docs/CURRENT_STATE.md
+docs/ORGANIZATION.md
+docs/POSTGRESQL_SETUP.md
+docs/STAFF_HISTORY.md
+migrations/sql/organization_hierarchy.sql
+migrations/versions/0010_organization_hierarchy.py
+tests/browser/assignment_history.cjs
+tests/browser/column_visibility.cjs
+tests/browser/history_forms.cjs
+tests/browser/organization.cjs
+tests/browser/staff.cjs
+tests/browser/staff_review.cjs
+tests/postgresql/test_organization_hierarchy.py
+tests/postgresql/test_organization_tree.py
+tests/test_admin_organization.py
+tests/test_admin_staff.py
+tests/test_organization.py
+tests/test_organization_hierarchy.py
+tests/test_organization_import.py
+```
+
+</details>
+
 ## Поточне оновлення: єдина дизайн-система
 
 `feature/security`, початковий HEAD **cea24ab**, початкове дерево чисте. [UI_DESIGN_SYSTEM.md](UI_DESIGN_SYSTEM.md) описує компоненти, охоплення, теми, підключення нової сторінки та обмеження. Основні референси — `01_sidebar_open_closed.webp` і `02_three_themes_open_closed.webp`; прикладні дані й нереалізовані функції з макетів не додавалися.

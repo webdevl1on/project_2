@@ -22,23 +22,22 @@ def organization(tmp_path):
 
 def revision(db,key):return db.get(OrgUnit,key,populate_existing=True).revision
 
-def create(db,actor,name,*,parent=None,kind='company',formed=D(2020,1,1),end=None):
-    return Service.create(db,actor,kind,name,formed,parent_id=parent,dissolved_on=end)
+def create(db,actor,name,*,parent=None,kind=None,formed=D(2020,1,1),end=None):
+    return Service.create(db,actor,kind or ('platoon' if parent else 'company'),name,formed,parent_id=parent,dissolved_on=end)
 
 def node(db,key,on=D(2020,1,1)):return next(item for item in Service.tree(db,on)['units'] if item['id']==key)
 
 
-def test_arbitrary_depth_and_later_parent_independent_of_kind(organization):
+def test_levels_and_later_parent_preserve_history(organization):
     db,actor=organization
     child=create(db,actor,'Перший підрозділ',kind='battalion')
-    parent=create(db,actor,'Пізніше внесений батько',kind='squad')
+    parent=create(db,actor,'Пізніше внесений батько',kind='unit')
     Service.revise(db,actor,child,revision(db,child),D(2020,6,1),parent_id=parent)
     assert node(db,child,D(2020,5,31))['parent_id'] is None
     assert node(db,child,D(2020,6,1))['parent_id']==parent
     last=child
-    for number in range(24):last=create(db,actor,f'Глибина {number}',parent=last,kind='other')
-    tree=Service.tree(db,D(2020,7,1));assert len(tree['units'])==26
-    assert tree['roots']==[parent] and node(db,child,D(2020,7,1))['kind']=='battalion'
+    for level in range(4,8):last=Service.create(db,actor,'other',f'Рівень {level}',D(2020,6,1),parent_id=last,hierarchy_level=level)
+    assert len(Service.tree(db,D(2020,7,1))['units'])==6
 
 
 def test_dated_names_do_not_rewrite_old_snapshots_and_stale_revision_fails(organization):
@@ -62,13 +61,12 @@ def test_duplicate_siblings_normalization_and_different_parents(organization):
     assert node(db,first,D(2020,3,1))['parent_id']==p
 
 
-def test_cycle_check_uses_every_historical_boundary(organization):
+def test_cycle_and_reverse_hierarchy_rejected_at_historical_boundaries(organization):
     db,actor=organization;a=create(db,actor,'А');b=create(db,actor,'Б',parent=a)
-    with pytest.raises(ValueError,match='Цикл'):Service.revise(db,actor,a,revision(db,a),D(2020,2,1),parent_id=b)
+    with pytest.raises(ValueError,match='ієрархія|Цикл'):Service.revise(db,actor,a,revision(db,a),D(2020,2,1),parent_id=b)
     Service.revise(db,actor,b,revision(db,b),D(2020,6,1),parent_id=None)
-    Service.revise(db,actor,a,revision(db,a),D(2020,6,1),parent_id=b)
-    with pytest.raises(ValueError,match='Цикл'):Service.revise(db,actor,a,revision(db,a),D(2020,5,1),parent_id=b)
-    assert node(db,a,D(2020,5,1))['parent_id'] is None
+    with pytest.raises(ValueError,match='ієрархія|Цикл'):Service.revise(db,actor,a,revision(db,a),D(2020,6,1),parent_id=b)
+    assert node(db,a,D(2020,7,1))['parent_id'] is None
 
 
 def test_sorting_cannot_move_units_to_other_parent(organization):

@@ -1,0 +1,7 @@
+/* Scoped management layout; shared themes and personnel workflows remain unchanged. */
+[data-staff-selection] form{background:none;padding:0;border:0}
+[data-staff-management] summary{font-weight:600}
+.staff-position-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:12px;align-items:end}
+.staff-position-grid label{min-width:0;font-size:13px}
+.staff-field-wide{grid-column:span 2}.staff-field-actions{grid-column:1/-1}
+@media(max-width:767px){.staff-field-wide{grid-column:span 1}}

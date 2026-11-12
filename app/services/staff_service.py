@@ -205,6 +205,8 @@ class StaffService:
             if record.annulled_at:raise ValueError('Анульовану версію не можна редагувати.')
             version_conflict(db,record.staff_structure_id,start,end,key)
             if not name.strip(): raise ValueError("Вкажіть назву версії.")
+            if any(a.assigned_from<start or (end is not None and (a.assigned_to is None or a.assigned_to>end)) for a in StaffRepository.assignments_for_version(db,key)):
+                raise ValueError('Неможливо змінити період штатки: є призначення військовослужбовців, дати яких виходять за вибраний період.')
             record.name=name.strip();record.valid_from=start;record.valid_to=end
             db.flush()  # refuses periods invalidating any assignment
 

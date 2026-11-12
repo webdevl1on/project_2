@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 from sqlalchemy import inspect,text
 
-REVISION='0009_access_control'
+REVISION='0010_organization_hierarchy'
 
 
 def require_postgresql_schema(engine):
@@ -21,7 +21,7 @@ def require_postgresql_schema(engine):
     guard_sql=(root/'initial_guards.sql').read_text()
     expected_triggers=set(re.findall(r'CREATE TRIGGER (\w+)',guard_sql)) | {'account_audit_no_update','account_audit_no_delete','users_no_insert_master','users_policy_update','users_no_delete','assignment_audit_no_update','assignment_audit_no_delete','assignment_annulled_guard','event_correction_no_update','event_correction_no_delete','person_event_no_delete','person_event_annulled_immutable'}
     expected_constraints=set(re.findall(r'ALTER TABLE (\w+) ADD CONSTRAINT (\w+)',guard_sql)) | {('user_sessions','session_mfa_times'),('auth_flows','auth_flow_kind'),('auth_flows','auth_flow_attempts'),('mfa_key_state','one_mfa_key_state'),('users','users_role_allowed'),('users','master_personal_active'),('account_audit','account_audit_operation'),('person_assignments','assignment_annulment_reason'),('assignment_audit','assignment_audit_operation')}
-    for source in ('organization_tree_guards.sql','organization_staff_guards.sql','access_guards.sql'):
+    for source in ('organization_tree_guards.sql','organization_staff_guards.sql','access_guards.sql','organization_hierarchy.sql'):
         sql=(root/source).read_text()
         expected_triggers |= set(re.findall(r'CREATE (?:CONSTRAINT )?TRIGGER (\w+)',sql))
         expected_constraints |= set(re.findall(r'ALTER TABLE (\w+) ADD CONSTRAINT (\w+)',sql))

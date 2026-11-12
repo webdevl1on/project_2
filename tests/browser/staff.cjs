@@ -62,7 +62,7 @@ module.exports=async({context,base,adminToken})=>{
             const section=page.locator('details').filter({has:page.locator('summary',{hasText:'Явно закрити'})});
             await section.locator('summary').click();
             const today=await page.evaluate(()=>new Date().toLocaleDateString('en-CA',{timeZone:'Europe/Kyiv'}));
-            await section.locator('[name="valid_to"]').fill(today);
+            await section.locator('[data-exact-date-for="valid_to"]').fill(today.split('-').reverse().join('.'));
             await section.locator('[name="confirmed"]').check();
             await Promise.all([page.waitForNavigation(),section.getByRole('button',{name:'Закрити версію'}).click()]);
             assert.ok((await page.locator('body').innerText()).includes('Версію та всі її відкриті призначення завершено'));
@@ -77,7 +77,7 @@ module.exports=async({context,base,adminToken})=>{
             await modal.locator('[name="file"]').setInputFiles(path.resolve(__dirname,'../../reference_data.xlsx'));
             await modal.locator('[name="name"]').fill('Браузерна архівна версія');
             // Earlier than the explicit synthetic regression version; no overlap.
-            await modal.locator('[name="valid_from"]').fill('1999-01-01');await modal.locator('[name="valid_to"]').fill('1999-12-31');
+            await modal.locator('[data-exact-date-for="valid_from"]').fill('01.01.1999');await modal.locator('[data-exact-date-for="valid_to"]').fill('31.12.1999');
             await Promise.all([page.waitForNavigation(),modal.getByRole('button',{name:'Перевірити файл'}).click()]);
             assert.match(await page.locator('body').innerText(),/Кількість посад/);
             assert.equal(await page.getByRole('button',{name:'Підтвердити завантаження'}).count(),1);

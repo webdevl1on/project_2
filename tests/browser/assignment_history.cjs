@@ -68,7 +68,7 @@ module.exports=async({context,base,adminToken})=>{
    await page.goto(base+'/admin/staff');await page.getByRole('button',{name:'Завантажити штатну структуру',exact:true}).click();
    const importer=page.locator('#staff-import-modal');
    await importer.locator('[name=file]').setInputFiles(require('node:path').resolve(__dirname,'../../reference_data.xlsx'));
-   await importer.locator('[name=name]').fill('Окрема тестова архівна версія');await importer.locator('[name=valid_from]').fill('1999-01-01');await importer.locator('[name=valid_to]').fill('1999-12-31');
+   await importer.locator('[name=name]').fill('Окрема тестова архівна версія');await importer.locator('[data-exact-date-for=valid_from]').fill('01.01.1999');await importer.locator('[data-exact-date-for=valid_to]').fill('31.12.1999');
    await Promise.all([page.waitForNavigation(),importer.getByRole('button',{name:'Перевірити файл'}).click()]);
    await Promise.all([page.waitForNavigation(),page.getByRole('button',{name:'Підтвердити завантаження'}).click()]);
    const imported=new URL(page.url()).searchParams.get('version_id');
