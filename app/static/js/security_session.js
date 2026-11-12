@@ -22,7 +22,10 @@
   if(local&&url.pathname==='/auth/mfa/finish'&&response.ok){
    try{const data=await response.clone().json();if(data.csrf_token){const meta=document.querySelector('meta[name="project2-csrf"]');if(meta)meta.content=data.csrf_token;document.querySelectorAll('form input[name=csrf]').forEach(input=>{input.value=data.csrf_token;input.defaultValue=data.csrf_token;});}}catch{}
   }
-  if(local&&response.status===403){try{const detail=(await response.clone().json()).detail;if(typeof detail==='string'&&detail.startsWith('MFA_REAUTH_REQUIRED')&&!document.getElementById('mfa-reauth-needed')){const box=document.createElement('div');box.id='mfa-reauth-needed';box.className='alert alert-warning';box.append('Потрібне свіже підтвердження особи. ');const link=document.createElement('a');link.href='/account/security';link.textContent='Підтвердити пароль і MFA';box.append(link);document.body.prepend(box);}}catch{}}
+  if(local&&response.status===403){try{const detail=(await response.clone().json()).detail;if(typeof detail==='string'&&detail.startsWith('MFA_REAUTH_REQUIRED')){
+   const handled=!document.dispatchEvent(new CustomEvent('project2:mfa-required',{cancelable:true,detail:{url:url.href}}));
+   if(!handled&&!document.getElementById('mfa-reauth-needed')){const box=document.createElement('div');box.id='mfa-reauth-needed';box.className='alert alert-warning';box.append('Потрібне свіже підтвердження особи. ');const link=document.createElement('a');link.href='/account/security';link.textContent='Підтвердити пароль і MFA';box.append(link);document.body.prepend(box);}
+  }}catch{}}
   if(local&&response.status===401&&url.pathname!='/auth/login')expired();
   return response;
  };

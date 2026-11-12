@@ -1,5 +1,59 @@
 # Поточний стан project_2
 
+## Security 1.4 — UI повторного MFA та форми доступу
+
+`feature/security`, початковий HEAD **5181944**, початкове дерево чисте. Реалізовано лише повторне підтвердження без втрати чернетки, зрозумілий вибір шаблону/підрозділу та формат дат/часу.
+
+- Серверний строк свіжого MFA — ті самі 5 хвилин. Реальний криптографічний Passkey перевірено на вході, до межі 5 хв та після неї; передчасної відмови для свіжого фактора не відтворено. На самій межі потрібна нова перевірка. Сесія, її абсолютний строк, CSRF та ACL не послаблені.
+- `/admin/access` замість технічного MFA-коду відкриває Bootstrap modal з чинною формою пароля та чинним MFA flow у same-origin iframe. Reauth mode змінює лише подання наявних HTML-сторінок. Після успіху origin/source-перевірене повідомлення повертає до того самого DOM, без replay критичного POST; потрібне повторне натискання користувача. Закриття/скасування не очищує матрицю, причину, дати чи вибір. Немає збереження паролів, кодів або чернеток у browser storage.
+- Шаблони вибираються за назвою; підрозділи — за повним шляхом із пошуком, тільки з вже дозволених matrix.rows. Значення POST залишаються реальними ID. Однакові назви в різних гілках розрізняються шляхом, недоступні/context-only вибори не додаються. Правила призначення, активності й успадкування шаблону не змінено.
+- Усі starts_at/ends_at форм ACL використовують спільний ProfileDates для ДД.ММ.РРРР і текстовий 24-годинний ГГ:ХХ замість локалізованого datetime-local. Named hidden ISO лишається чинним контрактом; перетворення місцевого часу браузера в UTC збережено. Неправильна/часткова дата блокує форму, порожня необов’язкова пара дозволена. Інші предметні дати/БД не змінено.
+
+Фактично виконано на синтетичних облікових записах та ізольованій SQLite:
+
+| Перевірка | Результат |
+| --- | --- |
+| `.venv/bin/python -m pytest tests/test_mfa.py tests/test_access_control.py tests/test_access_http.py tests/test_access_mfa_ui.py tests/test_ui_design.py tests/test_application_security.py -q --tb=short` | **264 passed**, 73,25 с; реальні WebAuthn-підписи, межі часу з керованим clock, reauth/expiry, embedded-сесії, ACL/CSRF та спільні шаблони. |
+| `node --test tests/js/*.test.cjs` | **64 passed**, без skipped: повні шляхи/ID/відбір доступних рядків, календар/24-годинний час, MFA UI hook і незмінений fallback інших сторінок. |
+| Chromium: `access_forms`, `access_control`, `security_mfa` через `tests/browser/column_visibility.cjs` | **14 PASS**, усі suite exit 0: 4 нові + 7 ACL + 3 MFA. Реальний CTAP2 virtual authenticator, Passkey login та reauth в iframe, скасування/чернетки/no replay, ID/UTC POST, однакові назви, невалідна/порожня дата. Англомовний browser / Europe/Kyiv показує ДД.ММ.РРРР та 24-годинний час; 390/768/1280 px без overflow/pageerror. |
+| Python AST / усі Jinja / змінені JS syntax / diff check / Alembic heads | Успішно; head лишився **0010_organization_hierarchy**. |
+
+Повний `tests/`, PostgreSQL suite, Firefox/Safari та реальні Windows Hello/Android/апаратні ключі цього UI-етапу не запускалися. Залишаються два попередні deprecation warnings Starlette/httpx та AnyIO. Окремої проблеми дострокового спливу MFA у сервісі не виявлено; у відтвореному сценарії відмова виникає після чинного строку. Відомих незавершених частин погодженого UI-виправлення немає.
+
+Не змінено ORM/схему, ролі, ACL-матрицю, MFA/CSRF/session policy, кадрову логіку або Security 1.5. Python — лише контекст двох наявних HTML-відповідей у routers/mfa.py. Не додано залежностей, нових production HTTP-маршрутів чи міграцій. Робочі дані/reset/production migrations не використовувалися. Git-обсяг — лише файли цього виправлення, повідомлення коміту `fix(security): improve MFA reauth and access forms`; push/merge заборонені та не виконуються.
+
+
+
+<details><summary>Файли UI-виправлення Security 1.4 (23)</summary>
+
+```text
+app/routers/mfa.py
+app/static/css/access.css
+app/static/js/access_choices.js
+app/static/js/access_matrix.js
+app/static/js/access_reauth.js
+app/static/js/profile_datetimes.js
+app/static/js/security_mfa.js
+app/static/js/security_session.js
+app/templates/account_security.html
+app/templates/admin/access.html
+app/templates/components/access_reauth.html
+app/templates/mfa.html
+docs/ACCESS_CONTROL.md
+docs/ARCHITECTURE.md
+docs/CURRENT_STATE.md
+docs/DATE_SYSTEM.md
+docs/SECURITY.md
+tests/browser/access_forms.cjs
+tests/browser/column_visibility.cjs
+tests/browser/serve_column_visibility.py
+tests/js/access_forms.test.cjs
+tests/js/security_session.test.cjs
+tests/test_access_mfa_ui.py
+```
+
+</details>
+
 ## Виправлення чотирьох зауважень ручного тестування
 
 `feature/security`, початковий HEAD **138acaa**, початкове дерево чисте. Реалізовано лише погоджені зміни:

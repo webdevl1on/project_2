@@ -87,7 +87,7 @@ async function main() {
         await signIn();
         const suites = ["ui_design", "ui_api", "presets", "layout", "filters", "history", "integration", "dates", "domain_dates", "catalog", "copy", "staff", "organization", "organization_staff", "events", "journal", "event_lifecycle", "event_corrections", "journal_snapshot", "history_forms", "assignment_history", "security", "account_management", "security_mfa", "access_control", "name_cases", "geography", "contacts", "personnel", "service_bases", "documents", "workspace", "medical", "injury_vlk", "vlk_workflow"];
         if (process.env.COLUMN_STAGE) {
-            assert.ok([...suites,'staff_review','dev_auth','open_access','profile_dates','document_ui','document_workflow','additional_records'].includes(process.env.COLUMN_STAGE));
+            assert.ok([...suites,'access_forms','staff_review','dev_auth','open_access','profile_dates','document_ui','document_workflow','additional_records'].includes(process.env.COLUMN_STAGE));
             await require(`./${process.env.COLUMN_STAGE}.cjs`)({ context, base, adminToken, assets });
             return;
         }

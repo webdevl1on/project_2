@@ -213,6 +213,22 @@ def access_fixture():
         return {'user':user,'other':other,'master':master,'admin':admin.id,'root':root,'unit':unit,'hidden':hidden,'positions':[p.position_id for p in positions],'document':doc,'file':file}
 
 
+@app.post('/_column-test/access/expire-mfa')
+def access_mfa_expiry_fixture():
+    """Age only synthetic test sessions; never installed by app.main."""
+    from datetime import timedelta
+    from sqlalchemy import select
+    from app.models import User,UserSession
+    with Session() as db:
+        user=db.scalar(select(User).where(User.username=='browser-admin'))
+        for session in db.scalars(select(UserSession).where(UserSession.user_id==user.id)):
+            session.created_at-=timedelta(minutes=6)
+            session.mfa_verified_at-=timedelta(minutes=6)
+            session.expires_at-=timedelta(minutes=6)
+        db.commit()
+    return {'ok':True}
+
+
 @app.post('/_column-test/many-positions')
 def many_positions():
     with Session() as db:

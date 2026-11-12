@@ -30,8 +30,8 @@ async def data(request):
 
 @router.get('/auth/mfa')
 async def mfa_page(request:Request,db:Session=Depends(get_db)):
-    await pending_request(request,db)
-    return templates.TemplateResponse(request=request,name='mfa.html',context={})
+    _,flow=await pending_request(request,db)
+    return templates.TemplateResponse(request=request,name='mfa.html',context={'embedded_reauth':flow.kind=='reauth' and request.query_params.get('reauth')=='1'})
 
 @router.get('/auth/mfa/state')
 async def state(request:Request,db:Session=Depends(get_db)):
@@ -62,7 +62,7 @@ async def pending_action(request:Request,action:str,db:Session=Depends(get_db)):
 
 @router.get('/account/security')
 def security_page(request:Request,user=Depends(current_user)):
-    return templates.TemplateResponse(request=request,name='account_security.html',context={})
+    return templates.TemplateResponse(request=request,name='account_security.html',context={'embedded_reauth':request.query_params.get('reauth')=='1'})
 
 @router.get('/account/security/state')
 def security_state(user=Depends(current_user),db:Session=Depends(get_db)):
