@@ -59,6 +59,8 @@ def begin(db,username,password,return_to='/persons',session_token=None,kind=None
         if not user or not valid or not user.is_active or locked:
             denied=True
             if user and user.is_active and not locked:failure_user(user)
+            from app.models.accounts import AccountAudit
+            db.add(AccountAudit(user_id=user.id if user else None,actor_user_id=None,operation='login_failed',before={},after={}))
         else:
             session=None
             if session_token:
@@ -74,6 +76,8 @@ def failure_user(user):
 
 def failure(db,user,flow):
     flow.attempts+=1;failure_user(user)
+    from app.models.accounts import AccountAudit
+    db.add(AccountAudit(user_id=user.id,actor_user_id=None,operation='mfa_failed',before={},after={}))
 
 def state(db,token):
     user,flow=pending(db,token)
@@ -200,6 +204,7 @@ def finish(db,token):
             return {'ok':True,'redirect_to':'/account/security'}
         token=secrets.token_urlsafe(48);csrf=secrets.token_hex(32);at=now()
         db.add(UserSession(token_hash=accounts.digest_token(token),user_id=user.id,csrf_token=csrf,public_id=secrets.token_hex(16),created_at=at,last_activity=at,mfa_verified_at=at,expires_at=at+timedelta(hours=8)))
+        audit(db,user.id,'login')
         return {'ok':True,'token':token,'csrf_token':csrf,'redirect_to':flow.return_to}
 
 def settings(db,uid):

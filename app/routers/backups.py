@@ -16,6 +16,22 @@ def page(request:Request,user=Depends(current_user),db:Session=Depends(get_db)):
 def status(user=Depends(current_user),db:Session=Depends(get_db)):
     return commands.status(db,user.id)
 
+@router.get('/volumes')
+def volumes(user=Depends(current_user),db:Session=Depends(get_db)):
+    try:return commands.volumes(db,user.id)
+    except ValueError as error:raise HTTPException(409,'USB недоступний. Перевірте локальне підключення до Windows-сервера, список дозволених носіїв та BitLocker.') from None
+
+@router.post('/emergency')
+@router.post('/statistics')
+@router.post('/usb')
+async def maintenance(request:Request,user=Depends(current_user),db:Session=Depends(get_db)):
+    operation=request.url.path.rsplit('/',1)[-1]
+    try:
+        details=await request.json() if operation=='usb' else None
+        return JSONResponse(commands.enqueue(db,user.id,operation,details=details),status_code=202)
+    except PermissionError:raise
+    except (ValueError,KeyError,TypeError,OSError):raise HTTPException(409,'Завдання відхилено. Перевірте захищені каталоги, носій і налаштування worker.') from None
+
 @router.post('/create')
 @router.post('/verify/{identity}')
 def enqueue(request:Request,identity:str|None=None,user=Depends(current_user),db:Session=Depends(get_db)):

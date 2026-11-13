@@ -39,7 +39,7 @@ def require_current_schema(engine):
         required |= GUARD_NAMES
         from app.models.medical import GUARDS
         required |= GUARDS
-        required |= {'access_audit_no_update','access_audit_no_delete'} | {table+'_no_delete' for table in ('access_rules','access_templates','access_template_assignments','position_access_policies','temporary_access','access_delegations','access_reviews')}
+        required |= {'subject_audit_no_update','subject_audit_no_delete','access_audit_no_update','access_audit_no_delete'} | {table+'_no_delete' for table in ('access_rules','access_templates','access_template_assignments','position_access_policies','temporary_access','access_delegations','access_reviews')}
         with engine.connect() as connection:
             installed=set(connection.execute(text("SELECT name FROM sqlite_master WHERE type='trigger'")).scalars())
         missing.extend("trigger:"+name for name in sorted(required-installed))

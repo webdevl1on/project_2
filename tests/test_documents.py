@@ -265,11 +265,13 @@ def old_database(path):
     from app.models.documents import NEW_TABLE_NAMES
     engine=create_engine('sqlite:///'+str(path))
     Base.metadata.create_all(engine,tables=[t for t in Base.metadata.sorted_tables if t.name not in NEW_TABLE_NAMES])
-    with sessionmaker(bind=engine)() as db:
-        p=Person(tax_number='0000000001');db.add(p);db.flush()
-        db.add_all([Passport(person_id=p.person_id,passport_number='00123',passport_issued_year=2015,is_active=True),
-                    Passport(person_id=p.person_id,passport_number='00456',passport_issued_year=2010,is_active=True)])
-        db.commit()
+    # Historical pre-account fixture uses Core, not today's ORM audit hooks:
+    # migration must not invent an author/operation before accounts existed.
+    with engine.begin() as db:
+        pid=db.scalar(Person.__table__.insert().values(tax_number='0000000001').returning(Person.person_id))
+        db.execute(Passport.__table__.insert(),[
+            {'person_id':pid,'passport_number':'00123','passport_issued_year':2015,'is_active':True},
+            {'person_id':pid,'passport_number':'00456','passport_issued_year':2010,'is_active':True}])
     engine.dispose()
 
 

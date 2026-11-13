@@ -2,7 +2,7 @@
 
 Цільова СУБД — PostgreSQL **17**, синхронний psycopg 3 / SQLAlchemy. SQLite залишається лише для явних legacy-утиліт і наявних тестів. Перенесення старих персональних даних не реалізоване й автоматично не виконується.
 
-Security 1.1–1.3 забезпечують персональний вхід, MFA, CSRF і сесії 15 хв / 8 год. Security 1.4 додає scoped ACL поверх організаційної структури. Поточний head — **0010_organization_hierarchy**, після 0009; див. [SECURITY.md](SECURITY.md) та [ACCESS_CONTROL.md](ACCESS_CONTROL.md).
+Security 1.1–1.3 забезпечують персональний вхід, MFA, CSRF і сесії 15 хв / 8 год. Security 1.4 додає scoped ACL поверх організаційної структури. Поточний head — **0011_security_operations_audit**, після 0010; див. [SECURITY.md](SECURITY.md) та [ACCESS_CONTROL.md](ACCESS_CONTROL.md).
 
 `0010_organization_hierarchy` додає рівень other, нові види та основну ієрархію; [ORGANIZATION.md](ORGANIZATION.md). Старі other залишають NULL. Старі зворотні/однакові рівні відомих типів блокують upgrade з ID проблеми; виправте підпорядкування явно старим інтерфейсом до міграції. Відмова відкочує DDL і не змінює даних. Перед ручним upgrade — перевірений backup. Ревізія застосовувалася тут лише до ізольованих випадкових схем project2_ci, не dev/prod. Reset не потрібний.
 
@@ -294,7 +294,7 @@ python -c "from app.database.db import engine; from app.database.schema_check im
 
 ## Організаційна структура — 0008_organization
 
-Організаційна ревізія — **0008_organization** після 0007; поточний head — **0010_organization_hierarchy**. Вісім нових таблиць дерева/оперативного підпорядкування/аудиту/покриття/квитанцій/перепризначення, nullable організаційні FK старих StaffStructure/Position, періоди й логічне анулювання Position та метадані анулювання StaffVersion. Старі люди, накази, призначення, User/MFA й аудит зберігаються; автоматичного зіставлення й минулих фіктивних подій немає.
+Організаційна ревізія — **0008_organization** після 0007; поточний head — **0011_security_operations_audit**. Вісім нових таблиць дерева/оперативного підпорядкування/аудиту/покриття/квитанцій/перепризначення, nullable організаційні FK старих StaffStructure/Position, періоди й логічне анулювання Position та метадані анулювання StaffVersion. Старі люди, накази, призначення, User/MFA й аудит зберігаються; автоматичного зіставлення й минулих фіктивних подій немає.
 
 Нова ревізія замінює активний UNIQUE номера посади й EXCLUDE періоду версій на предикати `annulled_at IS NULL`; відкладений EXCLUDE OrgCoverage дає одне джерело на unit/date. Заморожені SQL `organization_tree_guards.sql` та `organization_staff_guards.sql` перевіряють дерево на всіх періодах, життя підрозділів, належність посад, чинність призначень і незмінність історії/аудиту. Schema checker вимагає нові таблиці, колонки, guards, CHECK та активні предикати.
 
@@ -303,3 +303,10 @@ python -c "from app.database.db import engine; from app.database.schema_check im
 Перед ручним `python -m alembic upgrade 0008_organization` зупинити застосунок, перевірити цільову БД/оточення й зробити перевірений backup із цього документа. Автоматичного startup upgrade, create_all чи reset немає. Downgrade не видаляє організаційну історію: відновлення — у нову БД з backup. Після upgrade потрібне явне GUI-зіставлення старих структур і всіх їхніх посад. Подробиці й приклад — [ORGANIZATION.md](ORGANIZATION.md).
 
 Перевірки виконуються лише в project2_ci зі випадковою схемою на тест. Новий `tests/postgresql/test_organization_staff.py` перевіряє upgrade 0007→0008 двічі зі старими записами, ефективний ротний знімок без дублювання, DB guards, конкурентне підтвердження/призначення та rollback. Development/production у цьому етапі не змінювалися.
+
+
+## Security 1.6 — аудит та ізольоване резервування
+
+Адитивна `0011_security_operations_audit` після `0010_organization_hierarchy`: нова `subject_audit` з FK/index/CHECK/append-only triggers та розширення AccountAudit для login/login_failed/mfa_failed/logout. NULL user_id дозволено тільки для невдалого входу невідомого користувача; введені логіни/паролі/коди не журналюються. Старі користувачі, MFA, сесії, предметні записи й аудити не переписуються, backfill немає. Schema checker перевіряє новий head та guards. Downgrade не видаляє історію й відхиляється.
+
+Робочий upgrade — тільки вручну після перевіреної копії попередньою сумісною версією та backup окремих ключів. Startup і worker не мігрують PostgreSQL. Повний погодинний цикл використовує чинні pg_dump/pg_restore 17 та нову випадкову CI-БД. У development/production drill host/port повинен відрізнятися від робочого кластера; CI-контрольна БД — тільки project2_ci. Збережений dump не застосовується до project2_dev/project2_prod. Runbook Windows, дозволи, аварійні Excel та ручна процедура recovery — [BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md). Фактичні результати — [SECURITY16_REPORT.md](SECURITY16_REPORT.md).

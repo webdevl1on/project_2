@@ -16,7 +16,7 @@ def test_every_full_document_uses_the_shared_layout():
         if path.parent.name=='layouts':continue
         assert '<!doctype' not in source.lower(),str(path)
         if "extends 'layouts/" in source:pages.append(path)
-    assert len(pages)==39
+    assert len(pages)==40
     base=(ROOT/'app/templates/layouts/base.html').read_text()
     assert base.index('theme_manager.js')<base.index('bootstrap.min.css')
     assert base.count('security_session.html')==1

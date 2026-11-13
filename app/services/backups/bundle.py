@@ -6,7 +6,7 @@ from cryptography.fernet import Fernet
 from sqlalchemy import text
 from app.database.postgresql import REVISION
 from app.security.mfa_config import MARKER
-from .crypto import private_file,private_dir,sha,canonical
+from .crypto import private_file,private_dir,sha,canonical,METADATA_LIMIT
 
 SECRET_NAMES=('PROJECT2_MFA_KEYS','PROJECT2_MFA_CURRENT_KEY','STAFF_SIGNING_KEY','PROJECT2_WEBAUTHN_RP_ID','PROJECT2_WEBAUTHN_ORIGINS')
 
@@ -28,11 +28,13 @@ def check_mfa(connection,values):
     except Exception:raise ValueError('BACKUP_MFA_KEYS_MISMATCH') from None
 
 def inventory(source,target,*,immutable=False):
+    from .safe_files import no_links
+    no_links(source)
     private_dir(target);result=[]
     if not source.exists():return result
     if source.is_symlink():raise ValueError('BACKUP_SYMLINK_FORBIDDEN')
     for path in sorted(source.rglob('*')):
-        if path.is_symlink():raise ValueError('BACKUP_SYMLINK_FORBIDDEN')
+        no_links(path)
         if path.is_dir():continue
         if immutable and path.name.startswith('.pending-'):continue
         if not path.is_file():raise ValueError('BACKUP_SPECIAL_FILE_FORBIDDEN')
@@ -84,8 +86,8 @@ def open_bundle(config,ring,secret_ring,archive,capsule):
                 for item in source:
                     path=PurePosixPath(item.name)
                     if not item.isfile() or path.is_absolute() or '..' in path.parts or '\\' in item.name or ':' in item.name or item.name in members or len(item.name)>1000:raise ValueError('BACKUP_ARCHIVE_INVALID')
-                    if item.name=='manifest.json' and item.size>16*1024**2:raise ValueError('BACKUP_MANIFEST_TOO_LARGE')
-                    if item.name not in ('database.dump','manifest.json','operations.json') and not item.name.startswith(('documents/','photos/')):raise ValueError('BACKUP_ARCHIVE_INVALID')
+                    if item.name=='manifest.json' and item.size>METADATA_LIMIT:raise ValueError('BACKUP_MANIFEST_TOO_LARGE')
+                    if item.name not in ('database.dump','manifest.json','operations.json','photo-index.json') and not item.name.startswith(('documents/','photos/','operations/')):raise ValueError('BACKUP_ARCHIVE_INVALID')
                     total+=item.size
                     if item.size<0 or total>config.max_bytes:raise ValueError('BACKUP_ARCHIVE_TOO_LARGE')
                     target=root.joinpath(*path.parts);private_dir(target.parent)

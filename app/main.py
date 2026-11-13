@@ -93,6 +93,8 @@ async def permission_error(request:Request,error:PermissionError):
 
 from app.routers import backups
 app.include_router(backups.router)
+from app.routers import audit
+app.include_router(audit.router)
 from app.database.backup_maintenance import MaintenanceUnavailable
 @app.exception_handler(MaintenanceUnavailable)
 async def maintenance_error(request:Request,error:MaintenanceUnavailable):

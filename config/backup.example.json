@@ -4,9 +4,9 @@
   "secrets_key_file": "C:/project2-secrets/recovery-keys.json",
   "secrets": "C:/project2-recovery-capsules",
   "staging": "C:/project2-backup-staging",
-  "external": "D:/project2-offsite",
-  "external_marker": "SET_VERIFIED_VOLUME_ID",
-  "interval_minutes": 30,
+  "external": null,
+  "external_marker": "",
+  "interval_minutes": 60,
   "daily_hour": 2,
   "full_days": 14,
   "checkpoint_hours": 48,
@@ -15,5 +15,14 @@
   "alert_command": [],
   "tool_dir": "C:/Program Files/PostgreSQL/17/bin",
   "drill_root": "C:/project2-recovery-drills",
-  "drill_hours": 168
+  "drill_hours": 168,
+  "drill_each_backup": true,
+  "emergency_root": "C:/project2-emergency/Project_2",
+  "emergency_enabled": false,
+  "emergency_hour": 18,
+  "emergency_max_bytes": 107374182400,
+  "usb_volume_ids": [],
+  "archive_sids": [],
+  "service_sids": [],
+  "photo_index": null
 }

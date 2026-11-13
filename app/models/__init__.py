@@ -65,3 +65,6 @@ from app.models.access import AccessTemplate,TemplateAssignment,PositionAccessPo
 from app.services import access_reviews as _access_reviews
 from app.security import access_writes as _access_writes
 from app.database import backup_maintenance as _backup_maintenance
+from app.models.subject_audit import SubjectAudit
+from app.services.subject_audit import install as _install_subject_audit
+_install_subject_audit()

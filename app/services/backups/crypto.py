@@ -7,6 +7,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidTag
 
 MAGIC=b'P2BACKUP1\n';BLOCK=1024*1024
+METADATA_LIMIT=128*1024**2
 
 def canonical(data):return json.dumps(data,sort_keys=True,separators=(',',':'),ensure_ascii=True).encode()
 def private_dir(path):path.mkdir(parents=True,exist_ok=True,mode=0o700)
@@ -30,15 +31,17 @@ class Keyring:
     def signed(self,data):return {'key':self.current,'data':data,'mac':self.mac(self.current,data)}
     def read(self,path):
         try:
-            if path.is_symlink() or path.stat().st_size>16*1024**2:raise ValueError()
+            if path.is_symlink() or path.stat().st_size>METADATA_LIMIT:raise ValueError()
             record=json.loads(path.read_text())
             if not hmac.compare_digest(self.mac(record['key'],record['data']),record['mac']):raise ValueError()
             return record['data']
         except (KeyError,ValueError,TypeError,OSError):raise ValueError('BACKUP_METADATA_INVALID') from None
     def save(self,path,data):
+        encoded=canonical(self.signed(data))
+        if len(encoded)>METADATA_LIMIT:raise ValueError('BACKUP_METADATA_TOO_LARGE')
         temporary=path.with_name('.'+path.name+'.'+os.urandom(8).hex())
         try:
-            with private_file(temporary) as out:out.write(canonical(self.signed(data)));out.flush();os.fsync(out.fileno())
+            with private_file(temporary) as out:out.write(encoded);out.flush();os.fsync(out.fileno())
             os.replace(temporary,path)
         finally:temporary.unlink(missing_ok=True)
     def encrypt(self,source,target,*,limit):

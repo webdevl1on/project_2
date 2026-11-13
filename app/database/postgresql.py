@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 from sqlalchemy import inspect,text
 
-REVISION='0010_organization_hierarchy'
+REVISION='0011_security_operations_audit'
 
 
 def require_postgresql_schema(engine):
@@ -25,6 +25,8 @@ def require_postgresql_schema(engine):
         sql=(root/source).read_text()
         expected_triggers |= set(re.findall(r'CREATE (?:CONSTRAINT )?TRIGGER (\w+)',sql))
         expected_constraints |= set(re.findall(r'ALTER TABLE (\w+) ADD CONSTRAINT (\w+)',sql))
+    expected_triggers |= {'subject_audit_no_update','subject_audit_no_delete'}
+    expected_constraints |= {('subject_audit','subject_audit_operation'),('account_audit','account_audit_target')}
     for table_name in ('org_units','org_unit_states','org_operational_subordinations','org_audit',
                        'org_staff_coverage','org_staff_imports','org_staff_import_rows','org_reassignments','positions','staff_versions'):
         expected_constraints |= {(table_name,c.name) for c in Base.metadata.tables[table_name].constraints if c.name and c.name.startswith('org_')}

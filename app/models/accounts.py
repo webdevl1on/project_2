@@ -42,13 +42,14 @@ class AccountAudit(Base):
     __tablename__='account_audit'
     id: Mapped[int] = mapped_column(primary_key=True)
     actor_user_id: Mapped[int | None] = mapped_column(ForeignKey('users.id'))
-    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'),index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey('users.id'),index=True)
     occurred_at: Mapped[datetime] = mapped_column(DateTime,default=lambda:datetime.now(UTC))
     operation: Mapped[str] = mapped_column(String(30))
     before: Mapped[dict] = mapped_column(JSON)
     after: Mapped[dict] = mapped_column(JSON)
     reason: Mapped[str | None] = mapped_column(String(2000))
-    __table_args__=(CheckConstraint("operation IN ('create','edit','role_change','block','unblock','password_reset','password_change','sessions_revoke','promote_master','mfa_enroll','factor_add','factor_remove','backup_use','backup_generate','mfa_recover','mfa_reauth')",name='account_audit_operation'),)
+    __table_args__=(CheckConstraint("operation IN ('create','edit','role_change','block','unblock','password_reset','password_change','sessions_revoke','promote_master','mfa_enroll','factor_add','factor_remove','backup_use','backup_generate','mfa_recover','mfa_reauth','login','login_failed','mfa_failed','logout')",name='account_audit_operation'),
+                   CheckConstraint("user_id IS NOT NULL OR operation='login_failed'",name='account_audit_target'),)
 
 
 @event.listens_for(Base.metadata,'after_create')

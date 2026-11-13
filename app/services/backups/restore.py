@@ -32,6 +32,7 @@ def plan(backup,identity,target,*,actor,reason,external=False):
         raise
 
 def _plan(backup,identity,target,*,actor,reason,external=False):
+    backup.check_storage()
     if not isinstance(reason,str) or not reason.strip() or len(reason)>2000:raise ValueError('RESTORE_REASON_REQUIRED')
     url=target_url(target)
     if url.database==backup.db_engine.url.database:raise ValueError('RESTORE_SOURCE_FORBIDDEN')
@@ -55,6 +56,7 @@ def apply(backup,plan_id,target,output_root,*,actor,confirmed,authorize=None):
         raise
 
 def _apply(backup,plan_id,target,output_root,*,actor,confirmed,authorize=None):
+    backup.check_storage()
     if confirmed is not True:raise ValueError('RESTORE_CONFIRMATION_REQUIRED')
     if actor is None and authorize is None:raise ValueError('RESTORE_MASTER_PROOF_REQUIRED')
     result=backup.ring.read(backup.config.root/'plans'/(key(plan_id)+'.json'));url=target_url(target)
@@ -100,6 +102,8 @@ def _apply(backup,plan_id,target,output_root,*,actor,confirmed,authorize=None):
                     else:private_dir(stage/name)
                 validate_refs(stage,manifest['references'])
                 if (root/'operations.json').exists():shutil.copyfile(root/'operations.json',stage/'prior-operations.json')
+                if (root/'operations').exists():shutil.copytree(root/'operations',stage/'prior-operations')
+                if (root/'photo-index.json').exists():shutil.copyfile(root/'photo-index.json',stage/'photo-index.json')
                 # No plaintext MFA keys are published. Operator provisions them from this separate capsule.
                 shutil.copyfile(capsule,stage/'critical-config.p2s');os.chmod(stage/'critical-config.p2s',0o600)
                 report={'id':plan_id,'backup_id':result['backup_id'],'schema':manifest['schema'],'target':url.database,'restored_at':stamp(),'restore_seconds':time.monotonic()-start,'snapshot_at':manifest['snapshot_at'],'counts':manifest['counts'],'sessions_revoked':True,'state':'VERIFIED_ISOLATED','confirmed_master_id':verified_actor}

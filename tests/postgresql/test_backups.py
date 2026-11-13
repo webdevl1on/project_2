@@ -115,18 +115,18 @@ def test_missing_file_failed_backup_and_corruption_keep_previous_point(prepared,
     with pytest.raises(ValueError):backup.create()
     assert archive.read_bytes()==original and backup.store.status()['last_failure']
     path.write_bytes(content);damaged=bytearray(original);damaged[-30]^=1;archive.write_bytes(damaged)
-    with pytest.raises(ValueError):restore.plan(backup,record['id'],str(target),actor=ids['master'],reason='Перевірка пошкодження')
+    with pytest.raises(ValueError):restore.plan(backup,record['id'],target.render_as_string(hide_password=False),actor=ids['master'],reason='Перевірка пошкодження')
     assert backup.store.read('catalog',record['id'])['integrity']=='VERIFIED' # plan never trusts or changes catalog status
 
 
 def test_failed_restore_never_touches_source_or_publishes_files(prepared,target,tmp_path,monkeypatch):
-    backup,factory,ids=prepared;record=backup.create();plan=restore.plan(backup,record['id'],str(target),actor=ids['master'],reason='Тест відмови')
+    backup,factory,ids=prepared;record=backup.create();plan=restore.plan(backup,record['id'],target.render_as_string(hide_password=False),actor=ids['master'],reason='Тест відмови')
     public=Path(__file__).resolve().parents[2]/'app'/'static'/'insecure-recovery'
     with pytest.raises(ValueError,match='OUTPUT_OVERLAPS_SOURCE'):
-        restore.apply(backup,plan['id'],str(target),public,actor=ids['master'],confirmed=True)
+        restore.apply(backup,plan['id'],target.render_as_string(hide_password=False),public,actor=ids['master'],confirmed=True)
     def fail(*_):raise ValueError('synthetic postcheck failure')
     monkeypatch.setattr(restore,'require_postgresql_schema',fail)
-    with pytest.raises(ValueError,match='QUARANTINED'):restore.apply(backup,plan['id'],str(target),tmp_path/'never-published',actor=ids['master'],confirmed=True)
+    with pytest.raises(ValueError,match='QUARANTINED'):restore.apply(backup,plan['id'],target.render_as_string(hide_password=False),tmp_path/'never-published',actor=ids['master'],confirmed=True)
     assert not (tmp_path/'never-published').exists()
     with factory() as db:assert db.get(Person,ids['person']) and accounts.authenticate(db,ids['token'])
 
@@ -161,11 +161,13 @@ def test_retention_does_not_remove_good_older_copy_if_newer_is_damaged(prepared,
     changed=bytearray(new.read_bytes());changed[-25]^=1;new.write_bytes(changed)
     from datetime import timedelta
     monkeypatch.setattr(module,'now',lambda:datetime.now(UTC)+timedelta(days=100))
-    backup.prune();assert old.exists() and backup.verify(rows[0]['id'])['id']==rows[0]['id']
+    with pytest.raises(ValueError,match='AUTOMATIC_RETENTION_DISABLED'):backup.prune()
+    assert old.exists() and backup.verify(rows[0]['id'])['id']==rows[0]['id']
 
 
-def test_worker_jobs_survive_restart_recheck_identity_and_do_not_invent_actor(prepared):
+def test_worker_jobs_survive_restart_recheck_identity_and_do_not_invent_actor(prepared,tmp_path,monkeypatch):
     backup,factory,ids=prepared
+    approve_worker_drill(backup,ids,tmp_path,monkeypatch)
     job=backup.store.enqueue('create',ids['master'])
     restarted=BackupEngine(backup.db_engine,backup.settings,backup.config);assert restarted.run_once()
     done=backup.store.read('jobs',job['id']);assert done['state']=='SUCCESS'
@@ -177,9 +179,9 @@ def test_worker_jobs_survive_restart_recheck_identity_and_do_not_invent_actor(pr
 def test_version_mismatch_and_wrong_capsule_key_refuse_restore_without_touching_target(prepared,target,tmp_path):
     backup,_,ids=prepared;record=backup.create()
     mismatched=BackupEngine(backup.db_engine,backup.settings,replace(backup.config,release='different-release'))
-    with pytest.raises(ValueError,match='VERSION'):restore.plan(mismatched,record['id'],str(target),actor=ids['master'],reason='Перевірка версії')
+    with pytest.raises(ValueError,match='VERSION'):restore.plan(mismatched,record['id'],target.render_as_string(hide_password=False),actor=ids['master'],reason='Перевірка версії')
     backup.secret_ring=backup.ring
-    with pytest.raises(ValueError,match='AUTHENTICATION'):restore.plan(backup,record['id'],str(target),actor=ids['master'],reason='Перевірка ключа')
+    with pytest.raises(ValueError,match='AUTHENTICATION'):restore.plan(backup,record['id'],target.render_as_string(hide_password=False),actor=ids['master'],reason='Перевірка ключа')
     with create_engine(target).connect() as db:assert db.scalar(text("SELECT count(*) FROM pg_tables WHERE schemaname NOT IN ('pg_catalog','information_schema')"))==0
 
 
@@ -191,6 +193,7 @@ def test_chromium_real_backup_queue_and_worker(prepared,monkeypatch,tmp_path):
     from app.database.db import get_db
     from app.services.backups import commands
     backup,factory,ids=prepared;monkeypatch.setattr(commands,'settings',backup.settings)
+    approve_worker_drill(backup,ids,tmp_path,monkeypatch)
     config=asdict(backup.config)
     for k,v in list(config.items()):
         if isinstance(v,Path):config[k]=str(v)
@@ -225,11 +228,11 @@ def test_disaster_recovery_requires_real_restored_master_and_mfa(prepared,target
     backup,factory,ids=prepared
     with factory() as db:code=mfa.backup_generate(db,ids['master'])[0]
     record=backup.create()
-    proposal=restore.plan(backup,record['id'],str(target),actor=None,reason='Локальна перевірка втрати вихідної БД')
+    proposal=restore.plan(backup,record['id'],target.render_as_string(hide_password=False),actor=None,reason='Локальна перевірка втрати вихідної БД')
     # A real unused recovery code issued by the existing MFA service.
     answers=iter(['backup-master','backup']);secrets=iter([PASSWORD,code])
     monkeypatch.setattr('builtins.input',lambda *_:next(answers));monkeypatch.setattr('getpass.getpass',lambda *_:next(secrets))
-    report=restore.apply(backup,proposal['id'],str(target),tmp_path/'disaster-recovered',actor=None,confirmed=True,authorize=recovered_master)
+    report=restore.apply(backup,proposal['id'],target.render_as_string(hide_password=False),tmp_path/'disaster-recovered',actor=None,confirmed=True,authorize=recovered_master)
     assert report['confirmed_master_id']==ids['master']
     assert any(e['operation']=='restore' and e['result']=='SUCCESS' and e['actor_user_id']==ids['master'] for e in backup.store.events())
     with factory() as db:assert accounts.authenticate(db,ids['token'])[0].id==ids['master']
@@ -246,8 +249,8 @@ def test_recovery_benchmark_synthetic_5000_people_and_24mib_files(prepared,targe
         for index in range(3):
             data=b'%PDF-1.7\n'+os.urandom(8*1024*1024-9)
             document_files.attach(db,ids['admin'],ids['person'],doc.id,db.get(PersonDocument,doc.id).revision,data,f'benchmark-{index}.pdf','page',storage=DocumentStorage(backup.settings.paths['documents']))
-    record=backup.create();proposal=restore.plan(backup,record['id'],str(target),actor=ids['master'],reason='Вимірювання на синтетичному обсязі')
-    report=restore.apply(backup,proposal['id'],str(target),tmp_path/'benchmark-recovered',actor=ids['master'],confirmed=True)
+    record=backup.create();proposal=restore.plan(backup,record['id'],target.render_as_string(hide_password=False),actor=ids['master'],reason='Вимірювання на синтетичному обсязі')
+    report=restore.apply(backup,proposal['id'],target.render_as_string(hide_password=False),tmp_path/'benchmark-recovered',actor=ids['master'],confirmed=True)
     assert report['counts']['persons']==5001 and report['counts']['document_files']==4
     print('VOLUME_BENCHMARK',json.dumps({'people':5001,'document_bytes':24*1024*1024,'archive_bytes':record['size'],'backup_seconds':record['duration_seconds'],'freeze_seconds':record['freeze_seconds'],'restore_seconds':report['restore_seconds']}))
 
@@ -259,19 +262,26 @@ def test_target_lease_serializes_restore_from_different_output_roots(prepared,ta
     other=BackupEngine(backup.db_engine,backup.settings,replace(backup.config,root=tmp_path/'other-backups'))
     other.store.initialize()
     shutil.copyfile(backup.locations(record['id'])[0],other.locations(record['id'])[0])
-    proposals=[restore.plan(service,record['id'],str(target),actor=ids['master'],reason='Перевірка конкуренції') for service in (backup,other)]
+    proposals=[restore.plan(service,record['id'],target.render_as_string(hide_password=False),actor=ids['master'],reason='Перевірка конкуренції') for service in (backup,other)]
     entered=Event();release=Event();original=restore.require_postgresql_schema
     def pause(engine):
         entered.set();assert release.wait(20);return original(engine)
     monkeypatch.setattr(restore,'require_postgresql_schema',pause)
     with ThreadPoolExecutor() as pool:
-        first=pool.submit(restore.apply,backup,proposals[0]['id'],str(target),tmp_path/'first'/'recovered',actor=ids['master'],confirmed=True)
+        first=pool.submit(restore.apply,backup,proposals[0]['id'],target.render_as_string(hide_password=False),tmp_path/'first'/'recovered',actor=ids['master'],confirmed=True)
         try:
             assert entered.wait(20)
             with pytest.raises(ValueError,match='QUARANTINED'):
-                restore.apply(other,proposals[1]['id'],str(target),tmp_path/'second'/'recovered',actor=ids['master'],confirmed=True)
+                restore.apply(other,proposals[1]['id'],target.render_as_string(hide_password=False),tmp_path/'second'/'recovered',actor=ids['master'],confirmed=True)
         finally:release.set()
         assert first.result(timeout=20)['state']=='VERIFIED_ISOLATED'
     with pytest.raises(ValueError,match='INVALID_OR_EXPIRED'):
-        restore.apply(backup,proposals[0]['id'],str(target),tmp_path/'third',actor=ids['master'],confirmed=True)
+        restore.apply(backup,proposals[0]['id'],target.render_as_string(hide_password=False),tmp_path/'third',actor=ids['master'],confirmed=True)
     assert not (tmp_path/'second'/'recovered').exists()
+
+
+def approve_worker_drill(backup,ids,tmp_path,monkeypatch):
+    from app.services.backups import drills
+    backup.config=replace(backup.config,drill_root=tmp_path/'drills');backup.store.config=backup.config
+    monkeypatch.setenv('PROJECT2_BACKUP_DRILL_DATABASE_URL',backup.db_engine.url.render_as_string(hide_password=False))
+    drills.approve(backup,ids['master'],'PROJECT2_BACKUP_DRILL_DATABASE_URL','Ізольоване випробування погодинного worker',1,True)

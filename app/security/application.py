@@ -14,7 +14,7 @@ MFA_PATHS=frozenset({'/auth/mfa','/auth/mfa/state','/auth/mfa/totp/start','/auth
 SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS'})
 ADMIN_PREFIXES = ('/admin', '/staff/import', '/staff/structures', '/staff/versions', '/staff/positions')
 HTML_PATHS = frozenset({'/persons','/persons/new','/person-positions','/staff/history','/events',
-    '/admin/backups','/admin/access','/admin','/admin/login','/admin/staff','/admin/dictionaries','/admin/dictionaries/new',
+    '/admin/audit','/admin/backups','/admin/access','/admin','/admin/login','/admin/staff','/admin/dictionaries','/admin/dictionaries/new',
     '/admin/tcc','/admin/tcc/new','/admin/users','/admin/users/new','/admin/users/audit','/admin/organization','/admin/organization/staff','/account/password','/account/security','/account/sessions','/docs','/redoc'})
 
 

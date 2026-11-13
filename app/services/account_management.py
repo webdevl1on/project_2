@@ -41,6 +41,6 @@ def audit_page(db,actor_id,key=None,page=1):
     entries=[]
     for row,actor in Repo.audit(db,key,(page-1)*50):
         changes=[(label,value(field,row.before.get(field)),value(field,row.after.get(field))) for field,label in fields.items() if row.before.get(field)!=row.after.get(field)]
-        entries.append({'id':row.id,'user_id':row.user_id,'actor_user_id':row.actor_user_id,'actor':actor or 'Системна CLI-операція',
+        entries.append({'id':row.id,'user_id':row.user_id,'actor_user_id':row.actor_user_id,'actor':actor or 'Автор невідомий',
                         'occurred_at':format_system_timestamp(row.occurred_at),'operation':OPERATIONS[row.operation],'changes':changes,'reason':row.reason})
     return {'entries':entries,'page':page,'user_id':key}

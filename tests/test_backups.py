@@ -49,8 +49,8 @@ def test_schedule_meets_hourly_frequency_and_keeps_daily_full_distinct(backup_co
     from app.services.backups import store as module
     c,_=backup_config;store=Store(c,Keyring(c.key_file));clock=datetime(2026,11,8,3,tzinfo=UTC);monkeypatch.setattr(module,'now',lambda:clock)
     assert store.due([])[1]=='full'
-    records=[{'snapshot_at':(clock-timedelta(minutes=10)).isoformat(),'kind':'full','integrity':'VERIFIED'}]
-    due,kind=store.due(records);assert kind=='checkpoint' and due==clock+timedelta(minutes=20)
+    records=[{'snapshot_at':(clock-timedelta(minutes=10)).isoformat(),'kind':'full','schedule':'daily','integrity':'VERIFIED'}]
+    due,kind=store.due(records);assert kind=='full' and due==clock
     with pytest.raises(ValueError):replace(c,interval_minutes=61).validate(backup_config[1].paths)
 
 

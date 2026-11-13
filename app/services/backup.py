@@ -18,7 +18,9 @@ def master(db):
     from app.services.backups.commands import authorize
     token=getpass.getpass('Чинна персональна сесія Master після свіжої MFA: ')
     user,session=accounts.authenticate(db,token);db.info['access_session_hash']=session.token_hash
-    return authorize(db,user.id,critical=True).id
+    actor=authorize(db,user.id,critical=True)
+    if actor.role!='master':raise PermissionError('BACKUP_MASTER_REQUIRED')
+    return actor.id
 
 
 @contextmanager
@@ -50,8 +52,10 @@ def recovered_master(engine,values):
 def main(argv=None):
     parser=argparse.ArgumentParser(description=__doc__);sub=parser.add_subparsers(dest='command',required=True)
     gen=sub.add_parser('keygen');gen.add_argument('--file',required=True)
-    approve=sub.add_parser('approve-drill');approve.add_argument('--target-url-env',default='PROJECT2_BACKUP_DRILL_DATABASE_URL');approve.add_argument('--reason',required=True);approve.add_argument('--days',type=int,default=30);approve.add_argument('--confirm',action='store_true')
+    approve=sub.add_parser('approve-drill');approve.add_argument('--target-url-env',default='PROJECT2_BACKUP_DRILL_DATABASE_URL');approve.add_argument('--reason',required=True);approve.add_argument('--days',type=int,default=30);approve.add_argument('--until-revoked',action='store_true');approve.add_argument('--confirm',action='store_true')
     sub.add_parser('drill');sub.add_parser('revoke-drill')
+    emergency=sub.add_parser('approve-emergency');emergency.add_argument('--reason',required=True);emergency.add_argument('--days',type=int,default=30);emergency.add_argument('--until-revoked',action='store_true');emergency.add_argument('--confirm',action='store_true')
+    sub.add_parser('revoke-emergency')
     for name in ('status','run-once','create','verify'):
         p=sub.add_parser(name)
         if name=='verify':p.add_argument('--id',required=True);p.add_argument('--external',action='store_true')
@@ -84,18 +88,27 @@ def main(argv=None):
         else:
             with Session(engine) as db:actor=master(db)
         service.store.initialize()
-        with database_lease(service.config.root/'worker'):
+        with (database_lease(service.config.root/'worker') if offline else service.operation_lock()):
             if args.command=='approve-drill':
                 from app.services.backups.drills import approve
-                approve(service,actor,args.target_url_env,args.reason,args.days,args.confirm);result={'approved':True}
+                approve(service,actor,args.target_url_env,args.reason,0 if args.until_revoked else args.days,args.confirm);result={'approved':True}
+            elif args.command=='approve-emergency':
+                from app.services.backups.emergency import approve
+                approve(service,actor,args.reason,0 if args.until_revoked else args.days,args.confirm);result={'approved':True}
+            elif args.command=='revoke-emergency':
+                permit=service.ring.read(service.config.root/'emergency-permit.json');permit['active']=False;service.ring.save(service.config.root/'emergency-permit.json',permit)
+                service.store.event('emergency_revoke','SUCCESS',actor=actor);result={'revoked':True}
             elif args.command=='revoke-drill':
                 permit=service.ring.read(service.config.root/'drill-permit.json');permit['active']=False;service.ring.save(service.config.root/'drill-permit.json',permit)
                 service.store.event('drill_revoke','SUCCESS',actor=actor);result={'revoked':True}
             elif args.command=='drill':
                 from app.services.backups.drills import maybe_run
-                result=maybe_run(service,force=True)
+                result=maybe_run(service,force=True,actor=actor)
                 if result is None:raise ValueError('BACKUP_DRILL_APPROVAL_REQUIRED')
-            elif args.command=='create':result=service.create(actor=actor)
+            elif args.command=='create':
+                result=service.create(actor=actor)
+                from app.services.backups.drills import maybe_run
+                maybe_run(service,force=True,identity=result['id'],required=True,actor=actor)
             elif args.command=='verify':result=service.verify(args.id,actor=actor,external=args.external)
             elif args.command=='restore-plan':result=restore.plan(service,args.id,os.environ[args.target_url_env],actor=actor,reason=args.reason,external=args.external)
             else:

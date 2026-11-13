@@ -92,7 +92,10 @@ def session_info(db,token):
 def logout(db, token):
     with account_write(db):
         session = Repo.session(db, digest_token(token))
-        if session: Repo.delete(db, session)
+        if session:
+            user=Repo.user(db,session.user_id)
+            audit_change(db,user,'logout',{},user.id)
+            Repo.delete(db, session)
 
 
 @contextmanager

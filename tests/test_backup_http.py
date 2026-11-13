@@ -14,7 +14,7 @@ from types import SimpleNamespace
 @pytest.fixture
 def backup_web(acl_store,backup_config,monkeypatch):
     db,ids,factory=acl_store;c,_=backup_config;store=Store(c,Keyring(c.key_file))
-    backend=SimpleNamespace(store=store,initialize=lambda:store.initialize())
+    backend=SimpleNamespace(store=store,config=c,initialize=lambda:store.initialize())
     monkeypatch.setattr(commands,'backend',lambda db:backend)
     previous=dict(app.dependency_overrides)
     def override():
@@ -29,8 +29,10 @@ def test_backup_roles_csrf_fresh_mfa_and_server_author(backup_web):
     assert client.get('/admin/backups/data').status_code==401
     sign_in(client,'user');assert client.get('/admin/backups').status_code==403
     headers=sign_in(client,'admin');assert client.get('/admin/backups').status_code==200
-    assert not client.get('/admin/backups/data').json()['can_run']
-    assert client.post('/admin/backups/create',headers=headers).status_code==403
+    assert client.get('/admin/backups/data').json()['can_run']
+    admin_job=client.post('/admin/backups/create',headers=headers)
+    assert admin_job.status_code==202 and admin_job.json()['actor_user_id']==ids['admin']
+    item=store.read('jobs',admin_job.json()['id']);item['state']='SUCCESS';store.save('jobs',item)
     headers=sign_in(client,'master')
     assert client.post('/admin/backups/create').status_code==403
     assert client.post('/admin/backups/create',headers={**headers,'Origin':'https://foreign.example'}).status_code==403
@@ -53,3 +55,28 @@ def test_unconfigured_backup_status_is_safe_and_visible(acl_store,monkeypatch):
     monkeypatch.delenv('PROJECT2_BACKUP_CONFIG',raising=False)
     db,ids,_=acl_store
     result=commands.status(db,ids['master']);assert not result['configured'] and not result['can_run']
+
+def test_three_audit_tabs_filters_export_and_subject_acl(backup_web):
+    client,store,ids,factory=backup_web
+    sign_in(client,'user')
+    for path in ('/admin/audit','/admin/audit/export.txt','/admin/backups/volumes'):
+        assert client.get(path).status_code==403
+    sign_in(client,'admin')
+    for tab in ('system','subject','backup'):
+        result=client.get('/admin/audit',params={'tab':tab,'sort1':'actor','dir1':'asc','sort2':'at','dir2':'desc'})
+        assert result.status_code==200,result.text
+        assert 'data-column-table' in result.text
+        export=client.get('/admin/audit/export.txt',params={'tab':tab})
+        assert export.status_code==200 and export.headers['content-type'].startswith('text/plain')
+        assert 'Логін автора' in export.text
+    from app.models import Person
+    with factory() as db:
+        person=db.get(Person,ids['people'][0]);person.personal_number='SECRET-SYNTHETIC-ACL-VALUE';db.commit()
+    assert 'SECRET-SYNTHETIC-ACL-VALUE' in client.get('/admin/audit',params={'tab':'subject','q':'SECRET-SYNTHETIC-ACL-VALUE'}).text
+    sign_in(client,'master')
+    for path in ('/admin/audit','/admin/audit/export.txt'):
+        result=client.get(path,params={'tab':'subject','q':'SECRET-SYNTHETIC-ACL-VALUE'})
+        assert result.status_code==200
+        payload=result.text.split('<tbody>')[1].split('</tbody>')[0] if path=='/admin/audit' else result.text
+        assert 'SECRET-SYNTHETIC-ACL-VALUE' not in payload
+    assert client.get('/admin/audit?sort=unknown').status_code==422
