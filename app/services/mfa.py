@@ -89,7 +89,7 @@ def totp_start(db,token):
         user,flow=pending(db,token)
         if flow.kind not in ('setup','manage') or flow.verified or (flow.kind=='setup' and Repo.totp(db,user.id)):raise ValueError('Налаштування TOTP недоступне.')
         secret=pyotp.random_base32();flow.ciphertext=encrypt(secret)
-        return {'secret':secret,'uri':pyotp.TOTP(secret).provisioning_uri(user.username,issuer_name='project_2')}
+        return {'secret':secret,'uri':pyotp.TOTP(secret).provisioning_uri(name=user.username,issuer_name='project_2')}
 
 def totp_step(secret,code,last=-1):
     if not isinstance(code,str) or len(code)!=6 or not code.isascii() or not code.isdigit():return None

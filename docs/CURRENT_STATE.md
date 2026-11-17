@@ -1,5 +1,13 @@
 # Поточний стан project_2
 
+## Підготовка до робочого запуску (2026-11-17)
+
+- Виправлено несумісність із PyOTP 2.12: `provisioning_uri` у `app/services/mfa.py` викликається з `name=`; на чистій установці налаштування TOTP падало з `TypeError`. Бібліотеки безпеки/БД у `requirements.txt` закріплено точними версіями.
+- Додано [PRODUCTION_START.md](PRODUCTION_START.md) — покроковий перший запуск production з нуля на сервер-ПК (лише localhost) і `scripts/generate_production_secrets.py` (друкує ключі, нічого не записує).
+- Фактично перевірено в Linux-контейнері (PostgreSQL 16): повний набір на SQLite, JS 64 passed; сценарій PRODUCTION_START на окремій тестовій БД `project2_prod` — `alembic upgrade head` (0011), schema check, `seed_postgresql` (46 new, 0 conflicts), bootstrap, `mfa_keys --initialize`, вхід → перехід до `/auth/mfa`, HTTP із не-localhost Host → 403.
+- Не перевірено тут: 22 PostgreSQL-тести резервування/drill/Chromium (потрібні PostgreSQL 17, CREATEDB для drill, Chromium за очікуваним шляхом). Їх треба повторити на Windows-ПК.
+- Наступні етапи: Security 1.7 (LAN 8 ПК: HTTPS, DNS-ім'я для WebAuthn, обмеження підмережі, служба Windows) та фундамент майбутньої веб-версії (UUID записів, класи чутливості полів, `PROJECT2_EDITION`).
+
 ## Security 1.6 — резервування, аварійний архів та аудит
 
 `feature/security`, початковий чистий HEAD **a5a4a2e**. `origin/testing=00cf012` перевірено без зміни testing. Реалізація, Windows runbook і межі — [BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md); повний перелік файлів та фактичні запуски — [SECURITY16_REPORT.md](SECURITY16_REPORT.md). Історичні звіти нижче описують попередні етапи.

@@ -37,13 +37,13 @@ typing_extensions==4.15.0
 tzdata==2026.2
 uvicorn==0.49.0
 
-psycopg[binary]>=3.2,<4
-alembic>=1.16,<2
-python-dotenv>=1,<2
-httpx>=0.28,<1
+psycopg[binary]==3.3.9
+alembic==1.20.1
+python-dotenv==1.2.4
+httpx==0.28.1
 
 # RFC 6238, encrypted TOTP, validated WebAuthn and local QR rendering
-pyotp>=2.9,<3
-cryptography>=46,<49
-webauthn>=2.7,<3
-qrcode>=8,<9
+pyotp==2.12.0
+cryptography==48.0.1
+webauthn==2.8.0
+qrcode==8.2
