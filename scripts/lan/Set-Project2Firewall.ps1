@@ -11,14 +11,14 @@ foreach ($profile in @(Get-NetConnectionProfile | Where-Object NetworkCategory -
 $name = 'Project2-LAN-HTTPS'
 $rule = Get-NetFirewallRule -PolicyStore PersistentStore -Name $name -ErrorAction SilentlyContinue
 if ($PSCmdlet.ShouldProcess("Private, TCP $Port", 'Налаштувати вхідне правило Project 2')) {
-    $settings = @{ Direction='Inbound'; Action='Allow'; Enabled='True'; Profile='Private'; EdgeTraversalPolicy='Block' }
+    $settings = @{ Direction='Inbound'; Action='Allow'; Enabled='True'; Profile='Private'; EdgeTraversalPolicy='Block'; RemoteAddress='LocalSubnet' }
     if ($null -eq $rule) {
         New-NetFirewallRule @settings -Name $name -DisplayName 'Project 2 LAN HTTPS' -Protocol TCP -LocalPort $Port -PolicyStore PersistentStore | Out-Null
     } else {
         Set-NetFirewallRule @settings -Name $name -PolicyStore PersistentStore | Out-Null
         $rule | Get-NetFirewallPortFilter | Set-NetFirewallPortFilter -Protocol TCP -LocalPort $Port | Out-Null
     }
-    Write-Output "Правило $name налаштовано для TCP $Port у профілі Private."
+    Write-Output "Правило $name налаштовано для TCP $Port у профілі Private, лише з локальної підмережі."
 }
 # Inspect effective rules by protocol/port, independent of the Windows display language.
 $mdns = Get-NetFirewallRule -PolicyStore ActiveStore -Enabled True -Direction Inbound -Action Allow |

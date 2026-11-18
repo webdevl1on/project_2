@@ -52,3 +52,31 @@ def test_hosts_set_remove_and_repeat_preserve_unmanaged_lines_encoding_and_line_
             if (-not $eq.Equals($append, [byte[]]($enc.GetPreamble() + $enc.GetBytes($expected)))) { throw 'append' }
         }
     ''')
+
+
+def test_ca_name_constraints_extension_limits_trust_to_lan_server():
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+    result = subprocess.run([POWERSHELL, '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', '''
+        $ErrorActionPreference = 'Stop'
+        Import-Module ./scripts/lan/Project2Lan.psm1
+        $ext = New-Project2NameConstraints 'foxlys.local'
+        if (-not $ext.Critical -or $ext.Oid.Value -ne '2.5.29.30') { throw 'extension' }
+        [BitConverter]::ToString($ext.RawData).Replace('-', '')
+    '''], capture_output=True, timeout=30)
+    assert result.returncode == 0, (result.stderr + result.stdout).decode(errors='replace')
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives import hashes, serialization
+    import datetime
+    raw = bytes.fromhex(result.stdout.decode().strip())
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'probe')])
+    now = datetime.datetime.now(datetime.UTC)
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+            .serial_number(1).not_valid_before(now).not_valid_after(now + datetime.timedelta(days=1))
+            .add_extension(x509.UnrecognizedExtension(x509.ObjectIdentifier('2.5.29.30'), raw), critical=True)
+            .sign(key, hashes.SHA256()))
+    value = x509.load_der_x509_certificate(cert.public_bytes(serialization.Encoding.DER)).extensions.get_extension_for_class(x509.NameConstraints).value
+    assert [n.value for n in value.permitted_subtrees if isinstance(n, x509.DNSName)] == ['foxlys.local', 'localhost']
+    assert [n.value.rfc4514_string() for n in value.permitted_subtrees if isinstance(n, x509.DirectoryName)] == ['CN=foxlys.local']
+    assert sorted(str(n.value) for n in value.excluded_subtrees) == ['0.0.0.0/0', '::/0']

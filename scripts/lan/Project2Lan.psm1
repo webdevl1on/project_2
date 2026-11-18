@@ -131,13 +131,44 @@ function Write-Project2Pem([string]$Path, [string]$Label, [byte[]]$Bytes) {
     [IO.File]::WriteAllText($Path, "-----BEGIN $Label-----`r`n$body`r`n-----END $Label-----`r`n", [Text.Encoding]::ASCII)
 }
 
+function ConvertTo-Project2Der([byte]$Tag, [byte[]]$Content) {
+    # Minimal DER TLV encoder (definite length) for the Name Constraints extension.
+    if ($null -eq $Content) { $Content = [byte[]]@() }
+    $length = $Content.Length
+    if ($length -lt 0x80) { $prefix = [byte[]]@($Tag, $length) }
+    else {
+        $digits = [Collections.Generic.List[byte]]::new()
+        for ($n = $length; $n -gt 0; $n = $n -shr 8) { $digits.Insert(0, [byte]($n -band 0xFF)) }
+        $prefix = [byte[]](@($Tag, (0x80 -bor $digits.Count)) + $digits.ToArray())
+    }
+    return ,([byte[]]($prefix + $Content))
+}
+
+function New-Project2NameConstraints([string]$ServerName) {
+    # RFC 5280 NameConstraints, critical. The root CA may only sign the LAN server:
+    # permitted dNSName ServerName/localhost and directoryName CN=ServerName (Windows
+    # treats a name form without any constraint as undefined); all IPv4/IPv6 excluded.
+    $permitted = [byte[]]@()
+    foreach ($dns in @($ServerName, 'localhost')) {
+        $permitted += ConvertTo-Project2Der 0x30 (ConvertTo-Project2Der 0x82 ([Text.Encoding]::ASCII.GetBytes($dns)))
+    }
+    $subject = [Security.Cryptography.X509Certificates.X500DistinguishedName]::new("CN=$ServerName").RawData
+    $permitted += ConvertTo-Project2Der 0x30 (ConvertTo-Project2Der 0xA4 $subject)
+    $excluded = [byte[]]@()
+    foreach ($size in 8, 32) {
+        $excluded += ConvertTo-Project2Der 0x30 (ConvertTo-Project2Der 0x87 ([byte[]]::new($size)))
+    }
+    $body = [byte[]]((ConvertTo-Project2Der 0xA0 $permitted) + (ConvertTo-Project2Der 0xA1 $excluded))
+    return [Security.Cryptography.X509Certificates.X509Extension]::new('2.5.29.30', (ConvertTo-Project2Der 0x30 $body), $true)
+}
+
 function New-Project2Leaf($Signer, [string]$ServerName, [string]$Stage) {
     $now = Get-Date
     $end = $now.AddDays(824)
     if ($Signer.NotAfter -lt $end) { $end = $Signer.NotAfter }
     if ($end -le $now) { throw 'Строк дії CA завершився.' }
     $options = @{
-        Type = 'Custom'; DnsName = @($ServerName, 'localhost'); Signer = $Signer
+        Type = 'Custom'; Subject = "CN=$ServerName"; DnsName = @($ServerName, 'localhost'); Signer = $Signer
         Provider = 'Microsoft Software Key Storage Provider'; KeyAlgorithm = 'RSA'; KeyLength = 3072
         KeyExportPolicy = 'Exportable'; HashAlgorithm = 'SHA256'; CertStoreLocation = 'Cert:\CurrentUser\My'
         KeyUsage = @('DigitalSignature', 'KeyEncipherment'); NotBefore = $now.AddMinutes(-5); NotAfter = $end
@@ -194,4 +225,4 @@ function Update-Project2HostsBytes([byte[]]$Bytes, [string]$ServerName, [Net.IPA
     return ,([byte[]]($preamble + $encoding.GetBytes($outputText.ToString())))
 }
 
-Export-ModuleMember -Function Assert-Project2Administrator, Assert-Project2ServerName, Get-Project2ExternalPath, Assert-Project2TlsDirectory, Set-Project2PrivateDirectory, Get-Project2Fingerprint, Get-Project2CA, New-Project2Leaf, Get-Project2Port, Update-Project2HostsBytes
+Export-ModuleMember -Function Assert-Project2Administrator, Assert-Project2ServerName, Get-Project2ExternalPath, Assert-Project2TlsDirectory, Set-Project2PrivateDirectory, Get-Project2Fingerprint, Get-Project2CA, ConvertTo-Project2Der, New-Project2NameConstraints, New-Project2Leaf, Get-Project2Port, Update-Project2HostsBytes

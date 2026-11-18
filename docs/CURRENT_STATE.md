@@ -4,6 +4,8 @@
 
 У `codex/security17-lan` від `feature/security` (`5ba9ba6`) реалізовано прямий HTTPS uvicorn, перевірку TCP peer/Host/транспорту перед усіма маршрутами й статикою, приватні CIDR та оновлення інтерфейсів у режимі `auto`. Для Windows є скрипти видачі й поновлення TLS, довіри до CA, Firewall, планувальника, резервного запису `hosts` і діагностики. Порядок запуску та переходу з `localhost` наведено в [PRODUCTION_START.md](PRODUCTION_START.md#етап-lan).
 
+Після рев'ю (злито в `feature/security`): CA отримує критичне Name Constraints (лише `foxlys.local`, `localhost`, `CN=foxlys.local`; IP виключено), запасний `-NoNameConstraints`; правило Firewall обмежене `LocalSubnet`. Рев'ю-перевірка: повний набір SQLite 1352 passed / 130 skipped (PowerShell-тести пропущено — у середовищі рев'ю немає PowerShell), реальний `python -m app.serve` по HTTPS з LAN-адреси (200/303/400/403, відмова недовіреному CA і TLS 1.1), кодування Name Constraints — Python-порт + OpenSSL.
+
 Перевірки виконано в Linux на синтетичних даних.
 
 - `python -m pytest tests/ -q --tb=short` з ізольованою SQLite — 1354 пройшли, 128 PostgreSQL-тестів пропущено. Окремий запуск `python -m pytest tests/postgresql/ -q --tb=short` у `project2_ci` на PostgreSQL 17.11 — усі 128 пройшли. У кожному запуску було два попередження про застарілі інтерфейси тестового клієнта.

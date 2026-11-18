@@ -3,7 +3,9 @@
 param(
     [string]$ServerName = 'foxlys.local',
     [string]$EnvFile,
-    [string]$TlsDirectory = (Join-Path $env:SystemDrive 'project2-secrets\tls')
+    [string]$TlsDirectory = (Join-Path $env:SystemDrive 'project2-secrets\tls'),
+    # Fallback only if a client cannot validate the name-constrained chain.
+    [switch]$NoNameConstraints
 )
 $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'Project2Lan.psm1')
@@ -37,6 +39,8 @@ try {
         NotBefore = $now.AddMinutes(-5); NotAfter = $now.AddMinutes(-5).AddYears(10)
         TextExtension = @('2.5.29.19={critical}{text}ca=1&pathlength=0')
     }
+    if (-not $NoNameConstraints) { $options.Extension = @(New-Project2NameConstraints $ServerName) }
+    else { Write-Warning 'CA створюється без обмеження імен: його ключ зможе підписати будь-який сайт для ПК, які довіряють цьому CA.' }
     $ca = New-SelfSignedCertificate @options
     try {
         Export-Certificate -Cert $ca -FilePath (Join-Path $stage 'project2-ca.cer') -Type CERT | Out-Null
