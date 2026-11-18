@@ -100,3 +100,11 @@ from app.database.backup_maintenance import MaintenanceUnavailable
 async def maintenance_error(request:Request,error:MaintenanceUnavailable):
     from fastapi.responses import JSONResponse
     return JSONResponse({'detail':str(error)},status_code=503,headers={'Retry-After':'5'})
+
+# Starlette runs the last registered middleware first, including for mounted assets.
+from app.database.db import settings
+from app.security.lan import LanMiddleware
+from app.security.network import NetworkPolicy, NetworkSettings
+
+network_policy = NetworkPolicy(NetworkSettings.read(settings))
+app.add_middleware(LanMiddleware, policy=network_policy)

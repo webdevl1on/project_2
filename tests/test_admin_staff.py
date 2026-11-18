@@ -1,5 +1,5 @@
 from datetime import date as D
-from fastapi.testclient import TestClient as AnonymousClient
+from tests.http_auth import LoopbackClient as AnonymousClient
 from tests.http_auth import AuthenticatedClient as TestClient
 from lxml import html
 from app.main import app

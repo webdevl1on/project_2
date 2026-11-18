@@ -6,7 +6,7 @@ import secrets
 from lxml import html
 from openpyxl import load_workbook
 import pytest
-from fastapi.testclient import TestClient
+from tests.http_auth import LoopbackClient as TestClient
 from sqlalchemy import create_engine, select, func, event
 from sqlalchemy.orm import sessionmaker
 from app.database.base import Base

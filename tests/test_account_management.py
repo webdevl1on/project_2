@@ -5,7 +5,7 @@ from tests.mfa_helpers import login as mfa_login
 from datetime import datetime,UTC,timedelta
 import json
 import pytest
-from fastapi.testclient import TestClient
+from tests.http_auth import LoopbackClient as TestClient
 from sqlalchemy import create_engine,select,func,event,text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker

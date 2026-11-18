@@ -1,8 +1,8 @@
-# Запуск робочої БД на Windows (етап «тільки сервер-ПК»)
+# Запуск Project 2 на Windows
 
 Покрокова інструкція першого запуску production з нуля на ПК, який згодом стане LAN-сервером. Детальні пояснення — [POSTGRESQL_SETUP.md](POSTGRESQL_SETUP.md), безпека — [SECURITY.md](SECURITY.md), резервування — [BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md).
 
-На цьому етапі застосунок доступний **лише на самому сервер-ПК** (`http://localhost:8000`). Доступ інших ПК LAN (HTTPS, ім'я сервера, обмеження підмережі, служба Windows) — етап Security 1.7.
+Для першого входу на сервері використовуйте `http://localhost:8000`. Порядок відкриття `https://foxlys.local:8443` для клієнтських ПК наведено в розділі «Етап LAN».
 
 ## 0. Передумови
 
@@ -97,7 +97,7 @@ python -m app.services.bootstrap_account --username first-admin --display-name "
 ## 7. Запуск і перший вхід
 
 ```powershell
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-proxy-headers --no-access-log
 ```
 
 Відкрийте саме `http://localhost:8000/persons` (не `127.0.0.1` — origin WebAuthn має збігатися з `.env`). Увійдіть і налаштуйте MFA.
@@ -106,11 +106,92 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 ## 8. Перевірка тестами (один раз, на тестовій БД)
 
-Тести запускаються **не на production**: окрема роль/БД `project2_ci` і окремий `.env`/змінні процесу (POSTGRESQL_SETUP.md, «Тести»). Фікстури перестворюють таблиці тестової БД. Перед регулярною роботою прогніть PostgreSQL-набір на PostgreSQL 17 — у хмарному середовищі розробки 22 тести резервування/відновлення не були виконані через PostgreSQL 16, права CI-ролі та відсутній Chromium.
+Тести запускаються **не на production**: окрема роль/БД `project2_ci` і окремий `.env`/змінні процесу (POSTGRESQL_SETUP.md, «Тести»). Фікстури перестворюють таблиці тестової БД. Результати запусків для Security 1.7 наведено в [CURRENT_STATE.md](CURRENT_STATE.md).
 
 ## 9. Резервування
 
 До внесення значного обсягу даних налаштуйте резервні копії за [BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md) і [SECURITY16_REPORT.md](SECURITY16_REPORT.md#налаштування-windows-перед-використанням): окремі keyring, `PROJECT2_BACKUP_CONFIG`, worker у Task Scheduler, перший реальний drill.
+
+## Етап LAN
+
+Адреса для сервера `foxlys` та всіх восьми клієнтів — **`https://foxlys.local:8443`**. PostgreSQL працює на loopback сервера. Застосуйте ці кроки в каталозі версії, що містить `app/serve.py` та `scripts/lan/`.
+
+### На сервері
+
+1. До переходу перевірте вхід за TOTP або наявність невикористаного резервного коду, особливо для Master. Вони працюють після зміни імені. Passkey, апаратний FIDO2-ключ і Windows Hello прив’язані до RP ID. Після входу на `foxlys.local` зареєструйте їх для нового імені у «Безпеці облікового запису».
+2. У корені репозиторію оновіть залежності та створіть локальний CA і серверний сертифікат. Команди розраховано на Windows PowerShell 5.1. Усі скрипти, які вносять зміни, приймають `-WhatIf`.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+$tls = Join-Path $env:SystemDrive 'project2-secrets\tls'
+.\scripts\lan\New-Project2CA.ps1 -TlsDirectory $tls -ServerName foxlys.local
+```
+
+Підготуйте окремий каталог NTFS поза репозиторієм і сховищами даних. Доступ до нього мають власник, SYSTEM і локальні Administrators. CA діє 10 років. Збережіть його зашифрований `project2-ca.pfx` та пароль окремо для перевипуску. Сервер читає `server.crt.pem` і `server.key.pem`. Сертифікат містить імена `foxlys.local` та `localhost` і призначення `serverAuth`. За можливості створіть пару від імені Windows-акаунта завдання. Якщо PKI адмініструє інший власник, надайте завданню власний захищений каталог із копіями лише двох серверних PEM і вкажіть його в `.env`.
+
+3. Зупиніть попередній процес сервера. У чинному `.env` замініть значення нижче. Збережіть робочий `DATABASE_URL`, ключі MFA і підпису. Підставте фактичні шляхи до PEM. Для нестандартного `.env` скрипти створення/поновлення CA, Firewall та реєстрації завдання приймають `-EnvFile`.
+
+```dotenv
+PROJECT2_SERVER_NAME=foxlys.local
+PROJECT2_BIND_HOST=0.0.0.0
+PROJECT2_PORT=8443
+PROJECT2_TLS_CERT=C:/project2-secrets/tls/server.crt.pem
+PROJECT2_TLS_KEY=C:/project2-secrets/tls/server.key.pem
+PROJECT2_ALLOWED_NETWORKS=auto
+PROJECT2_AUTH_ALLOW_LOCAL_HTTP=0
+PROJECT2_WEBAUTHN_RP_ID=foxlys.local
+PROJECT2_WEBAUTHN_ORIGINS=["https://foxlys.local:8443"]
+```
+
+`0.0.0.0` слухає активні IPv4-інтерфейси незалежно від адреси DHCP. Для розгортання через IPv6 задайте `PROJECT2_BIND_HOST=::` і перевірте доступність цього сімейства адрес на клієнтах. На порту 443 запишіть origin як `https://foxlys.local`. Особливості `auto` та явних CIDR описано в [SECURITY.md](SECURITY.md#security-17--lan).
+
+4. Відкрийте Windows PowerShell як адміністратор. Звірте SHA-256 публічного CA з відбитком, отриманим під час створення, та встановіть довіру також на сервері. Далі налаштуйте правило вхідного TCP тільки для профілю Private. Скрипт повідомляє, чи увімкнено вхідне правило mDNS UDP 5353 для Private.
+
+```powershell
+$publicCA = Join-Path $env:SystemDrive 'project2-secrets\tls\project2-ca.cer'
+.\scripts\lan\Install-Project2ClientCA.ps1 -CertificatePath $publicCA
+.\scripts\lan\Set-Project2Firewall.ps1
+```
+
+5. Зареєструйте завдання для вибраного Windows-акаунта, який має право пакетного входу, доступ до коду, `.env`, ключа TLS та робочих каталогів. Пароль запитує `Get-Credential`. Для першої перевірки запустіть завдання одразу.
+
+```powershell
+$taskUser = Read-Host 'Введіть ДОМЕН\користувач або КОМПʼЮТЕР\користувач'
+.\scripts\lan\Register-Project2Task.ps1 -UserName $taskUser
+Start-ScheduledTask -TaskName 'Project2-LAN'
+.\scripts\lan\Register-Project2Task.ps1 -Status
+.\scripts\lan\Test-Project2Lan.ps1
+```
+
+Task Scheduler запускає `.venv\Scripts\python.exe -m app.serve` з кореня репозиторію при старті Windows, зокрема до інтерактивного входу. Після помилки передбачено три перезапуски з інтервалом одна хвилина. Паралельний запуск пропускається, час роботи необмежений. stdout/stderr за замовчуванням записуються у `%ProgramData%\Project2\LanLogs\server.log`. Після досягнення 5 MiB створюється наступний файл журналу, зберігаються три попередні. Для заміни шляху є `-LogDirectory`, для зняття реєстрації — `Register-Project2Task.ps1 -Unregister`. Для ручного запуску з тим самим `.env` виконайте `.\.venv\Scripts\python.exe -m app.serve` після зупинки завдання.
+
+### На кожному клієнтському ПК
+
+1. Передайте `project2-ca.cer`, `Install-Project2ClientCA.ps1`, `Test-Project2Lan.ps1` та їхній `Project2Lan.psm1`. Отримайте SHA-256 від адміністратора окремим довіреним каналом. У PowerShell адміністратора виконайте перші дві команди, звірте відбиток і підтвердьте установку. Діагностика працює під звичайним користувачем.
+
+```powershell
+$expected = Read-Host 'Контрольний SHA-256 CA'
+.\Install-Project2ClientCA.ps1 -CertificatePath .\project2-ca.cer -ExpectedSha256 $expected
+.\Test-Project2Lan.ps1
+```
+
+2. Діагностика перевіряє системне розпізнавання імені, TCP, ланцюжок довіри та DNS-ім’я TLS і відповідь `HTTP 200` на `/auth/login`. Відкрийте `https://foxlys.local:8443/auth/login` та увійдіть із персональною MFA. Перевірте довіру в браузері, яким користуватиметься цей ПК. Браузер із власним сховищем CA потребує довіри до того самого публічного сертифіката у своїх налаштуваннях.
+
+### Зміна мережі та перевипуск
+
+Якщо нова довірена мережа має профіль Private і Windows mDNS розпізнає `foxlys.local`, сервер та клієнти продовжують використовувати ту саму адресу. `auto` оновлює активні підмережі при зверненнях з інтервалом щонайменше 60 с. Для мережі Public перевірте попередження `Set-Project2Firewall.ps1`. Переведіть інтерфейс у Private тільки після перевірки мережі.
+
+Якщо mDNS недоступний, з’ясуйте поточну адресу сервера через `Get-NetIPAddress`. На відповідному клієнті відкрийте PowerShell адміністратора та виконайте команди нижче. Після зміни DHCP-адреси повторіть їх з новою адресою. `-Remove` видаляє позначений запис цього імені.
+
+```powershell
+$serverIP = Read-Host 'Поточна LAN-адреса сервера foxlys'
+.\Add-Project2HostsEntry.ps1 -IPAddress $serverIP
+.\Test-Project2Lan.ps1
+```
+
+Для резервного варіанту передайте клієнту також `Add-Project2HostsEntry.ps1`. Якщо ім’я вже записане в `hosts` іншим адміністратором, перевірте такий запис окремо. Скрипт керує лише рядком з `# project2`.
+
+Серверна пара діє до 824 днів від дати випуску, у межах строку CA. За 30 днів до завершення виконайте `.\scripts\lan\Renew-Project2ServerCert.ps1 -TlsDirectory $tls`. Поза цим вікном свідомий перевипуск доступний через `-Force`. Введіть пароль PFX. Після успішної заміни обох PEM перезапустіть завдання та повторіть `Test-Project2Lan.ps1`. Якщо завдання читає окремі копії PEM, оновіть обидві перед перезапуском. За того самого CA довіра на клієнтах зберігається. Для заміни кореневого CA поширте новий публічний сертифікат і перевірте його відбиток на кожному ПК.
 
 ## Оновлення робочої версії
 

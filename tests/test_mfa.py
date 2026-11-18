@@ -5,7 +5,7 @@ from datetime import datetime,timedelta,UTC
 import pytest,pyotp,cbor2
 from sqlalchemy import create_engine,select,func,event
 from sqlalchemy.orm import sessionmaker
-from fastapi.testclient import TestClient
+from tests.http_auth import LoopbackClient as TestClient
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import hashes
 from app.models import User,UserSession,AccountAudit,AuthFlow,TotpFactor,Passkey,RecoveryCode

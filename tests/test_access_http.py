@@ -1,7 +1,7 @@
 """Real cookie MFA and the existing handlers: no direct-ID/category/list/file escapes."""
 from datetime import date as D
 import pytest
-from fastapi.testclient import TestClient
+from tests.http_auth import LoopbackClient as TestClient
 from sqlalchemy import select,func
 from app.main import app
 from app.database.db import get_db

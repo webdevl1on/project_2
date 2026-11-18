@@ -4,7 +4,7 @@ from tests.mfa_helpers import finish_http
 from datetime import datetime,UTC,timedelta
 import re
 import pytest
-from fastapi.testclient import TestClient
+from tests.http_auth import LoopbackClient as TestClient
 from fastapi.routing import APIRoute
 from sqlalchemy import create_engine,select,func
 from sqlalchemy.orm import sessionmaker

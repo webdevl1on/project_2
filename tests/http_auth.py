@@ -11,7 +11,14 @@ from app.models import User
 from app.services import accounts
 
 
-class AuthenticatedClient(TestClient):
+class LoopbackClient(TestClient):
+    """An in-process ASGI client with a numeric TCP peer, like a real socket."""
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault('client', ('127.0.0.1', 50000))
+        super().__init__(*args, **kwargs)
+
+
+class AuthenticatedClient(LoopbackClient):
     def __init__(self,app,*args,**kwargs):
         if os.environ.get('PROJECT2_ENV')!='testing' or get_db not in app.dependency_overrides:
             raise RuntimeError('AuthenticatedClient requires an explicitly isolated test DB override.')

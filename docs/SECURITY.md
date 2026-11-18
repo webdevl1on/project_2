@@ -1,4 +1,19 @@
-# Безпека — Security 1.1–1.6
+# Безпека — Security 1.1–1.7
+
+## Security 1.7 — LAN
+
+У локальній мережі адреса входу — `https://foxlys.local:8443/auth/login`. Серверний `python -m app.serve` читає обраний `.env` і запускає uvicorn з власною парою PEM. TLS завершується у процесі застосунку. Для non-loopback bind перевіряються DNS-ім’я, порт, файли TLS поза репозиторієм і сховищами та відповідність явним RP ID й HTTPS origin WebAuthn. Production відхиляє поєднання LAN-bind із `PROJECT2_AUTH_ALLOW_LOCAL_HTTP=1`. Незаданий bind означає loopback.
+
+| Умова | Серверна перевірка |
+| --- | --- |
+| Запит із чужої приватної підмережі, публічної IP або з невідомим peer | `LanMiddleware` перед роутером і static mount повертає порожню 403. До журналу потрапляють TCP-адреса та шлях без query string. Звичайний access log uvicorn для цього запуску вимкнено. |
+| Підміна IP або протоколу forwarded-заголовками | `app.serve` задає `proxy_headers=False`, `forwarded_allow_ips=""`. Фільтр читає тільки ASGI `scope["client"]`. `secure_transport` перевіряє HTTPS та чинний прямий HTTP-виняток для loopback. |
+| Чужий, пошкоджений чи дубльований Host | 400 перед будь-яким маршрутом. Дозволено налаштоване ім’я з портом або без нього. Прямий loopback додатково може використовувати `localhost`, `127.0.0.1` і `[::1]`. Локальні перенаправлення повертають відносний шлях. |
+| Windows підключено до публічної мережі | Правило Firewall для порту застосунку обмежено профілем Private. Це окремий захист, оскільки навіть у публічній Wi-Fi мережі DHCP може видавати приватні IP. |
+
+`PROJECT2_ALLOWED_NETWORKS=auto` використовує приватні префікси активних інтерфейсів. Для IPv4 враховується `is_private`, для IPv6 — link-local `fe80::/10` та ULA `fc00::/7`. На Windows модуль NetTCPIP повертає фактичну `PrefixLength` обох сімейств, на інших платформах адреси й маски надає `psutil`. Перший перелік для LAN читається при старті. Наступне оновлення за запитом можливе через 60 секунд за монотонним годинником. У разі помилки отримання інтерфейсів доступ обмежується loopback до наступної перевірки. Явний список приватних CIDR через кому замінює `auto`. Публічний або змішаний діапазон спричиняє помилку старту.
+
+За мережевим фільтром діють персональна автентифікація, MFA, Origin/CSRF, параметри cookie та серверні ACL. Через LAN сертифікату `foxlys.local` має довіряти клієнтський ПК. Кроки видачі, встановлення довіри, перевипуску й діагностики наведено в [інструкції запуску](PRODUCTION_START.md#етап-lan).
 
 ## UI Security 1.4: повторне підтвердження без втрати чернетки
 
@@ -11,7 +26,7 @@
 `security_session.js` зберігає попередню поведінку інших сторінок: лише оброблена ACL-сторінкою cancelable-подія замінює стандартне посилання на безпеку. Security 1.5 та його серверні операції не змінено. Повторна MFA оновлює лише чинний час перевірки, не абсолютні 8 годин і не інші сесії. Межі й результати цього UI-виправлення — [CURRENT_STATE.md](CURRENT_STATE.md).
 
 
-Поточний етап — Security 1.6 у `feature/security`, початковий HEAD `a5a4a2e`, схема **0011_security_operations_audit** після `0010_organization_hierarchy`. Повна специфікація ACL — [ACCESS_CONTROL.md](ACCESS_CONTROL.md), резервування/Windows/USB/відновлення — [BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md), фактичний звіт — [SECURITY16_REPORT.md](SECURITY16_REPORT.md). Нижче збережено історичні описи; їхні старі результати не є новим запуском.
+Етап Security 1.6 виконано у `feature/security` від HEAD `a5a4a2e`, схема **0011_security_operations_audit** після `0010_organization_hierarchy`. Повна специфікація ACL — [ACCESS_CONTROL.md](ACCESS_CONTROL.md), резервування/Windows/USB/відновлення — [BACKUP_AND_RESTORE.md](BACKUP_AND_RESTORE.md), фактичний звіт — [SECURITY16_REPORT.md](SECURITY16_REPORT.md). Нижче збережено історичні описи; їхні старі результати не є новим запуском.
 
 Вхід/MFA/CSRF/15 хв–8 год залишаються чинними. Master керує системою, але не отримує предметних даних автоматично; Admin має захищений повний предметний доступ і керує звичайними User. User отримує доступ за серверними ALLOW/DENY з ручної матриці, шаблонів, чинної затвердженої керівної політики, персональних і фіксованих тимчасових правил. DENY переважає. Editor/Viewer мігрують до User зі збереженням паролів/MFA/сесій/історії та **без автоматичних предметних grants**.
 
@@ -40,7 +55,7 @@ Master-only ключі/відновлення зберігають сервер�
 
 ## Центральний потік
 
-`app/main.py` → `security/application.application_access` → `security/accounts.current_user` → чинні `services/accounts.authenticate` / AccountRepository → UserSession/User.
+`app/main.py` → `security/lan.LanMiddleware` → `security/application.application_access` → `security/accounts.current_user` → чинні `services/accounts.authenticate` / AccountRepository → UserSession/User.
 
 Сесія перевіряється за HttpOnly cookie `project2_user`: строк, існування та активність користувача. Перевірений користувач і CSRF кешуються тільки в `request.state` одного запиту. Модулі документів/медицини повторно використовують той самий current_user, без окремої системи входу. Серверне персональне авторство документів/подій/призначень збережено.
 
@@ -79,7 +94,7 @@ Windows PowerShell, після налаштування наявної developme
 $env:PROJECT2_AUTH_ENABLED = '1' # необов’язковий явний запис; без нього також потрібен вхід
 $env:PROJECT2_AUTH_ALLOW_LOCAL_HTTP = '1'
 python -m app.services.bootstrap_account --username first-admin --display-name "Адміністратор"
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-proxy-headers --no-access-log
 ```
 
 Якщо в БД залишилися **лише незмінені** технічні `project2-open-access` / `project2-dev-local`, до bootstrap можна явно додати `--allow-legacy-technical-accounts`. Створиться перший персональний admin; старі користувачі/сесії/аудит не змінюються. За наявності будь-якого персонального облікового запису цей виняток відхиляється. HTTP `/auth/users` цей CLI-параметр не приймає.

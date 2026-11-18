@@ -1,6 +1,6 @@
 """Real MFA/CSRF and roles; no HTTP restore or archive download capability."""
 import pytest
-from fastapi.testclient import TestClient
+from tests.http_auth import LoopbackClient as TestClient
 from app.main import app
 from app.database.db import get_db
 from app.services.backups import commands

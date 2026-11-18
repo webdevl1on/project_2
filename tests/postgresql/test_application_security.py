@@ -1,7 +1,7 @@
 """Actual PostgreSQL: whole-route denial and real personal-session regression."""
 from tests.access_helpers import legacy_user
 from tests.mfa_helpers import finish_http
-from fastapi.testclient import TestClient
+from tests.http_auth import LoopbackClient as TestClient
 from app.main import app
 from app.database.db import get_db
 from app.models import Person

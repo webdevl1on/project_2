@@ -2,7 +2,7 @@
 from tests.access_helpers import legacy_user
 from datetime import date as D
 import pytest
-from fastapi.testclient import TestClient
+from tests.http_auth import LoopbackClient as TestClient
 from sqlalchemy import create_engine,select,func
 from sqlalchemy.orm import sessionmaker
 from app.database.base import Base

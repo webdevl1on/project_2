@@ -45,6 +45,8 @@ def existing_security_contract(monkeypatch):
 # Stable synthetic-only key configuration; never used by app runtime or real DBs.
 os.environ.setdefault('PROJECT2_MFA_KEYS','{"test":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}')
 os.environ.setdefault('PROJECT2_MFA_CURRENT_KEY','test')
+os.environ.setdefault('PROJECT2_SERVER_NAME','testserver')
+os.environ.setdefault('PROJECT2_PORT','443')
 os.environ.setdefault('PROJECT2_WEBAUTHN_RP_ID','testserver')
 os.environ.setdefault('PROJECT2_WEBAUTHN_ORIGINS','["https://testserver"]')
 from sqlalchemy import event

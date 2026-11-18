@@ -1,13 +1,23 @@
 # Поточний стан project_2
 
+## Security 1.7 — LAN (2026-11-18)
+
+У `codex/security17-lan` від `feature/security` (`5ba9ba6`) реалізовано прямий HTTPS uvicorn, перевірку TCP peer/Host/транспорту перед усіма маршрутами й статикою, приватні CIDR та оновлення інтерфейсів у режимі `auto`. Для Windows є скрипти видачі й поновлення TLS, довіри до CA, Firewall, планувальника, резервного запису `hosts` і діагностики. Порядок запуску та переходу з `localhost` наведено в [PRODUCTION_START.md](PRODUCTION_START.md#етап-lan).
+
+Перевірки виконано в Linux на синтетичних даних.
+
+- `python -m pytest tests/ -q --tb=short` з ізольованою SQLite — 1354 пройшли, 128 PostgreSQL-тестів пропущено. Окремий запуск `python -m pytest tests/postgresql/ -q --tb=short` у `project2_ci` на PostgreSQL 17.11 — усі 128 пройшли. У кожному запуску було два попередження про застарілі інтерфейси тестового клієнта.
+- Тести LAN перевірили мережевий фільтр із керованими адресами та часом, конфігурацію WebAuthn, завантаження тестової TLS-пари в uvicorn без відкриття сокета й ротацію журналу. Парсер PowerShell 7.6.9 перевірив усі сім скриптів і спільний модуль. Оновлення запису `hosts` перевірено на тестових даних у кількох кодуваннях.
+
+На реальному Windows-ПК досі потрібно перевірити видачу/перевипуск через Windows PKI, ACL приватних ключів, довіру браузерів, mDNS, фактичні префікси NetTCPIP, профіль Firewall, автозапуск після перезавантаження та вхід із клієнтських ПК. Середовище перевірки не містить цих Windows-служб або фізичної LAN `foxlys`.
+
 ## Підготовка до робочого запуску (2026-11-17)
 
 - Виправлено несумісність із PyOTP 2.12: `provisioning_uri` у `app/services/mfa.py` викликається з `name=`; на чистій установці налаштування TOTP падало з `TypeError`. Бібліотеки безпеки/БД у `requirements.txt` закріплено точними версіями.
 - Додано [PRODUCTION_START.md](PRODUCTION_START.md) — покроковий перший запуск production з нуля на сервер-ПК (лише localhost) і `scripts/generate_production_secrets.py` (друкує ключі, нічого не записує).
 - Фактично перевірено в Linux-контейнері (PostgreSQL 16): повний набір на SQLite, JS 64 passed; сценарій PRODUCTION_START на окремій тестовій БД `project2_prod` — `alembic upgrade head` (0011), schema check, `seed_postgresql` (46 new, 0 conflicts), bootstrap, `mfa_keys --initialize`, вхід → перехід до `/auth/mfa`, HTTP із не-localhost Host → 403.
 - Не перевірено тут: 22 PostgreSQL-тести резервування/drill/Chromium (потрібні PostgreSQL 17, CREATEDB для drill, Chromium за очікуваним шляхом). Їх треба повторити на Windows-ПК.
-- Security 1.7 (LAN) ще не реалізовано; погоджені рішення й промпт для Codex — [codex/SECURITY17_LAN.md](codex/SECURITY17_LAN.md): сервер `foxlys` → `https://foxlys.local:8443` (mDNS, без налаштування роутера), HTTPS у uvicorn від власного CA, підмережі `auto`, Firewall лише для Private, автозапуск через Task Scheduler.
-- Наступні етапи: Security 1.7 (LAN 8 ПК: HTTPS, DNS-ім'я для WebAuthn, обмеження підмережі, служба Windows) та фундамент майбутньої веб-версії (UUID записів, класи чутливості полів, `PROJECT2_EDITION`).
+- У планах після LAN — фундамент майбутньої веб-версії (UUID записів, класи чутливості полів, `PROJECT2_EDITION`).
 
 ## Security 1.6 — резервування, аварійний архів та аудит
 

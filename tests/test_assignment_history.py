@@ -5,7 +5,7 @@ from datetime import date as D, timedelta
 import pytest
 from sqlalchemy import event, text
 from sqlalchemy.exc import DBAPIError
-from fastapi.testclient import TestClient
+from tests.http_auth import LoopbackClient as TestClient
 from lxml import html
 from app.models import PersonAssignment, AssignmentAudit, Position, StaffVersion
 from app.services.staff_service import StaffService as Service, assignments_at

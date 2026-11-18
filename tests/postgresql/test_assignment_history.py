@@ -107,7 +107,7 @@ def test_concurrent_edit_annul_revision_and_audit_not_lost(pg_factory):
 
 
 def test_postgresql_two_real_cookie_authors_and_unknown_actor(pg_factory,monkeypatch):
-    from fastapi.testclient import TestClient
+    from tests.http_auth import LoopbackClient as TestClient
     from app.main import app
     from app.database.db import get_db
     from app.services import accounts

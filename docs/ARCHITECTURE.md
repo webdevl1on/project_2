@@ -26,6 +26,7 @@ UI ACL: `access_matrix.js` зберігає чинні handlers/DTO, `access_cho
 
 | Завдання | Основні файли |
 | --- | --- |
+| HTTPS та доступ із LAN | `app/serve.py`, `app/security/network.py`, `app/security/lan.py`, `app/main.py`, `scripts/lan/`, [Етап LAN](PRODUCTION_START.md#етап-lan) |
 | Базовий захист усіх HTTP-маршрутів | `docs/SECURITY.md`, `app/security/application.py`, `accounts.py`, `admin.py`, `app/routers/accounts.py`, `app/main.py`, `app/templates/login.html`, `app/static/js/security_session.js` |
 | Керування користувачами / Master | `app/account_policy.py`, `app/models/accounts.py`, `app/repositories/account_repository.py`, `app/services/accounts.py`, `account_management.py`, `promote_master.py`, `app/routers/account_management.py`, `app/templates/admin/user*.html`, `account_audit.html`, `app/templates/account_password.html`, `app/static/js/account_management.js`, `migrations/versions/0006_account_management.py` |
 | MFA / Passkey / власні сесії | `app/models/mfa.py`, `app/services/mfa.py`, `mfa_keys.py`, `recover_master_mfa.py`, `app/repositories/mfa_repository.py`, `app/security/mfa_config.py`, `app/routers/mfa.py`, `app/static/js/security_mfa.js`, `security_session.js`, `migrations/versions/0007_mfa_sessions.py` |
@@ -65,7 +66,11 @@ UI ACL: `access_matrix.js` зберігає чинні handlers/DTO, `access_cho
 
 ```mermaid
 flowchart LR
-    Browser[Браузер: HTML-форми] --> Routers[FastAPI: app/routers]
+    Browser[Браузер] --> TLS[uvicorn HTTPS]
+    TLS --> LAN[LanMiddleware: TCP peer, Host, транспорт]
+    LAN --> Static[Статичні ресурси]
+    LAN --> Policy[application_access: сесія та ACL]
+    Policy --> Routers[FastAPI: app/routers]
     Routers --> Services[app/services]
     Services --> Validators[app/validators та app/utils/date_utils]
     Services --> Repositories[app/repositories]
