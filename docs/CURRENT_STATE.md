@@ -6,6 +6,7 @@
 - Додано [PRODUCTION_START.md](PRODUCTION_START.md) — покроковий перший запуск production з нуля на сервер-ПК (лише localhost) і `scripts/generate_production_secrets.py` (друкує ключі, нічого не записує).
 - Фактично перевірено в Linux-контейнері (PostgreSQL 16): повний набір на SQLite, JS 64 passed; сценарій PRODUCTION_START на окремій тестовій БД `project2_prod` — `alembic upgrade head` (0011), schema check, `seed_postgresql` (46 new, 0 conflicts), bootstrap, `mfa_keys --initialize`, вхід → перехід до `/auth/mfa`, HTTP із не-localhost Host → 403.
 - Не перевірено тут: 22 PostgreSQL-тести резервування/drill/Chromium (потрібні PostgreSQL 17, CREATEDB для drill, Chromium за очікуваним шляхом). Їх треба повторити на Windows-ПК.
+- Security 1.7 (LAN) ще не реалізовано; погоджені рішення й промпт для Codex — [codex/SECURITY17_LAN.md](codex/SECURITY17_LAN.md): сервер `foxlys` → `https://foxlys.local:8443` (mDNS, без налаштування роутера), HTTPS у uvicorn від власного CA, підмережі `auto`, Firewall лише для Private, автозапуск через Task Scheduler.
 - Наступні етапи: Security 1.7 (LAN 8 ПК: HTTPS, DNS-ім'я для WebAuthn, обмеження підмережі, служба Windows) та фундамент майбутньої веб-версії (UUID записів, класи чутливості полів, `PROJECT2_EDITION`).
 
 ## Security 1.6 — резервування, аварійний архів та аудит
