@@ -1,5 +1,11 @@
 # Поточний стан project_2
 
+## Security 1.8 — заплановано (2026-11-19)
+
+Погоджено: обов'язкові сертифікати пристроїв (mTLS) для всіх ПК LAN, включно із сервером; ключ — неекспортований у `Cert:\CurrentUser\My`; окремий Device CA (Python CLI), CRL для відкликання; HSTS. Промпт для Codex — [codex/SECURITY18_DEVICE_CERTS.md](codex/SECURITY18_DEVICE_CERTS.md). Ще не реалізовано.
+
+Фактично на реальних ПК (зі слів користувача, 2026-11-19): LAN-доступ `https://foxlys.local:8443` працює; клієнт зі встановленим `project2-ca.cer` входить без попереджень (ланцюжок із Name Constraints прийнято Windows). Другий клієнт без CA також увійшов — імовірно через обхід попередження браузера; це й стало причиною 1.8.
+
 ## Security 1.7 — LAN (2026-11-18)
 
 У `codex/security17-lan` від `feature/security` (`5ba9ba6`) реалізовано прямий HTTPS uvicorn, перевірку TCP peer/Host/транспорту перед усіма маршрутами й статикою, приватні CIDR та оновлення інтерфейсів у режимі `auto`. Для Windows є скрипти видачі й поновлення TLS, довіри до CA, Firewall, планувальника, резервного запису `hosts` і діагностики. Порядок запуску та переходу з `localhost` наведено в [PRODUCTION_START.md](PRODUCTION_START.md#етап-lan).
