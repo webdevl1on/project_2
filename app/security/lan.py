@@ -10,6 +10,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app.security.accounts import secure_transport
+from app.security.device_tls import SCOPE_TRUST
 from app.security.network import NetworkPolicy, logger
 
 HOST = re.compile(r'(?P<name>[a-zA-Z0-9.-]+|\[::1\])(?::(?P<port>[0-9]{1,5}))?\Z')
@@ -47,6 +48,8 @@ class LanMiddleware:
     async def __call__(self, scope, receive, send):
         if scope['type'] not in ('http', 'websocket'):
             return await self.app(scope, receive, send)
+        if scope['type'] == 'http':
+            send = self.response_headers(send, scope['scheme'] == 'https')
         address = peer_address(scope.get('client'))
         # A Windows adapter refresh can launch PowerShell. Keep it off the ASGI event loop.
         if (address is not None and address.is_private and not address.is_loopback
@@ -56,6 +59,9 @@ class LanMiddleware:
             allowed = address is not None and self.policy.allows(address)
         if not allowed:
             logger.warning('Відхилено мережевий запит IP=%s шлях=%r', address, scope['path'])
+            status = 403
+        elif not self.policy.settings.loopback_only and (
+                self.policy.settings.device_trust is None or scope.get(SCOPE_TRUST) is not self.policy.settings.device_trust):
             status = 403
         elif not permitted_host(scope['headers'], self.policy.settings.server_name, address.is_loopback):
             status = 400
@@ -69,19 +75,21 @@ class LanMiddleware:
             except HTTPException as error:
                 status = error.status_code
             else:
-                return await self.app(scope, receive, self.relative_redirects(send))
+                return await self.app(scope, receive, send)
         if scope['type'] == 'websocket':
             return await send({'type': 'websocket.close', 'code': 1008})
         await Response(status_code=status, headers={'Cache-Control': 'no-store'})(scope, receive, send)
 
     @staticmethod
-    def relative_redirects(send):
+    def response_headers(send, https):
         async def send_response(message):
-            if message['type'] == 'http.response.start' and message['status'] in (307, 308):
-                # Starlette's trailing-slash redirect normally echoes the HTTP authority.
+            if message['type'] == 'http.response.start':
                 headers = MutableHeaders(scope=message)
+                if https:
+                    headers.setdefault('Strict-Transport-Security', 'max-age=31536000')
+                # Starlette's trailing-slash redirect normally echoes the HTTP authority.
                 location = headers.get('location', '')
-                if location.startswith(('http://', 'https://')):
+                if message['status'] in (307, 308) and location.startswith(('http://', 'https://')):
                     target = urlsplit(location)
                     headers['location'] = '/' + target.path.lstrip('/') + (('?' + target.query) if target.query else '')
             await send(message)

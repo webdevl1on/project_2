@@ -18,7 +18,7 @@ def powershell(command):
 
 def test_all_lan_scripts_parse_and_windows_powershell_reads_ukrainian():
     scripts = [*LAN.glob('*.ps1'), *LAN.glob('*.psm1')]
-    assert len(scripts) == 8 and all(p.read_bytes().startswith(b'\xef\xbb\xbf') for p in scripts)
+    assert len(scripts) == 11 and all(p.read_bytes().startswith(b'\xef\xbb\xbf') for p in scripts)
     powershell('''
         $ErrorActionPreference = 'Stop'
         foreach ($script in Get-ChildItem scripts/lan -File) {
@@ -80,3 +80,30 @@ def test_ca_name_constraints_extension_limits_trust_to_lan_server():
     assert [n.value for n in value.permitted_subtrees if isinstance(n, x509.DNSName)] == ['foxlys.local', 'localhost']
     assert [n.value.rfc4514_string() for n in value.permitted_subtrees if isinstance(n, x509.DirectoryName)] == ['CN=foxlys.local']
     assert sorted(str(n.value) for n in value.excluded_subtrees) == ['0.0.0.0/0', '::/0']
+
+
+def test_powershell_recognizes_only_current_project_device_certificates(tmp_path):
+    import os
+    from cryptography.hazmat.primitives.serialization import Encoding, pkcs12
+    from tests.device_pki import PFX_PASSWORD, cli, make_authority, sign_leaf
+
+    directory = tmp_path / 'ca'
+    cli(directory, 'init')
+    pfx = tmp_path / 'pc.pfx'
+    cli(directory, 'issue', '--name', 'pc-1', '--out', pfx)
+    _, device, _ = pkcs12.load_key_and_certificates(pfx.read_bytes(), PFX_PASSWORD.encode())
+    root, signer = make_authority()
+    server, _ = sign_leaf(root, signer)
+    for name, cert in (('device', device), ('server', server)):
+        (tmp_path / name).write_bytes(cert.public_bytes(Encoding.DER))
+    command = r"""
+        $ErrorActionPreference = 'Stop'
+        Import-Module ./scripts/lan/Project2Lan.psm1
+        $device = [Security.Cryptography.X509Certificates.X509Certificate2]::new((Join-Path $env:TEST_PKI_DIR 'device'))
+        $server = [Security.Cryptography.X509Certificates.X509Certificate2]::new((Join-Path $env:TEST_PKI_DIR 'server'))
+        if (-not (Test-Project2DeviceCertificate $device -Current)) { throw 'device' }
+        if (Test-Project2DeviceCertificate $server) { throw 'server' }
+    """
+    result = subprocess.run([POWERSHELL, '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', command],
+                            capture_output=True, timeout=30, env={**os.environ, 'TEST_PKI_DIR': str(tmp_path)})
+    assert result.returncode == 0, (result.stderr + result.stdout).decode(errors='replace')

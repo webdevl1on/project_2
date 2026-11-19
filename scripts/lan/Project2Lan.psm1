@@ -225,4 +225,30 @@ function Update-Project2HostsBytes([byte[]]$Bytes, [string]$ServerName, [Net.IPA
     return ,([byte[]]($preamble + $encoding.GetBytes($outputText.ToString())))
 }
 
-Export-ModuleMember -Function Assert-Project2Administrator, Assert-Project2ServerName, Get-Project2ExternalPath, Assert-Project2TlsDirectory, Set-Project2PrivateDirectory, Get-Project2Fingerprint, Get-Project2CA, ConvertTo-Project2Der, New-Project2NameConstraints, New-Project2Leaf, Get-Project2Port, Update-Project2HostsBytes
+function Test-Project2DeviceCertificate($Certificate, [switch]$Current) {
+    if ($Certificate.Issuer -ne 'CN=Project 2 Device CA') { return $false }
+    $parts = $Certificate.SubjectName.Decode([Security.Cryptography.X509Certificates.X500DistinguishedNameFlags]::UseNewLines) -split '\r?\n'
+    if ('O=Project 2 Devices' -notin $parts -or $Certificate.GetNameInfo('SimpleName', $false) -cnotmatch '^[a-z0-9-]{1,40}$') { return $false }
+    $eku = $Certificate.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.37' }
+    $usage = $Certificate.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.15' }
+    $basic = $Certificate.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.19' }
+    $aki = $Certificate.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.35' }
+    if (-not $aki -or -not $basic -or $basic.CertificateAuthority -or -not $eku -or -not $usage -or
+        -not ($usage.KeyUsages -band [Security.Cryptography.X509Certificates.X509KeyUsageFlags]::DigitalSignature) -or
+        '1.3.6.1.5.5.7.3.2' -notin @($eku.EnhancedKeyUsages | ForEach-Object { $_.Value })) { return $false }
+    $now = Get-Date
+    return (-not $Current -or ($Certificate.NotBefore -le $now -and $now -lt $Certificate.NotAfter))
+}
+
+function Assert-Project2DeviceKey($Certificate) {
+    $key = [Security.Cryptography.X509Certificates.ECDsaCertificateExtensions]::GetECDsaPrivateKey($Certificate)
+    if ($null -eq $key) { throw 'Приватний ключ пристрою недоступний цьому користувачу Windows.' }
+    try {
+        if ($key -isnot [Security.Cryptography.ECDsaCng] -or
+            $key.Key.ExportPolicy -ne [Security.Cryptography.CngExportPolicies]::None) {
+            throw 'Політика ключа допускає експорт або не підтверджена. Перевірте ключ і повторіть імпорт без дозволу експорту.'
+        }
+    } finally { $key.Dispose() }
+}
+
+Export-ModuleMember -Function Assert-Project2Administrator, Assert-Project2ServerName, Get-Project2ExternalPath, Assert-Project2TlsDirectory, Set-Project2PrivateDirectory, Get-Project2Fingerprint, Get-Project2CA, ConvertTo-Project2Der, New-Project2NameConstraints, New-Project2Leaf, Get-Project2Port, Update-Project2HostsBytes, Test-Project2DeviceCertificate, Assert-Project2DeviceKey

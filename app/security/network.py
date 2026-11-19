@@ -16,6 +16,7 @@ import psutil
 
 from app.config import ROOT_DIR
 from app.database.settings import Settings
+from app.security.device_tls import DeviceTrust
 from app.security.mfa_config import relying_party
 
 Address = IPv4Address | IPv6Address
@@ -124,14 +125,19 @@ def protected_paths(storage: Settings) -> tuple[Path, ...]:
     return tuple(roots)
 
 
+def external_path(path: Path, forbidden: tuple[Path, ...], name: str) -> Path:
+    path = path.absolute()
+    resolved = path.resolve()
+    if any(p.is_relative_to(root) for p in (path, resolved) for root in forbidden):
+        raise ValueError(f'{name} має бути поза репозиторієм, static і каталогами даних.')
+    return resolved
+
+
 def tls_file(name: str, forbidden: tuple[Path, ...]) -> Path | None:
     value = os.environ.get(name)
     if not value:
         return None
-    path = Path(value).absolute()
-    resolved = path.resolve()
-    if any(p.is_relative_to(root) for p in (path, resolved) for root in forbidden):
-        raise ValueError(f'{name} має бути поза репозиторієм, static і каталогами даних.')
+    resolved = external_path(Path(value), forbidden, name)
     if not resolved.is_file():
         raise ValueError(f'{name} має вказувати на доступний файл PEM.')
     return resolved
@@ -146,6 +152,7 @@ class NetworkSettings:
     cert: Path | None
     key: Path | None
     networks: tuple[Network, ...] | None
+    device_trust: DeviceTrust | None = None
 
     @classmethod
     def read(cls, storage: Settings):
@@ -181,8 +188,17 @@ class NetworkSettings:
                 raise ValueError('Перевірте PROJECT2_WEBAUTHN_RP_ID та PROJECT2_WEBAUTHN_ORIGINS.') from None
             if rp != name or origin not in origins:
                 raise ValueError(f'PROJECT2_WEBAUTHN_RP_ID має бути {name}, а PROJECT2_WEBAUTHN_ORIGINS має містити {origin}.')
-        return cls(bind, loopback, port, name or 'localhost', cert, key,
-                   explicit_networks(os.environ.get('PROJECT2_ALLOWED_NETWORKS', 'auto').strip()))
+        networks = explicit_networks(os.environ.get('PROJECT2_ALLOWED_NETWORKS', 'auto').strip())
+        trust = None
+        if not loopback:
+            ca = tls_file('PROJECT2_CLIENT_CA', forbidden)
+            crl = tls_file('PROJECT2_CLIENT_CRL', forbidden)
+            if not ca or not crl:
+                raise ValueError('Для LAN обов’язкові PROJECT2_CLIENT_CA і PROJECT2_CLIENT_CRL. Підготуйте Device CA.')
+            trust = DeviceTrust.read(ca, crl, cert)
+            if trust.renewal_due:
+                logger.warning(trust.summary())
+        return cls(bind, loopback, port, name or 'localhost', cert, key, networks, trust)
 
 
 class NetworkPolicy:

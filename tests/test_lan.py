@@ -5,35 +5,20 @@ import logging
 from pathlib import Path
 import socket
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import ANY, Mock
 
 import pytest
 from fastapi.testclient import TestClient
 
-from app.database.settings import Settings
+from tests.device_pki import lan
 from app.main import app, network_policy
 from app.security import network
 from app import serve
 
 
-@pytest.fixture
-def lan(monkeypatch, tmp_path):
-    storage = Settings('production', None, {'documents': tmp_path / 'documents'})
-    for name in ('cert', 'key'):
-        path = tmp_path / (name + '.pem')
-        path.write_text('synthetic path for mocked TLS startup')
-        monkeypatch.setenv('PROJECT2_TLS_' + name.upper(), str(path))
-    for name, value in {'BIND_HOST': '0.0.0.0', 'SERVER_NAME': 'foxlys.local', 'PORT': '8443',
-                        'ALLOWED_NETWORKS': '192.168.50.0/24,fd21:12::/64,fe80::/64',
-                        'AUTH_ALLOW_LOCAL_HTTP': '0', 'WEBAUTHN_RP_ID': 'foxlys.local',
-                        'WEBAUTHN_ORIGINS': '["https://foxlys.local:8443"]'}.items():
-        monkeypatch.setenv('PROJECT2_' + name, value)
-    monkeypatch.setattr(network_policy, 'settings', network.NetworkSettings.read(storage))
-    return storage
-
-
 def request(peer, path='/auth/login', host='foxlys.local:8443', scheme='https', headers=None):
-    client = TestClient(app, base_url=f'{scheme}://foxlys.local:8443', client=(peer, 32123),
+    trust = network_policy.settings.device_trust
+    client = TestClient(trust.application(app) if trust else app, base_url=f'{scheme}://foxlys.local:8443', client=(peer, 32123),
                         follow_redirects=False)
     try:
         return client.get(path, headers=[('Host', host), *(headers or [])])
@@ -174,8 +159,8 @@ def test_serve_passes_direct_tls_settings_without_forwarding_or_secrets(lan, mon
     run = Mock(); monkeypatch.setattr(serve.uvicorn, 'run', run)
     serve.main([])
     cfg = network_policy.settings
-    run.assert_called_once_with(app, host='0.0.0.0', port=8443, ssl_certfile=str(cfg.cert), ssl_keyfile=str(cfg.key),
-                                proxy_headers=False, forwarded_allow_ips='', server_header=False,
+    run.assert_called_once_with(ANY, host='0.0.0.0', port=8443, ssl_certfile=str(cfg.cert), ssl_keyfile=str(cfg.key),
+                                ssl_context_factory=cfg.device_trust.ssl_context, proxy_headers=False, forwarded_allow_ips='', server_header=False,
                                 reload=False, workers=1, access_log=False)
     output = capsys.readouterr().out
     assert 'https://foxlys.local:8443' in output and '192.168.50.0/24' in output and 'key.pem' not in output
@@ -188,24 +173,9 @@ def test_launcher_reads_selected_dotenv_and_loads_real_tls_without_opening_a_soc
     import os
     import subprocess
     import sys
-    from datetime import UTC, datetime, timedelta
-    from cryptography import x509
-    from cryptography.hazmat.primitives import hashes, serialization
-    from cryptography.hazmat.primitives.asymmetric import ec
-    from cryptography.x509.oid import NameOID
-
-    key = ec.generate_private_key(ec.SECP256R1())
-    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'foxlys.local')])
-    now = datetime.now(UTC)
-    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
-            .serial_number(1).not_valid_before(now).not_valid_after(now + timedelta(days=1))
-            .add_extension(x509.SubjectAlternativeName([x509.DNSName('foxlys.local')]), critical=False)
-            .sign(key, hashes.SHA256()))
-    (tmp_path / 'cert.pem').write_bytes(cert.public_bytes(serialization.Encoding.PEM))
-    (tmp_path / 'key.pem').write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
-                                                        serialization.NoEncryption()))
+    # The LAN fixture provides a signed server certificate and a separate Device CA/CRL.
     options = ('BIND_HOST', 'PORT', 'SERVER_NAME', 'ALLOWED_NETWORKS', 'TLS_CERT', 'TLS_KEY',
-               'WEBAUTHN_RP_ID', 'WEBAUTHN_ORIGINS')
+               'CLIENT_CA', 'CLIENT_CRL', 'WEBAUTHN_RP_ID', 'WEBAUTHN_ORIGINS')
     settings = {'PROJECT2_' + name: os.environ['PROJECT2_' + name] for name in options}
     settings.update(PROJECT2_ENV='testing', DATABASE_URL='sqlite:///:memory:')
     file = tmp_path / 'server.env'
@@ -217,6 +187,8 @@ def check(app, **kwargs):
     config.load()
     assert config.ssl is not None and config.port == 8443 and config.host == '0.0.0.0'
     assert not config.proxy_headers
+    import ssl
+    assert config.ssl.verify_mode == ssl.CERT_REQUIRED and config.ssl.verify_flags & ssl.VERIFY_CRL_CHECK_LEAF
     print('TLS loaded')
 uvicorn.run = check
 runpy.run_module('app.serve',run_name='__main__')'''

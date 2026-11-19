@@ -56,11 +56,13 @@ def main(argv=None):
             if not config.loopback_only:
                 networks.extend(map(str, network_policy.allowed_networks()))
             scheme = 'https' if config.cert else 'http'
+            trust = config.device_trust
             print(f'Project 2 · {scheme}://{config.server_name}:{config.port} · {mode} · '
-                  f'дозволено {", ".join(networks)}', flush=True)
-            uvicorn.run(app, host=config.bind_host, port=config.port,
+                  f'дозволено {", ".join(networks)}' + (f' · {trust.summary()}' if trust else ''), flush=True)
+            uvicorn.run(trust.application(app) if trust else app, host=config.bind_host, port=config.port,
                         ssl_certfile=str(config.cert) if config.cert else None,
                         ssl_keyfile=str(config.key) if config.key else None,
+                        ssl_context_factory=trust.ssl_context if trust else None,
                         proxy_headers=False, forwarded_allow_ips='', server_header=False,
                         reload=False, workers=1, access_log=False)
         except (ValueError, OSError) as error:
