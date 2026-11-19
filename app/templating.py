@@ -15,7 +15,16 @@ def security_context(request):
     # Navigation metadata only: reuse the evaluator's existing read decision for real units.
     org_visible=bool(user and (user.role=='admin' or e and (e.allowed('organization') or any(e.allowed('organization',unit_id=key) for key in e.states))))
     return {'acl_allow':allowed,'acl_manage':bool(e and e.can_manage_rules),'security_csrf':getattr(request.state,'csrf_token',''),
-            'security_user':user,'ui_org_visible':org_visible}
+            'security_user':user,'ui_org_visible':org_visible,'ui_device_crl':device_crl_notice(request,user)}
+
+
+def device_crl_notice(request,user):
+    # Only the TLS listener of app.serve puts the verified DeviceTrust into the ASGI scope.
+    from app.security.device_tls import SCOPE_TRUST
+    trust=request.scope.get(SCOPE_TRUST)
+    if trust is None or user is None or user.role not in ('master','admin') or not trust.renewal_due:return None
+    days=trust.days_left()
+    return {'next_update':trust.next_update,'days_left':days,'critical':days<7}
 
 
 templates = Jinja2Templates(directory="app/templates", context_processors=[security_context])

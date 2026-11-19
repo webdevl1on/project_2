@@ -10,6 +10,7 @@ import sys
 import uvicorn
 
 from app.config import ROOT_DIR
+from app.security import listener_loop
 
 
 class TaskLog(RotatingFileHandler):
@@ -59,7 +60,9 @@ def main(argv=None):
             trust = config.device_trust
             print(f'Project 2 · {scheme}://{config.server_name}:{config.port} · {mode} · '
                   f'дозволено {", ".join(networks)}' + (f' · {trust.summary()}' if trust else ''), flush=True)
+            listener_loop.configure(trust)
             uvicorn.run(trust.application(app) if trust else app, host=config.bind_host, port=config.port,
+                        loop='app.security.listener_loop:lan_event_loop',
                         ssl_certfile=str(config.cert) if config.cert else None,
                         ssl_keyfile=str(config.key) if config.key else None,
                         ssl_context_factory=trust.ssl_context if trust else None,

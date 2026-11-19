@@ -63,6 +63,10 @@ class DeviceTrust:
     def renewal_due(self):
         return self.next_update - datetime.now(UTC) < timedelta(days=30)
 
+    def days_left(self, now=None):
+        # Whole days until nextUpdate; 0 on the last day, negative once expired.
+        return (self.next_update - (now or datetime.now(UTC))).days
+
     def summary(self):
         return (f'mTLS: Device CA {self.fingerprint.hex()[:16]}, CRL до {self.next_update:%Y-%m-%d %H:%M UTC}, '
                 f'відкликано {self.revoked}' + (' · Залишилося менше 30 днів, поновіть CRL до вказаної дати.'

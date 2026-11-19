@@ -159,11 +159,14 @@ def test_serve_passes_direct_tls_settings_without_forwarding_or_secrets(lan, mon
     run = Mock(); monkeypatch.setattr(serve.uvicorn, 'run', run)
     serve.main([])
     cfg = network_policy.settings
-    run.assert_called_once_with(ANY, host='0.0.0.0', port=8443, ssl_certfile=str(cfg.cert), ssl_keyfile=str(cfg.key),
+    run.assert_called_once_with(ANY, host='0.0.0.0', port=8443, loop='app.security.listener_loop:lan_event_loop',
+                                ssl_certfile=str(cfg.cert), ssl_keyfile=str(cfg.key),
                                 ssl_context_factory=cfg.device_trust.ssl_context, proxy_headers=False, forwarded_allow_ips='', server_header=False,
                                 reload=False, workers=1, access_log=False)
     output = capsys.readouterr().out
     assert 'https://foxlys.local:8443' in output and '192.168.50.0/24' in output and 'key.pem' not in output
+    from app.security import listener_loop
+    assert listener_loop._device_trust is cfg.device_trust
     log = tmp_path / 'task.log'
     serve.main(['--log-file', str(log)])
     assert 'https://foxlys.local:8443' in log.read_text()

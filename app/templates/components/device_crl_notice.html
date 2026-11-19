@@ -1,0 +1,7 @@
+{# Master/Admin only: device CRL deadline; renewal needs the offline CA password, never the web app. #}
+<div class="alert {{ 'alert-danger' if ui_device_crl.critical else 'alert-warning' }}" role="alert">
+<strong>{% if ui_device_crl.days_left < 0 %}Список відкликаних сертифікатів пристроїв прострочено — нові підключення з LAN відхиляються.{% else %}Список відкликаних сертифікатів пристроїв діє до {{ ui_device_crl.next_update.strftime('%d.%m.%Y') }} (залишилось днів: {{ ui_device_crl.days_left }}).{% endif %}</strong>
+Після цієї дати сервер не пускатиме жоден ПК. На сервері в PowerShell у каталозі застосунку виконайте
+<code>.\.venv\Scripts\python.exe -m app.security.device_ca crl --dir C:\project2-secrets\device-ca</code>,
+потім <code>.\scripts\lan\Restart-Project2Task.ps1</code>.
+</div>

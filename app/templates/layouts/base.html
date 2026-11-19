@@ -16,6 +16,7 @@
 {% set ui_page_title=self.title() %}
 {% block navigation %}{% include 'components/app_navigation.html' %}{% endblock %}
 <div id="app-workspace" class="ui-workspace {% block workspace_class %}{% endblock %}" role="{% block workspace_role %}main{% endblock %}" tabindex="-1">
+{% if ui_device_crl is defined and ui_device_crl %}{% include 'components/device_crl_notice.html' %}{% endif %}
 {% block breadcrumbs %}
 {% set ui_path=request.url.path if request is defined else '' %}
 {% if security_user is defined and security_user %}
