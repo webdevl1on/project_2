@@ -1,6 +1,6 @@
 """LAN admission tests use synthetic ASGI peers, interface snapshots and a clock."""
 from dataclasses import replace
-from ipaddress import ip_address
+from ipaddress import ip_address, ip_network
 import logging
 from pathlib import Path
 import socket
@@ -219,3 +219,35 @@ def test_background_task_captures_both_streams_and_rotates_logs(lan, monkeypatch
     current = log.read_text(encoding='utf-8')
     assert 'synthetic stdout' in current and 'synthetic stderr' in current
     assert (tmp_path / 'server.log.1').read_bytes().startswith(b'old-run')
+
+
+def test_boot_time_discovery_failure_retries_every_10_seconds(caplog):
+    clock = [100.0]
+    calls = []
+    results = [OSError('network not ready'), (), (ip_network('192.168.0.0/24'),)]
+
+    def discover():
+        calls.append(clock[0])
+        result = results.pop(0) if results else (ip_network('192.168.0.0/24'),)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    settings = replace(network_policy.settings, networks=None, loopback_only=False)
+    with caplog.at_level('INFO', logger=network.logger.name):
+        policy = network.NetworkPolicy(settings, discover=discover, clock=lambda: clock[0])
+        client = ip_address('192.168.0.20')
+        assert not policy.allows(client) and len(calls) == 1
+        clock[0] += 9.9
+        assert not policy.allows(client) and len(calls) == 1
+        clock[0] += 0.1  # failed: retry after 10 s; an empty result is retried the same way
+        assert not policy.allows(client) and len(calls) == 2
+        clock[0] += 10
+        assert policy.allows(client) and len(calls) == 3
+        clock[0] += 59
+        assert policy.allows(client) and len(calls) == 3  # healthy: back to the 60 s interval
+        clock[0] += 1
+        assert policy.allows(client) and len(calls) == 4
+    warnings = [r for r in caplog.records if 'Не вдалося прочитати' in r.getMessage()]
+    assert len(warnings) == 1 and 'Повтор кожні 10 с' in warnings[0].getMessage()
+    assert 'Мережеві інтерфейси прочитано: 192.168.0.0/24.' in caplog.text

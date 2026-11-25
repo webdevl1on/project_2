@@ -1,5 +1,9 @@
 # Поточний стан project_2
 
+## Мережа після перезавантаження (2026-11-25)
+
+На реальному сервері після перезавантаження Windows `auto` не прочитав інтерфейси (мережа ще не готова) і хвилину пускав лише loopback. Тепер `NetworkPolicy` повторює спробу кожні 10 с, доки не отримає приватні підмережі (збій або порожній результат), пише одне попередження і рядок «Мережеві інтерфейси прочитано: …», далі — звичний інтервал 60 с. Тест: `test_boot_time_discovery_failure_retries_every_10_seconds`. Того ж дня на сервері: диск конвертовано в GPT/UEFI, увімкнено fTPM, BitLocker на C: і F: (автоматичне розблокування F:), PostgreSQL і файлові сховища перенесено на F:.
+
 ## Security 1.8 — сертифікати пристроїв і HSTS (2026-11-19)
 
 На реальних ПК (зі слів користувача): mTLS увімкнено на `foxlys`, `Test-Project2Lan.ps1` — mTLS, HSTS і HTTP 200 (TLS 1.2). Після рев'ю додано: банер строку CRL для Master/Admin, щоденну перевірку CRL у журналі й тихий облік обірваних зʼєднань замість traceback `WinError 10054` (`app/security/listener_loop.py`, `components/device_crl_notice.html`, `tests/test_listener_loop.py`). Перевірено в Linux: нові тести 22 passed, LAN/mTLS/Device CA 112 passed, повний SQLite-набір без нових падінь, реальний `app.serve` із новим циклом. На Windows придушення traceback ще не перевірене.

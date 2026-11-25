@@ -26,6 +26,8 @@ V6_PRIVATE = tuple(map(ip_network, ('fc00::/7', 'fe80::/10', '::1/128')))
 # These globally reachable anycast addresses are inside an otherwise private IANA block.
 V4_PUBLIC_EXCEPTIONS = (IPv4Address('192.0.0.9'), IPv4Address('192.0.0.10'))
 logger = logging.getLogger('uvicorn.error.project2.lan')
+REFRESH_SECONDS = 60
+RETRY_SECONDS = 10
 
 
 def private_network(network: Network) -> bool:
@@ -210,6 +212,7 @@ class NetworkPolicy:
         self._lock = Lock()
         self._next_refresh = float('-inf')
         self._cached = ()
+        self._degraded = False
         if not settings.loopback_only:
             self.allowed_networks()  # Initial discovery before accepting remote requests.
 
@@ -221,10 +224,20 @@ class NetworkPolicy:
             if now >= self._next_refresh:
                 try:
                     self._cached = self._discover()
+                    failed = False
                 except (OSError, subprocess.SubprocessError, UnicodeError, psutil.Error):
                     self._cached = ()
-                    logger.warning('Не вдалося прочитати мережеві інтерфейси. Доступний лише loopback.')
-                self._next_refresh = now + 60
+                    failed = True
+                # Right after Windows boot the network is often not ready yet: retry soon
+                # while nothing usable is known, then fall back to the normal interval.
+                retry = failed or not self._cached
+                if retry and not self._degraded:
+                    logger.warning('Не вдалося прочитати мережеві інтерфейси. Доступний лише loopback. '
+                                   'Повтор кожні %d с.', RETRY_SECONDS)
+                elif not retry and self._degraded:
+                    logger.info('Мережеві інтерфейси прочитано: %s.', ', '.join(map(str, self._cached)))
+                self._degraded = retry
+                self._next_refresh = now + (RETRY_SECONDS if retry else REFRESH_SECONDS)
             return self._cached
 
     def allows(self, address: Address) -> bool:
