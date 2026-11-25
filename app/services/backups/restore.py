@@ -17,6 +17,14 @@ def target_url(value):
     if url.drivername!='postgresql+psycopg' or not url.host or set(url.query)-SSL_OPTIONS.keys() or not re.fullmatch('project2_restore_[a-f0-9]{8,32}',url.database or ''):raise ValueError('RESTORE_REQUIRES_NEW_ISOLATED_DATABASE')
     return url
 
+def restore_list(listing,schema):
+    """pg_dump --schema=X always emits CREATE SCHEMA X (and its COMMENT). A fresh target
+    already has `public`, so for a schema that exists in the target only those two TOC
+    entries are dropped; everything else is restored unchanged in one transaction."""
+    if not schema:return listing
+    entry=re.compile(rb'^\d+; \d+ \d+ (?:SCHEMA - |COMMENT - SCHEMA )'+re.escape(schema.encode())+rb'(?: |\r?$)')
+    return b''.join(line for line in listing.splitlines(keepends=True) if not entry.match(line))
+
 def fingerprint(url):return hashlib.sha256(canonical({'host':url.host,'port':url.port or 5432,'database':url.database,'username':url.username,'tls':dict(url.query)})).hexdigest()
 
 def empty(engine):
@@ -84,9 +92,14 @@ def _apply(backup,plan_id,target,output_root,*,actor,confirmed,authorize=None):
             result['consumed']=True;backup.ring.save(config.root/'plans'/(plan_id+'.json'),result)
             with tempfile.TemporaryDirectory(prefix='restore-',dir=output.parent) as raw:
                 stage=Path(raw);env_stage=stage/'client';private_dir(env_stage)
-                with engine.begin() as db:db.execute(text('CREATE EXTENSION IF NOT EXISTS btree_gist'))
+                with engine.begin() as db:
+                    db.execute(text('CREATE EXTENSION IF NOT EXISTS btree_gist'))
+                    schema_exists=bool(db.scalar(text('SELECT 1 FROM pg_namespace WHERE nspname=:s'),{'s':manifest['schema']}))
                 with Repo.client(url,env_stage) as env:
-                    Repo.tool(config,'pg_restore',['--no-owner','--no-privileges','--exit-on-error','--single-transaction','--dbname='+url.database,str(root/'database.dump')],env)
+                    dump=str(root/'database.dump');listing=env_stage/'restore.list'
+                    with open(listing,'wb') as out:Repo.tool(config,'pg_restore',['--list',dump],env,output=out)
+                    listing.write_bytes(restore_list(listing.read_bytes(),manifest['schema'] if schema_exists else None))
+                    Repo.tool(config,'pg_restore',['--no-owner','--no-privileges','--exit-on-error','--single-transaction','--use-list='+str(listing),'--dbname='+url.database,dump],env)
                 engine.dispose();engine=create_engine(url,hide_parameters=True,connect_args={'options':'-c search_path='+manifest['schema']+',public -c timezone=UTC'})
                 require_postgresql_schema(engine)
                 with engine.connect() as db:
