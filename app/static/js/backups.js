@@ -53,6 +53,7 @@
   if (!root) return;
   const get = selector => root.querySelector(selector);
   const message = get('[data-backup-message]');
+  const emergencyAccepted = get('[data-emergency-accepted]');
   const list = get('[data-backup-list]');
   const select = get('[data-usb-volume]');
   const actionsBySelector = {
@@ -278,6 +279,7 @@
   async function run(type, path, body = {}, key = type) {
     if (submitting.has(type)) return;
     submitting.add(type);
+    if (type === 'emergency') emergencyAccepted.textContent = '';
     setNotice(key);
     render();
     try {
@@ -288,7 +290,11 @@
         .sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 5);
       state.active_jobs = (state.active_jobs || []).filter(row => row.id !== job.id);
       if (isActive(job)) state.active_jobs.push(job);
-      message.textContent = 'Завдання прийнято worker.';
+      if (type === 'emergency') {
+        emergencyAccepted.textContent = 'Завдання створення нової версії Excel прийнято обробку.';
+      } else {
+        message.textContent = 'Завдання прийнято worker.';
+      }
     } catch (error) {
       if (error.mfa) mfaAction = key;
       setNotice(key, error.message);

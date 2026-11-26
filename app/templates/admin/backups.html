@@ -1,5 +1,5 @@
 {% extends 'layouts/base.html' %}
-{% from 'components/ui.html' import page_header %}
+{% from 'components/ui.html' import page_header, tabs %}
 {% block title %}Резервне копіювання{% endblock %}
 {% block head %}<link href="/static/css/access.css" rel="stylesheet">
 <link href="/static/css/backups.css" rel="stylesheet">{% endblock %}
@@ -10,80 +10,94 @@
   {{ page_header('Резервне копіювання', 'Щогодинні узгоджені повні копії PostgreSQL, документів і фотографій') }}
   <p data-backup-message data-access-message role="status"></p>
   <p data-backup-warning class="alert alert-warning" hidden></p>
-  <details class="card card-body mb-3" data-backup-guide open>
-    <summary class="fw-semibold">Як користуватися</summary>
-    <ol class="mt-2 mb-0">
-      <li>Резервні копії бази створюються щогодини й перевіряються тестовим відновленням автоматично.</li>
-      <li>Читабельна копія даних в Excel формується щодня о 18:00 за Києвом. Для позачергового формування натисніть «Створити нову версію Excel».</li>
-      <li>Для запису найсвіжіших даних створіть нову версію Excel і дочекайтеся «Готово». Вставте флешку P2-EMERGENCY у сервер. Натисніть «Створити аварійний архів на USB», виберіть носій і натисніть «Підтвердити копіювання». Дочекайтеся «Готово» та безпечно вийміть флешку.</li>
-      <li>На USB копіюється остання готова версія Excel. Щоб сформувати нову версію, використовуйте кнопку Excel.</li>
-    </ol>
-  </details>
+  {{ tabs('backup-tabs', [('overview', 'Огляд'), ('copies', 'Резервні копії'),
+                          ('jobs', 'Останні завдання'), ('events', 'Журнал операцій')], 'overview') }}
+  <div class="tab-content">
+    <div class="tab-pane active" id="backup-tabs-overview" role="tabpanel" aria-labelledby="backup-tabs-overview-tab" tabindex="0">
+      <details class="card card-body mb-3" data-backup-guide open>
+        <summary class="fw-semibold">Як користуватися</summary>
+        <ol class="mt-2 mb-0">
+          <li>Резервні копії бази створюються щогодини й перевіряються тестовим відновленням автоматично.</li>
+          <li>Читабельна копія даних в Excel формується щодня о 18:00 за Києвом. Для позачергового формування натисніть «Створити нову версію Excel».</li>
+          <li>Для запису найсвіжіших даних створіть нову версію Excel і дочекайтеся «Готово». Вставте флешку P2-EMERGENCY у сервер. Натисніть «Створити аварійний архів на USB», виберіть носій і натисніть «Підтвердити копіювання». Дочекайтеся «Готово» та безпечно вийміть флешку.</li>
+          <li>На USB копіюється остання готова версія Excel. Щоб сформувати нову версію, використовуйте кнопку Excel.</li>
+        </ol>
+      </details>
 
-  <section aria-labelledby="backup-versions-title" class="mb-3">
-    <h2 id="backup-versions-title" class="h5">Останні версії <small class="text-body-secondary fs-6">(час за Києвом)</small></h2>
-    <div class="row g-2">
-      <div class="col-12 col-md-4"><div class="card card-body h-100">
-        <h3 class="h6">Остання повна копія бази</h3><p class="mb-0" data-backup-last>—</p>
-      </div></div>
-      <div class="col-12 col-md-4"><div class="card card-body h-100">
-        <h3 class="h6">Остання версія Excel на сервері</h3><p class="mb-0" data-emergency-last>—</p>
-      </div></div>
-      <div class="col-12 col-md-4"><div class="card card-body h-100">
-        <h3 class="h6">Остання копія на USB</h3><p class="mb-0" data-usb-last>—</p>
-        <p class="badge text-bg-warning align-self-start text-wrap mt-2 mb-0" data-usb-outdated hidden>На флешці не найсвіжіша версія</p>
-      </div></div>
+      <section aria-labelledby="backup-versions-title" class="mb-3">
+        <h2 id="backup-versions-title" class="h5">Останні версії <small class="text-body-secondary fs-6">(час за Києвом)</small></h2>
+        <div class="row g-2">
+          <div class="col-12 col-md-4"><div class="card card-body h-100">
+            <h3 class="h6">Остання повна копія бази</h3><p class="mb-0" data-backup-last>—</p>
+          </div></div>
+          <div class="col-12 col-md-4"><div class="card card-body h-100">
+            <h3 class="h6">Остання версія Excel на сервері</h3><p class="mb-0" data-emergency-last>—</p>
+          </div></div>
+          <div class="col-12 col-md-4"><div class="card card-body h-100">
+            <h3 class="h6">Остання копія на USB</h3><p class="mb-0" data-usb-last>—</p>
+            <p class="badge text-bg-warning align-self-start text-wrap mt-2 mb-0" data-usb-outdated hidden>На флешці не найсвіжіша версія</p>
+          </div></div>
+        </div>
+      </section>
+
+      <section class="card card-body mb-3" data-backup-current-section hidden>
+        <h2 class="h5">Перебіг завдань</h2>
+        <div class="d-grid gap-2" data-backup-current aria-live="polite"></div>
+      </section>
+
+      <dl class="row">
+        <dt class="col-sm-4">Остання невдала спроба</dt><dd class="col-sm-8" data-backup-failure>—</dd>
+        <dt class="col-sm-4">Наступне резервування</dt><dd class="col-sm-8" data-backup-next>—</dd>
+        <dt class="col-sm-4">Зовнішнє сховище</dt><dd class="col-sm-8" data-backup-external>—</dd>
+        <dt class="col-sm-4">Останнє тестове відновлення</dt><dd class="col-sm-8" data-backup-drill>—</dd>
+      </dl>
+      <button type="button" class="btn btn-primary" data-backup-create hidden>Створити резервну копію</button>
+      <button type="button" class="btn btn-outline-secondary" data-backup-refresh>Оновити стан</button>
+      <p data-job-notice="create" class="alert alert-warning mt-2" role="status" hidden></p>
+      <p class="small mt-2">Завдання виконуються на сервері, тож сторінку можна закрити. Повне відновлення запускає Master окремою серверною процедурою.</p>
+
+      <section class="card card-body my-3">
+        <h2 class="h5">Аварійний архів</h2>
+        <p data-emergency-accepted class="text-success mb-0" role="status"></p>
+        <p>Три книги Excel і накопичувальні документи. Попередні версії зберігаються.</p>
+        <div class="d-flex gap-2 flex-wrap">
+          <button type="button" class="btn btn-outline-primary" data-emergency-create hidden>Створити нову версію Excel</button>
+          <button type="button" class="btn btn-primary" data-usb-open hidden>Створити аварійний архів на USB</button>
+        </div>
+        <p data-job-notice="emergency" class="alert alert-warning mt-2 mb-0" role="status" hidden></p>
+        <div data-usb-picker class="mt-3" hidden>
+          <p>Підключіть до сервера дозволений USB з NTFS і розблокованим BitLocker.</p>
+          <label class="form-label" for="backup-usb-volume">Носій</label>
+          <select id="backup-usb-volume" name="volume_id" class="form-select" data-usb-volume></select>
+          <button type="button" class="btn btn-primary mt-2" data-usb-confirm>Підтвердити копіювання</button>
+        </div>
+        <p data-job-notice="usb" class="alert alert-warning mt-2 mb-0" role="status" hidden></p>
+      </section>
+
+      <section class="card card-body my-3">
+        <h2 class="h5">Стан сховища</h2>
+        <p class="small">Щотижневі вимірювання. Приріст з’явиться після накопичення базового вимірювання за 7 днів.</p>
+        <dl class="row" data-storage-statistics></dl>
+        <button type="button" class="btn btn-outline-secondary align-self-start" data-storage-refresh hidden>Оновити вимірювання worker</button>
+        <p data-job-notice="statistics" class="alert alert-warning mt-2 mb-0" role="status" hidden></p>
+      </section>
     </div>
-  </section>
-
-  <section class="card card-body mb-3" data-backup-current-section hidden>
-    <h2 class="h5">Перебіг завдань</h2>
-    <div class="d-grid gap-2" data-backup-current aria-live="polite"></div>
-  </section>
-
-  <dl class="row">
-    <dt class="col-sm-4">Остання невдала спроба</dt><dd class="col-sm-8" data-backup-failure>—</dd>
-    <dt class="col-sm-4">Наступне резервування</dt><dd class="col-sm-8" data-backup-next>—</dd>
-    <dt class="col-sm-4">Зовнішнє сховище</dt><dd class="col-sm-8" data-backup-external>—</dd>
-    <dt class="col-sm-4">Останнє тестове відновлення</dt><dd class="col-sm-8" data-backup-drill>—</dd>
-  </dl>
-  <button type="button" class="btn btn-primary" data-backup-create hidden>Створити резервну копію</button>
-  <button type="button" class="btn btn-outline-secondary" data-backup-refresh>Оновити стан</button>
-  <p data-job-notice="create" class="alert alert-warning mt-2" role="status" hidden></p>
-  <p class="small mt-2">Завдання виконуються на сервері, тож сторінку можна закрити. Повне відновлення запускає Master окремою серверною процедурою.</p>
-  <div class="table-responsive"><table class="table table-sm">
-    <thead><tr><th>Знімок (Київ)</th><th>Тип</th><th>Розмір</th><th>Цілісність</th><th>Тестове відновлення</th><th>Зовнішня копія</th><th>Дії</th></tr></thead>
-    <tbody data-backup-list></tbody>
-  </table></div>
-
-  <section class="card card-body my-3">
-    <h2 class="h5">Аварійний архів</h2>
-    <p>Три книги Excel і накопичувальні документи. Попередні версії зберігаються.</p>
-    <div class="d-flex gap-2 flex-wrap">
-      <button type="button" class="btn btn-outline-primary" data-emergency-create hidden>Створити нову версію Excel</button>
-      <button type="button" class="btn btn-primary" data-usb-open hidden>Створити аварійний архів на USB</button>
+    <div class="tab-pane" id="backup-tabs-copies" role="tabpanel" aria-labelledby="backup-tabs-copies-tab" tabindex="0">
+      <div class="table-responsive backup-catalog-scroll" role="region" aria-label="Таблиця резервних копій" tabindex="0">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Знімок (Київ)</th><th>Тип</th><th>Розмір</th><th>Цілісність</th><th>Тестове відновлення</th><th>Зовнішня копія</th><th>Дії</th></tr></thead>
+          <tbody data-backup-list></tbody>
+        </table>
+      </div>
     </div>
-    <p data-job-notice="emergency" class="alert alert-warning mt-2 mb-0" role="status" hidden></p>
-    <div data-usb-picker class="mt-3" hidden>
-      <p>Підключіть до сервера дозволений USB з NTFS і розблокованим BitLocker.</p>
-      <label class="form-label" for="backup-usb-volume">Носій</label>
-      <select id="backup-usb-volume" name="volume_id" class="form-select" data-usb-volume></select>
-      <button type="button" class="btn btn-primary mt-2" data-usb-confirm>Підтвердити копіювання</button>
+    <div class="tab-pane" id="backup-tabs-jobs" role="tabpanel" aria-labelledby="backup-tabs-jobs-tab" tabindex="0">
+      <div class="d-grid gap-2" data-backup-jobs></div>
     </div>
-    <p data-job-notice="usb" class="alert alert-warning mt-2 mb-0" role="status" hidden></p>
-  </section>
-
-  <section class="card card-body my-3">
-    <h2 class="h5">Стан сховища</h2>
-    <p class="small">Щотижневі вимірювання. Приріст з’явиться після накопичення базового вимірювання за 7 днів.</p>
-    <dl class="row" data-storage-statistics></dl>
-    <button type="button" class="btn btn-outline-secondary align-self-start" data-storage-refresh hidden>Оновити вимірювання worker</button>
-    <p data-job-notice="statistics" class="alert alert-warning mt-2 mb-0" role="status" hidden></p>
-  </section>
-  <h2 class="h5">Останні завдання</h2><div class="d-grid gap-2 mb-3" data-backup-jobs></div>
-  <h2 class="h5">Журнал операцій</h2>
-  <a href="/admin/audit?tab=backup">Фільтри, сортування та TXT-експорт журналу</a>
-  <div data-backup-events></div>
+    <div class="tab-pane" id="backup-tabs-events" role="tabpanel" aria-labelledby="backup-tabs-events-tab" tabindex="0">
+      <a href="/admin/audit?tab=backup">Фільтри, сортування та TXT-експорт журналу</a>
+      <div data-backup-events></div>
+    </div>
+  </div>
   {% with action_reauth=true %}{% include 'components/access_reauth.html' %}{% endwith %}
   <script type="application/json" data-backup-state>{{ backup_status|tojson }}</script>
 </main>

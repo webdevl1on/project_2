@@ -13,7 +13,11 @@ const {chromium}=require('playwright'),{execFileSync}=require('node:child_proces
   await context.addCookies([{name:'project2_user',value:cfg.admin,url:cfg.base}]);
   await page.goto(cfg.base+'/admin/backups');await page.locator('[data-emergency-create]:visible').waitFor();
   await page.locator('[data-emergency-create]').click();
-  const jobDone=name=>page.locator('[data-backup-jobs] article').filter({hasText:name}).getByText('Готово',{exact:true}).waitFor();
+  const confirmation = page.locator('h2:has-text("Аварійний архів") + [data-emergency-accepted]');
+  const accepted = 'Завдання створення нової версії Excel прийнято обробку.';
+  await confirmation.getByText(accepted,{exact:true}).waitFor();
+  assert.equal(await page.locator('[data-backup-message]').textContent(),'');
+  const jobDone=name=>page.locator('[data-backup-current] article').filter({hasText:name}).getByText('Готово',{exact:true}).waitFor();
   await jobDone('Створення нової версії Excel');
   assert.match(await page.locator('[data-emergency-last]').textContent(),/Книги:.*Файли документів і фото: 2/);
   console.log('PASS Security 1.6 UI: Admin creates three real Excel books via the PostgreSQL worker');
