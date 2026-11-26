@@ -86,3 +86,60 @@ def test_usb_root_icacls_grants_use_star_prefixed_sids(monkeypatch, tmp_path):
         assert grants and all(g.startswith('*S-1-') for g in grants), grants
     assert '*S-1-5-21-9-9-9-1002:(OI)(CI)R' in calls[0] and '*S-1-5-21-9-9-9-1002:(OI)(CI)M' in calls[1]
     assert '*S-1-5-18:(OI)(CI)F' in calls[0]
+
+
+class _WinCtypes:
+    """ctypes plus the Windows-only last-error helpers, emulated for any OS."""
+    def __init__(self):
+        import ctypes
+        self._ctypes, self.last = ctypes, 0
+    def __getattr__(self, name):
+        return getattr(self._ctypes, name)
+    def get_last_error(self):
+        return self.last
+    def WinError(self, code=None):
+        return OSError(code, 'synthetic Windows error')
+
+
+def _rename_api(results):
+    c = _WinCtypes()
+    calls = []
+    class Api:
+        def SetFileInformationByHandle(self, handle, cls, buffer, size):
+            raw = bytes(buffer)[:size]
+            ok, error = results[len([x for x in calls if not isinstance(x, tuple)])]
+            calls.append(raw)
+            c.last = 0 if ok else error
+            return ok
+        def CloseHandle(self, handle):
+            calls.append(('close', handle)); return 1
+    return Api(), calls, c
+
+
+def test_rename_uses_full_path_when_windows_accepts_it():
+    from ctypes import wintypes
+    api, calls, c = _rename_api([(1, 0)])
+    safe_files.windows_rename(c, wintypes, api, 5, Path('F:/x/Excel'), 'book.xlsx')
+    assert len(calls) == 1 and str(Path('F:/x/Excel') / 'book.xlsx').encode('utf-16-le') in calls[0]
+
+
+def test_rename_falls_back_to_parent_handle_on_invalid_name(monkeypatch):
+    import ctypes
+    from ctypes import wintypes
+    api, calls, c = _rename_api([(0, 123), (1, 0)])
+    monkeypatch.setattr(safe_files, 'win_open', lambda path, **k: 77)
+    parent = Path('//?/Volume{35b9e986-cabe-11f1-8d4d-047f0e6717be}/Project_2/Excel')
+    safe_files.windows_rename(c, wintypes, api, 5, parent, 'Аудит.xlsx')
+    first, second, closed = calls
+    assert 'Аудит.xlsx'.encode('utf-16-le') in second and b'Volume' not in second.replace(b'\x00', b'')
+    assert (77).to_bytes(ctypes.sizeof(ctypes.c_void_p), 'little') in second  # RootDirectory = parent handle
+    assert closed == ('close', 77)
+
+
+def test_rename_other_errors_are_not_retried(monkeypatch):
+    from ctypes import wintypes
+    api, calls, c = _rename_api([(0, 5)])
+    monkeypatch.setattr(safe_files, 'win_open', lambda path, **k: pytest.fail('no fallback for access denied'))
+    with pytest.raises(OSError):
+        safe_files.windows_rename(c, wintypes, api, 5, Path('F:/x'), 'a')
+    assert len(calls) == 1

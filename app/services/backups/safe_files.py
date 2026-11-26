@@ -137,6 +137,26 @@ def windows_read(path):
     handle=win_open(path)
     with os.fdopen(msvcrt.open_osfhandle(handle,os.O_RDONLY|os.O_BINARY),'rb') as inp:yield inp
 
+def windows_rename(c,w,api,handle,parent,name):
+    """Rename an open file in place (FileRenameInfo, no replace).
+
+    A full Win32 path works for drive-letter roots, but SetFileInformationByHandle
+    rejects a \\?\Volume{GUID}\... path with ERROR_INVALID_NAME (123). Then rename
+    relative to a handle of the (already pinned) parent directory with the bare name.
+    """
+    class Rename(c.Structure):_fields_=[('Flags',w.DWORD),('RootDirectory',w.HANDLE),('FileNameLength',w.DWORD),('FileName',w.WCHAR*1)]
+    def attempt(text,root):
+        encoded=text.encode('utf-16-le');offset=Rename.FileName.offset;buffer=c.create_string_buffer(offset+len(encoded)+2);info=Rename.from_buffer(buffer)
+        info.Flags=0;info.RootDirectory=root;info.FileNameLength=len(encoded);c.memmove(c.addressof(buffer)+offset,encoded,len(encoded))
+        return api.SetFileInformationByHandle(handle,3,buffer,len(buffer))
+    if attempt(str(parent/name),None):return
+    error=c.get_last_error()
+    if error!=123:raise c.WinError(error)
+    directory=win_open(parent,directory=True)
+    try:
+        if not attempt(name,directory):raise c.WinError(c.get_last_error())
+    finally:api.CloseHandle(directory)
+
 def windows_copy(source,parent,name,expected):
     import msvcrt
     c,w,api=winapi();target=parent/name
@@ -152,10 +172,7 @@ def windows_copy(source,parent,name,expected):
             with source.open('rb') as inp:shutil.copyfileobj(inp,out,BLOCK)
             out.flush();os.fsync(out.fileno());out.seek(0)
             if file_hash(out)!=expected:raise ValueError('STORAGE_CHECKSUM_MISMATCH')
-            class Rename(c.Structure):_fields_=[('Flags',w.DWORD),('RootDirectory',w.HANDLE),('FileNameLength',w.DWORD),('FileName',w.WCHAR*1)]
-            encoded=str(target).encode('utf-16-le');offset=Rename.FileName.offset;buffer=c.create_string_buffer(offset+len(encoded));info=Rename.from_buffer(buffer)
-            info.Flags=0;info.RootDirectory=None;info.FileNameLength=len(encoded);c.memmove(c.addressof(buffer)+offset,encoded,len(encoded))
-            if not api.SetFileInformationByHandle(handle,3,buffer,len(buffer)):raise c.WinError(c.get_last_error())
+            windows_rename(c,w,api,handle,parent,name)
         except Exception:
             disposition=w.BOOL(True);api.SetFileInformationByHandle(handle,4,c.byref(disposition),c.sizeof(disposition))
             raise
