@@ -117,9 +117,13 @@ def windows_parents(root,names,create):
         current=Path(root.anchor)
         for name in ('',*root.parts[1:],*names):
             if name:current=current/name
-            if create:
+            # Never mkdir the drive anchor: Windows answers ERROR_ACCESS_DENIED for "F:\",
+            # and may do the same for an existing directory the caller cannot create in.
+            if create and name:
                 try:current.mkdir()
                 except FileExistsError:pass
+                except PermissionError:
+                    if not current.is_dir():raise
             handle=win_open(current,directory=True);stack.callback(api.CloseHandle,handle)
         yield current
 

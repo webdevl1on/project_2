@@ -1,5 +1,9 @@
 # Поточний стан project_2
 
+## Аварійний Excel на Windows: створення папок (2026-11-26)
+
+Перший експорт на робочому сервері падав (`EMERGENCY_GENERATION_FAILED`, внутрішньо `PermissionError 13`): `safe_files.windows_parents` викликав `mkdir` і для кореня диска `F:\`, а Windows відповідає на це ERROR_ACCESS_DENIED, а не «вже існує». Виправлено: корінь диска не створюється; `PermissionError` для вже наявної папки ігнорується, для відсутньої — як і раніше, помилка. Та сама функція використовується для копіювання на USB і зовнішню репліку. Тест `tests/test_safe_files_windows.py` емулює семантику Windows (без виправлення 2 з 3 падають). На робочому Windows-сервері — після оновлення.
+
 ## Відновлення з копії схеми public (2026-11-25)
 
 На робочому сервері перший drill упав: копія знімається `pg_dump --schema=public`, тому містить `CREATE SCHEMA public`, а свіжа ціль відновлення вже має `public` → `pg_restore` відхиляв увесь дамп (`RESTORE_FAILED_TARGET_QUARANTINED` / `BACKUP_DRILL_FAILED`). CI цього не ловив, бо тести працюють у випадковій схемі `project2_test_<uuid>`. Виправлення: `restore.restore_list` — перед відновленням `pg_restore --list`, і якщо схема вже існує в цілі, з TOC прибираються лише записи `SCHEMA - <schema>` та `COMMENT - SCHEMA <schema>`; далі звичайний `pg_restore --single-transaction --use-list`. Формат копій не змінено, наявні копії придатні. Перевірено: `tests/test_restore_list.py`; ручне відтворення на PostgreSQL 16 (без фільтра — та сама помилка, з фільтром — таблиця з EXCLUDE btree_gist відновлена); тести резервування 49 passed. На PostgreSQL 17 робочого сервера — після оновлення.
