@@ -102,7 +102,11 @@ def win_open(path,*,directory=False,write=False):
     c,w,api=winapi()
     access=0x80000000|(0x40000000|0x10000 if write else 0)
     flags=0x00200000|(0x02000000 if directory else 0) # OPEN_REPARSE_POINT, BACKUP_SEMANTICS
-    handle=api.CreateFileW(str(path),access,1,None,1 if write else 3,flags,None)
+    # Directories: share READ|WRITE but never DELETE. Renaming a file into a directory makes
+    # Windows open that directory for writing; FILE_SHARE_READ alone caused a sharing
+    # violation. Withholding FILE_SHARE_DELETE still pins the directory against rename/removal.
+    share=0x3 if directory else 0x1
+    handle=api.CreateFileW(str(path),access,share,None,1 if write else 3,flags,None)
     if handle==w.HANDLE(-1).value:raise c.WinError(c.get_last_error())
     # FILE_ATTRIBUTE_TAG_INFO includes the reparse flag even with OPEN_REPARSE_POINT.
     info=(w.DWORD*2)()

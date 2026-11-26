@@ -171,7 +171,7 @@ def test_win32_open_denies_reparse_and_never_shares_delete_or_replaces(backup_co
         def CloseHandle(self,handle):closed.append(handle)
     monkeypatch.setattr(safe_files,'winapi',lambda:(ctypes,wintypes,Kernel()))
     assert safe_files.win_open(Path('synthetic-directory'),directory=True)==123
-    args=calls[-1];assert args[2]==1 and args[5]&0x00200000 and args[5]&0x02000000 # no FILE_SHARE_DELETE; open reparse itself
+    args=calls[-1];assert not args[2]&4 and args[2]&2 and args[5]&0x00200000 and args[5]&0x02000000 # never FILE_SHARE_DELETE; share WRITE so a rename into the directory works; open reparse itself
     assert safe_files.win_open(Path('synthetic-new-file'),write=True)==123
     args=calls[-1];assert args[4]==1 and args[1]&0x10000 # CREATE_NEW and DELETE access for handle rename
     attributes[0]=0x400

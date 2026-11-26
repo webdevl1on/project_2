@@ -49,3 +49,22 @@ def test_access_denied_for_missing_directory_still_fails(emulated, tmp_path, mon
     with pytest.raises(PermissionError):
         with safe_files.windows_parents(tmp_path, ('blocked', 'x'), True):
             pass
+
+
+def test_directory_handles_allow_write_sharing_but_never_delete(monkeypatch):
+    calls = []
+    class Api:
+        def CreateFileW(self, path, access, share, *rest):
+            calls.append((path, share)); return 7
+        def GetFileInformationByHandleEx(self, handle, cls, info, size):
+            return 1
+        def CloseHandle(self, handle):
+            return 1
+    import ctypes
+    monkeypatch.setattr(safe_files, 'winapi', lambda: (ctypes, SimpleNamespace(DWORD=ctypes.c_uint32, HANDLE=ctypes.c_ssize_t), Api()))
+    safe_files.win_open('F:/emergency', directory=True)
+    safe_files.win_open('F:/emergency/x.partial', write=True)
+    (_, directory_share), (_, file_share) = calls
+    FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_SHARE_DELETE = 1, 2, 4
+    assert directory_share & FILE_SHARE_WRITE and directory_share & FILE_SHARE_READ
+    assert not directory_share & FILE_SHARE_DELETE and file_share == FILE_SHARE_READ
