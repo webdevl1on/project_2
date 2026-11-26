@@ -86,6 +86,7 @@ def select_volume(backup,identifier):
     return volume,root
 
 def secure_usb_root(backup,root):
+    # icacls treats a bare 'S-1-…' as an account NAME (error 1332); '*S-1-…' is a SID.
     target=root/'Project_2';no_links(target)
     created=not target.exists()
     # Pin every ancestor before running ACL tools; junction substitution must not
@@ -97,7 +98,7 @@ def secure_usb_root(backup,root):
         report=inspect_storage();sids=[report['worker_sid'],'S-1-5-18','S-1-5-32-544',*backup.config.service_sids,*backup.config.archive_sids]
         if any(not re.fullmatch(r'S-1-\d+(?:-\d+)+',s) for s in sids):raise ValueError('STORAGE_SID_INVALID')
         service_count=3+len(backup.config.service_sids)
-        args=['icacls.exe',str(target),'/inheritance:r','/grant:r',*[s+':(OI)(CI)F' for s in sids[:service_count]],*[s+':(OI)(CI)R' for s in sids[service_count:]]]
+        args=['icacls.exe',str(target),'/inheritance:r','/grant:r',*['*'+s+':(OI)(CI)F' for s in sids[:service_count]],*['*'+s+':(OI)(CI)R' for s in sids[service_count:]]]
         try:subprocess.run(args,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=30,check=True)
         except (OSError,subprocess.SubprocessError):raise ValueError('STORAGE_NTFS_ACL_REQUIRED') from None
       private_acl(inspect_storage(target),(*backup.config.service_sids,*backup.config.archive_sids))
@@ -107,7 +108,7 @@ def secure_usb_root(backup,root):
             report=inspect_storage();sids=[report['worker_sid'],'S-1-5-18','S-1-5-32-544',*backup.config.service_sids,*backup.config.archive_sids]
             if any(not re.fullmatch(r'S-1-\d+(?:-\d+)+',s) for s in sids):raise ValueError('STORAGE_SID_INVALID')
             service_count=3+len(backup.config.service_sids)
-            args=['icacls.exe',str(excel),'/inheritance:r','/grant:r',*[s+':(OI)(CI)F' for s in sids[:service_count]],*[s+':(OI)(CI)M' for s in sids[service_count:]]]
+            args=['icacls.exe',str(excel),'/inheritance:r','/grant:r',*['*'+s+':(OI)(CI)F' for s in sids[:service_count]],*['*'+s+':(OI)(CI)M' for s in sids[service_count:]]]
             try:subprocess.run(args,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=30,check=True)
             except (OSError,subprocess.SubprocessError):raise ValueError('STORAGE_NTFS_ACL_REQUIRED') from None
         private_acl(inspect_storage(excel),(*backup.config.service_sids,*backup.config.archive_sids))

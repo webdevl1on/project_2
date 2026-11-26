@@ -6,6 +6,10 @@
 
 Другий збій там само: перейменування `.partial` у кінцеве ім'я (`SetFileInformationByHandle`, FileRenameInfo) відхилялося, бо власні дескриптори батьківських папок були відкриті з `FILE_SHARE_READ`, а Windows під час rename відкриває цільову папку на запис. Тепер папки відкриваються з `FILE_SHARE_READ|FILE_SHARE_WRITE`, але, як і раніше, без `FILE_SHARE_DELETE`: підміна/перейменування самих папок під час запису заблоковані. Оновлено перевірку в `test_security16.py` і додано тест у `test_safe_files_windows.py`.
 
+## Копіювання аварійного архіву на USB: icacls (2026-11-26)
+
+На робочому сервері копіювання на BitLocker-USB зупинялося після створення `Project_2` (`STORAGE_NTFS_ACL_REQUIRED`): `secure_usb_root` передавав `icacls /grant:r` голі SID (`S-1-…`), які icacls трактує як імена облікових записів (помилка 1332), тож закриті права не ставились. Тепер SID передаються як `*S-1-…`. Тест у `tests/test_safe_files_windows.py`. Якщо на USB лишилася порожня `Project_2` від невдалих спроб, її треба видалити вручну: модуль свідомо не приймає наявну папку з відкритими правами.
+
 ## Відновлення з копії схеми public (2026-11-25)
 
 На робочому сервері перший drill упав: копія знімається `pg_dump --schema=public`, тому містить `CREATE SCHEMA public`, а свіжа ціль відновлення вже має `public` → `pg_restore` відхиляв увесь дамп (`RESTORE_FAILED_TARGET_QUARANTINED` / `BACKUP_DRILL_FAILED`). CI цього не ловив, бо тести працюють у випадковій схемі `project2_test_<uuid>`. Виправлення: `restore.restore_list` — перед відновленням `pg_restore --list`, і якщо схема вже існує в цілі, з TOC прибираються лише записи `SCHEMA - <schema>` та `COMMENT - SCHEMA <schema>`; далі звичайний `pg_restore --single-transaction --use-list`. Формат копій не змінено, наявні копії придатні. Перевірено: `tests/test_restore_list.py`; ручне відтворення на PostgreSQL 16 (без фільтра — та сама помилка, з фільтром — таблиця з EXCLUDE btree_gist відновлена); тести резервування 49 passed. На PostgreSQL 17 робочого сервера — після оновлення.

@@ -68,3 +68,21 @@ def test_directory_handles_allow_write_sharing_but_never_delete(monkeypatch):
     FILE_SHARE_READ, FILE_SHARE_WRITE, FILE_SHARE_DELETE = 1, 2, 4
     assert directory_share & FILE_SHARE_WRITE and directory_share & FILE_SHARE_READ
     assert not directory_share & FILE_SHARE_DELETE and file_share == FILE_SHARE_READ
+
+
+def test_usb_root_icacls_grants_use_star_prefixed_sids(monkeypatch, tmp_path):
+    from app.services.backups import windows_storage
+    calls = []
+    monkeypatch.setattr(windows_storage, 'SafeTree', lambda root: SimpleNamespace(parent=lambda *a, **k: __import__('contextlib').nullcontext()))
+    monkeypatch.setattr(windows_storage, 'no_links', lambda p: p)
+    monkeypatch.setattr(windows_storage, 'inspect_storage', lambda path=None: {'worker_sid': 'S-1-5-21-1-2-3-1001', 'volumes': [], 'acl': None})
+    monkeypatch.setattr(windows_storage, 'private_acl', lambda report, allowed: None)
+    monkeypatch.setattr(windows_storage.subprocess, 'run', lambda args, **k: calls.append(args))
+    backup = SimpleNamespace(config=SimpleNamespace(service_sids=(), archive_sids=('S-1-5-21-9-9-9-1002',)))
+    windows_storage.secure_usb_root(backup, tmp_path)
+    assert len(calls) == 2
+    for args in calls:
+        grants = args[4:]
+        assert grants and all(g.startswith('*S-1-') for g in grants), grants
+    assert '*S-1-5-21-9-9-9-1002:(OI)(CI)R' in calls[0] and '*S-1-5-21-9-9-9-1002:(OI)(CI)M' in calls[1]
+    assert '*S-1-5-18:(OI)(CI)F' in calls[0]
