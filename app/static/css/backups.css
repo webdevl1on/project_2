@@ -1,0 +1,12 @@
+[data-backup-panel] [hidden] {
+  display: none !important;
+}
+
+[data-backup-guide] > summary {
+  cursor: pointer;
+}
+
+[data-backup-current] .badge,
+[data-backup-jobs] .badge {
+  overflow-wrap: anywhere;
+}

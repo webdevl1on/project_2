@@ -124,6 +124,7 @@ def test_chromium_emergency_usb_audit_and_fresh_mfa(prepared,tmp_path,monkeypatc
     from tests.mfa_helpers import login
     from app.main import app
     from app.database.db import get_db
+    from app.services import mfa
     from app.services.backups import commands,windows_storage
     backup,factory,ids=prepared
     backup.config=replace(backup.config,emergency_root=tmp_path/'readable',usb_volume_ids=('synthetic-volume',));backup.store.config=backup.config
@@ -136,6 +137,7 @@ def test_chromium_emergency_usb_audit_and_fresh_mfa(prepared,tmp_path,monkeypatc
     monkeypatch.setattr(commands,'settings',backup.settings)
     with factory() as db:
         admin,_=login(db,'backup-admin',PASSWORD)
+        recovery_code=mfa.backup_generate(db,ids['admin'])[0]
         person=db.get(Person,ids['person']);person.personal_number='SECRET-SYNTHETIC-PERSON';db.commit()
         from app.services import audit
         assert audit.filtered(db,'subject',{'q':'SECRET-SYNTHETIC-PERSON'},user_id=ids['admin'])
@@ -148,7 +150,7 @@ def test_chromium_emergency_usb_audit_and_fresh_mfa(prepared,tmp_path,monkeypatc
     server_socket=socket.socket();server_socket.bind(('127.0.0.1',0));server_socket.listen(128);port=server_socket.getsockname()[1]
     server=uvicorn.Server(uvicorn.Config(app,log_level='error'));thread=threading.Thread(target=lambda:server.run(sockets=[server_socket]),daemon=True);thread.start()
     control=tmp_path/'control';control.mkdir()
-    environment={**os.environ,'PROJECT2_BROWSER_SECURITY16':json.dumps({'base':f'http://localhost:{port}','admin':admin,'master':ids['token'],'volume':volume['id'],'control':str(control)})}
+    environment={**os.environ,'PROJECT2_BROWSER_SECURITY16':json.dumps({'base':f'http://localhost:{port}','admin':admin,'master':ids['token'],'volume':volume['id'],'control':str(control),'password':PASSWORD,'recovery_code':recovery_code})}
     process=subprocess.Popen(['node','tests/browser/security16_live.cjs'],env=environment,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
     try:
         deadline=time.monotonic()+120

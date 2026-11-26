@@ -1,9 +1,14 @@
 """Authenticated application use cases; privileged file/restore work stays in the worker/CLI."""
+from datetime import datetime
+
 from app.services import accounts
 from app.services.access_management import fresh
 from app.database.db import settings
 from .config import BackupConfig
 from .engine import BackupEngine
+from .store import stamp
+from .status_view import (ACTIVE_STATES, last_usb, public_backup, public_emergency, public_event,
+                          public_job, public_statistics, with_kyiv)
 
 
 def authorize(db,user_id,*,critical=False):
@@ -13,15 +18,30 @@ def authorize(db,user_id,*,critical=False):
 
 def backend(db):return BackupEngine(db.get_bind(),settings,BackupConfig.load(settings))
 
-def status(db,user_id):
+def status(db,user_id,*,watched_ids=()):
     user=authorize(db,user_id)
     try:
         engine=backend(db);result=engine.store.status()
-        # OS paths, encrypted manifest contents and key identifiers are never returned by HTTP.
-        result['can_run']=True
-        statistics=engine.store.records('statistics');result['statistics']=max(statistics,key=lambda r:r['at']) if statistics else None
-        emergency=engine.store.records('emergency');last=max(emergency,key=lambda r:r['at']) if emergency else None
-        result['emergency']=({k:last[k] for k in ('id','at','day')} if last else None)
+        # Keep durable records private. The HTTP contract contains display metadata only.
+        jobs = sorted(result['jobs'], key=lambda job: datetime.fromisoformat(job['at']), reverse=True)
+        events = result['events']
+        versions = {row['id']: row for row in engine.store.records('emergency') if row.get('ready')}
+        latest = max(versions.values(), key=lambda row: datetime.fromisoformat(row['at']), default=None)
+        statistics = max(engine.store.records('statistics'), key=lambda row: row['at'], default=None)
+        result.update(can_run=True, server_at=stamp(), statistics=public_statistics(statistics),
+                      emergency=public_emergency(latest), last_usb=last_usb(engine, jobs, events, versions, latest),
+                      last_full=next((public_backup(row) for row in result['backups']
+                                      if row['kind'] == 'full' and row['integrity'] == 'VERIFIED'), None),
+                      backups=[public_backup(row) for row in result['backups']],
+                      jobs=[public_job(job) for job in jobs[:5]],
+                      watched_jobs=[public_job(job) for job in jobs if job['id'] in watched_ids],
+                      active_jobs=[public_job(job) for job in jobs if job['state'] in ACTIVE_STATES],
+                      events=[public_event(event) for event in events])
+        for key in ('last_success', 'last_integrity'):
+            result[key] = public_backup(result[key])
+        for key in ('last_failure', 'last_drill'):
+            result[key] = public_event(result[key])
+        with_kyiv(result, 'next_at')
         result['can_export']=False
         if engine.config.emergency_root:
             try:
@@ -29,7 +49,7 @@ def status(db,user_id):
                 authorize_export(db,user.id);result['can_export']=True
             except PermissionError:pass
         return result
-    except (ValueError,TypeError,KeyError,OSError):return {'configured':False,'can_run':False,'backups':[],'jobs':[],'events':[],'message':'Налаштуйте захищений worker, ключі та конфігурацію резервування на сервері.'}
+    except (ValueError,TypeError,KeyError,OSError):return {'configured':False,'can_run':False,'backups':[],'jobs':[],'active_jobs':[],'events':[],'last_full':None,'emergency':None,'last_usb':None,'message':'Налаштуйте захищений worker, ключі та конфігурацію резервування на сервері.'}
 
 def enqueue(db,user_id,operation,identity=None,*,details=None):
     user=authorize(db,user_id,critical=True);engine=backend(db)

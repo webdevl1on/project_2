@@ -8,8 +8,9 @@
  window.addEventListener('message',event=>{
   if(!waiting||event.origin!==location.origin||event.source!==frame.contentWindow||event.data?.type!=='project2:mfa-confirmed')return;
   bootstrap.Modal.getInstance(modal)?.hide();
-  const notice=root.querySelector('[data-access-message]');notice.textContent='Особу підтверджено. Чернетка збережена. Перевірте дані та повторно підтвердьте операцію.';notice.hidden=false;
+  const notice=root.querySelector('[data-access-message]');notice.textContent=root.dataset.mfaReauthConfirmed||'Особу підтверджено. Чернетка збережена. Перевірте дані та повторно підтвердьте операцію.';notice.hidden=false;
   const error=root.querySelector('[data-access-error]');if(error)error.hidden=true;
+  root.dispatchEvent(new Event('project2:mfa-confirmed'));
  });
  root.addEventListener('access:reauth-needed',show);
 })();
